@@ -6,7 +6,8 @@ Godot 4.7 + GDScript retro football game. Design/roadmap: `PLAN.md`. Status tabl
 - Tests: `godot --headless --path . -s addons/gut/gut_cmdln.gd -gconfig=res://.gutconfig.json`
 - Full check (import + tests + sim smoke): `bash tools/run_tests.sh "$GODOT"`
 - Linux/cloud: `source tools/install_godot_linux.sh` first (exports `$GODOT`).
-- Balance sim: `godot --headless --path . -- --sim=300` (add `--verbose` for per-play lines,
+- Full-game balance: `godot --headless --path . -- --ai-vs-ai=40` (~3 min; add `--verbose` for scores).
+- Balance sim (one-drive sandbox): `godot --headless --path . -- --sim=300` (add `--verbose` for per-play lines,
   `--spam=slants` to repeat one play, `--nokey` to disable defensive memory, `--smart` for
   situational calls, `--by-play` for per-play averages). Steps at 60 Hz; prints pts/drive.
 - Debug a single matchup: a throwaway GUT test that builds a PlayRunner, steps `_physics_process`
@@ -46,7 +47,12 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    returns), jump timing (`RatingModel.jump_*`), INT returns/pick six, simple fumbles,
    `DebugOverlay` (F1 / 3 fingers), `DefensePace` + `Settings` autoload. Sandbox `--defend`,
    `--pace=`, `--autosnap`. No route preview for the human defense.
-7. [ ] Phase 3 – full game: clock, quarters, possessions, kicks/FG meter, AI offense, ai_vs_ai sim.
+7. [x] Phase 3 – full game: `MatchController` (scenes/match/match.tscn, main via scenes/boot.tscn
+   router), `GameClock` (NFL-time clock sped up so a 15:00 quarter ≈ Settings.quarter_minutes of
+   play), `GameState` (score/possession/downs/timeouts/stats/OT), `KickModel` (kickoffs, punts,
+   FG/PAT meter), `KickMeter` UI, PAT/2-pt choice, CPU 4th-down/2-pt/timeouts, pause menu,
+   final screen. `--ai-vs-ai=N` batch: ~23 pts/team, 58% comp, 0.9 INT/team, 0 stuck plays
+   (runs 2.9 ypc — still low).
 8. [ ] Phase 4 – roster import (GameData), cards affect play, team picker, lineup.
 9. [ ] Phase 5 – packs, coins, save system, collection.
 10. [ ] Phase 6 – season, challenges, polish.

@@ -18,6 +18,9 @@ func _init(p_agent: PlayerAgent, p_ctx: PlayRunner, p_mark: PlayerAgent) -> void
 func think() -> void:
 	if mark != null:
 		aim = ctx.anticipate(mark) + Vector2(CUSHION, 0.0)
+		# Don't follow a back into the backfield: wait at the second level (where blockers
+		# can reach you) until he comes out.
+		aim.x = maxf(aim.x, ctx.los_x + ctx.tuning.man_hold_depth)
 
 
 func act(_dt: float) -> void:

@@ -12,7 +12,7 @@ config_version=5
 
 config/name="Pocket Gridiron"
 config/description="Retro 2D arcade football with an ultimate-team meta game."
-run/main_scene="res://scenes/debug/drive_sandbox.tscn"
+run/main_scene="res://scenes/boot.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [autoload]

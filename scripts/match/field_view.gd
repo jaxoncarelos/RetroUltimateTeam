@@ -65,6 +65,16 @@ func set_teams(home: TeamData, away: TeamData) -> void:
 	queue_redraw()
 
 
+## The offense always attacks +x, so on a change of possession the end zones swap.
+func set_possession(off_team: TeamData, def_team: TeamData) -> void:
+	left_endzone = off_team.primary
+	right_endzone = def_team.primary
+	left_label = off_team.team_name.to_upper()
+	right_label = def_team.team_name.to_upper()
+	if is_inside_tree():
+		_rebuild_turf()
+
+
 func _rebuild_turf() -> void:
 	_turf = StadiumArt.build_turf(left_endzone, right_endzone)
 	queue_redraw()

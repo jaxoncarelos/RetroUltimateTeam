@@ -4,6 +4,11 @@ extends CanvasLayer
 
 signal play_selected(play: PlayDef)
 signal restart_pressed
+## PUNT / FG / TIMEOUT buttons (by name).
+signal special_pressed(action: String)
+signal pause_pressed
+## A choice panel option was picked (index into the options passed to show_choice).
+signal choice_made(index: int)
 
 const WARN_COLOR := Color("#ff004d")
 const BAR_SIZE := 4
@@ -16,6 +21,14 @@ var _keyed_id := ""
 var _grid: PanelContainer
 var _grid_rows: VBoxContainer
 var _grid_buttons: Dictionary = {}
+
+var _specials: HBoxContainer
+var _pause: Button
+var _choice: PanelContainer
+var _choice_title: Label
+var _choice_body: Label
+var _choice_buttons: VBoxContainer
+var kick_meter: KickMeter
 
 var _down_label: Label
 var _drive_label: Label
@@ -115,6 +128,46 @@ func _ready() -> void:
 	_grid_rows.add_theme_constant_override("separation", 2)
 	grid_box.add_child(_grid_rows)
 
+	# Special teams / timeout buttons (top right, under the pause button).
+	_specials = HBoxContainer.new()
+	_specials.add_theme_constant_override("separation", 3)
+	_anchor(_specials, Vector2(1.0, 0.0), Rect2(-200, 26, 196, 26))
+	_specials.alignment = BoxContainer.ALIGNMENT_END
+	root.add_child(_specials)
+
+	_pause = Button.new()
+	_pause.text = "II"
+	_pause.custom_minimum_size = Vector2(26, 20)
+	_anchor(_pause, Vector2(1.0, 0.0), Rect2(-30, 4, 26, 20))
+	_pause.pressed.connect(func() -> void: pause_pressed.emit())
+	_pause.visible = false
+	root.add_child(_pause)
+
+	kick_meter = KickMeter.new()
+	kick_meter.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(kick_meter)
+
+	_choice = PanelContainer.new()
+	_anchor(_choice, Vector2(0.5, 0.5), Rect2(-110, -70, 220, 140))
+	_choice.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_choice.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_choice.visible = false
+	root.add_child(_choice)
+	var cbox := VBoxContainer.new()
+	cbox.add_theme_constant_override("separation", 4)
+	_choice.add_child(cbox)
+	_choice_title = Label.new()
+	_choice_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_choice_title.add_theme_color_override("font_color", UiTheme.ACCENT)
+	_choice_title.add_theme_font_size_override("font_size", 16)
+	cbox.add_child(_choice_title)
+	_choice_body = Label.new()
+	_choice_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cbox.add_child(_choice_body)
+	_choice_buttons = VBoxContainer.new()
+	_choice_buttons.add_theme_constant_override("separation", 3)
+	cbox.add_child(_choice_buttons)
+
 	_restart = Button.new()
 	_restart.text = "NEW DRIVE"
 	_anchor(_restart, Vector2(0.5, 0.5), Rect2(-48, 10, 96, 24))
@@ -174,6 +227,53 @@ func set_keyed(_plays: Array[PlayDef], keyed_id: String) -> void:
 	_refresh_card_texts()
 	_warning.text = "DEFENSE IS KEYING ON %s" % keyed_name
 	_warning.visible = keyed_name != ""
+
+
+## Buttons like "PUNT", "FG 42", "TIMEOUT 2" (the text before the first space is the action).
+func set_special_actions(actions: Array[String]) -> void:
+	for c in _specials.get_children():
+		_specials.remove_child(c)
+		c.queue_free()
+	for a in actions:
+		var b := Button.new()
+		b.text = a
+		b.custom_minimum_size = Vector2(44, 22)
+		var action := a.get_slice(" ", 0)
+		b.pressed.connect(func() -> void: special_pressed.emit(action))
+		_specials.add_child(b)
+
+
+func show_pause_button(on: bool) -> void:
+	_pause.visible = on
+
+
+## Modal panel with a title, body text and one button per option (choice_made(index)).
+func show_choice(title: String, body: String, options: Array[String]) -> void:
+	_choice_title.text = title
+	_choice_body.text = body
+	_choice_body.visible = body != ""
+	for c in _choice_buttons.get_children():
+		_choice_buttons.remove_child(c)
+		c.queue_free()
+	for i in options.size():
+		var b := Button.new()
+		b.text = options[i]
+		b.custom_minimum_size = Vector2(160, 24)
+		var idx := i
+		b.pressed.connect(func() -> void:
+			_choice.visible = false
+			choice_made.emit(idx))
+		_choice_buttons.add_child(b)
+	_choice.visible = true
+	_choice.reset_size.call_deferred()
+
+
+func hide_choice() -> void:
+	_choice.visible = false
+
+
+func is_choice_open() -> bool:
+	return _choice.visible
 
 
 func show_playbook_grid(on: bool) -> void:
@@ -314,8 +414,13 @@ func _process(delta: float) -> void:
 func is_point_over_ui(p: Vector2) -> bool:
 	if _restart.visible and _restart.get_global_rect().has_point(p):
 		return true
-	if _grid.visible:
-		return true   # the playbook grid is modal
+	if _grid.visible or _choice.visible:
+		return true   # the playbook grid and choice panels are modal
+	if _pause.visible and _pause.get_global_rect().has_point(p):
+		return true
+	for b in _specials.get_children():
+		if b is Control and b.visible and b.get_global_rect().has_point(p):
+			return true
 	if _play_bar.visible:
 		for b in _play_bar.get_children():
 			if b is Control and b.get_global_rect().has_point(p):

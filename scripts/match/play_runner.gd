@@ -607,7 +607,7 @@ func _resolve_arrival() -> void:
 	var def_cov := d.attr("cov") if d != null else 50.0
 	if rng.randf() < RatingModel.catch_prob(t, o.attr("cth"), contest, def_cov):
 		_set_carrier(o)
-	elif d != null and rng.randf() < 0.15:
+	elif d != null and rng.randf() < t.tip_int_chance:
 		_set_carrier(d)
 	else:
 		_end_play("incomplete", Vector2(los_x, ball_y), "DROPPED!" if contest < 0.3 else "BROKEN UP!")

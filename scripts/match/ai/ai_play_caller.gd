@@ -54,6 +54,35 @@ static func pick_defense(plays: Array[PlayDef], memory: DefenseMemory, situation
 	return plays[weighted_index(w, rng)]
 
 
+## CPU 4th-down call: "go", "fg" or "punt". fg_dist/fg_max in yards.
+static func fourth_down(situation: Dictionary, fg_dist: float, fg_max: float) -> String:
+	var to_go := int(situation.get("to_go", 10))
+	var los_x := float(situation.get("los_x", 35.0))
+	var diff := int(situation.get("score_diff", 0))
+	var secs := float(situation.get("seconds_left", 999.0))
+	var in_range := fg_dist <= fg_max - 2.0
+	var late := secs < 240.0
+	if late and diff < 0:
+		# Trailing late: kick only if a FG ties or wins, otherwise keep the ball.
+		if in_range and diff >= -3:
+			return "fg"
+		return "go"
+	if to_go <= 1 and los_x >= FieldGeo.OWN_GOAL + 35.0:
+		return "go"
+	if in_range:
+		return "fg"
+	if to_go <= 2 and los_x >= FieldGeo.OWN_GOAL + 50.0:
+		return "go"
+	return "punt"
+
+
+## CPU after a touchdown: go for two? `diff` = score difference after the 6 points.
+static func go_for_two(diff: int, quarter: int) -> bool:
+	if quarter < 4:
+		return false
+	return diff in [-2, -5, -10, 1, 5]
+
+
 static func weighted_index(weights: PackedFloat32Array, rng: RandomNumberGenerator) -> int:
 	var total := 0.0
 	for w in weights:

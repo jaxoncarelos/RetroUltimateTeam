@@ -13,7 +13,7 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 | 0 | Tooling, project skeleton, Android export | ✅ done (APK builds; on-device check pending) |
 | 1 | One playable offensive drive, placeholder art | ✅ playable in `drive_sandbox` |
 | 2 | Defense playable | ✅ `drive_sandbox -- --defend` |
-| 3 | Full game (clock, both halves, AI opponent) | — |
+| 3 | Full game (clock, both halves, AI opponent) | ✅ main scene (`scenes/match/match.tscn`) |
 | 4 | Roster import, cards affect gameplay | — |
 | 5 | Packs, economy, collection | — |
 | 6 | Season, challenges, polish | — |
@@ -21,7 +21,9 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 ## Running
 
 1. Install **Godot 4.7.x** (standard build, not .NET).
-2. Open `project.godot`, press **F5**. The main scene is the Phase 1 drive sandbox.
+2. Open `project.godot`, press **F5**. You play a full game as KC vs PHI: offense when you
+   have the ball, defense when they do. The drive sandbox is still there for debugging
+   (`scenes/debug/drive_sandbox.tscn`, or launch with `-- --sandbox`).
 
 ### Controls (touch, or mouse on desktop)
 | When | Gesture |
@@ -31,18 +33,25 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 | Snap (run) | press on the QB to snap; keep holding and drag up/down to steer once you have the ball |
 | QB with the ball | drag **back** (slingshot) to aim, release to throw · drag **forward** to scramble |
 | Ball carrier | follows the play's lane on his own · hold + drag up/down to steer · drag back to slow |
-| CPU defense | learns your tendencies: repeat a play and it gets **keyed** (red "DEFENSE IS KEYING ON …" warning) |
 | | flick up/down = juke · double-tap = dive |
+| CPU defense | learns your tendencies: repeat a play and it gets **keyed** (red "DEFENSE IS KEYING ON …" warning) |
 | **Defense** (`-- --defend`) | pick a call (BEST preselected), tap the field when ready |
 | | drag anywhere = move your defender (yellow ring) · tap the ball carrier = dive tackle |
 | | tap the ball's landing marker = leap to swat/pick (time it for the ball's arrival; from far away it sprints you there) |
 | | tap any defender = take control · INT return: drag up/down to steer |
-| Keyboard | `R` restarts the drive · `F1` AI debug overlay (three-finger tap on a phone) |
+| 4th down | **PUNT** / **FG** buttons (top right) · FG/PAT: tap when the meter needle is in the green |
+| After a TD | choose KICK PAT or GO FOR 2 |
+| Anytime | **II** = pause (defense pace, quarter length, restart) · **TIMEOUT** button between plays |
+| Keyboard | `R` restarts the drive (sandbox) · `F1` AI debug overlay (three-finger tap on a phone) |
 
 ### Debug arguments
 ```
+godot --path . -- --watch                 # CPU vs CPU full game (demo)
+godot --headless --path . -- --ai-vs-ai=100   # 100 headless CPU-vs-CPU games, prints averages
+godot --path . -- --home=BUF --away=SF --quarter=1.5   # pick teams / quarter length
+godot --path . -- --sandbox               # the one-drive sandbox (add --defend for defense)
 godot --path . -- --autoplay          # CPU calls plays and throws; watch a drive
-godot --headless --path . -- --sim=300 # 300 autoplay plays at 4x, prints stats, quits
+godot --headless --path . -- --sim=300 # 300 sandbox autoplay plays, prints stats, quits
 godot --headless --path . -- --sim=80 --verbose   # plus one line per play
 godot --headless --path . -- --sim=1000 --smart    # CPU calls plays situationally (PlayAdvisor)
 godot --headless --path . -- --sim=1000 --spam=mesh  # always call one play (defense keys on it)
