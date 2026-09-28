@@ -3,9 +3,6 @@ extends Control
 ## game. Processes the last match result handed back by the match scene: record, coins
 ## (postgame rewards), season/challenge progress.
 
-## Hooks for Phase 6 modes: mode name -> Callable(result) run after a match from that mode.
-static var result_handlers: Dictionary = {}
-
 var prof: Profile
 var _header: Label
 var _message: Label
@@ -109,11 +106,9 @@ func _process_result(r: Dictionary) -> void:
 	if forfeit:
 		head = "FORFEIT vs %s" % r["opponent"]
 	_message.text = "%s   ·   REWARDS +%d COINS\n%s" % [head, rw["total"], "   ".join(lines)]
-	var mode := str(r.get("mode", "quick"))
-	if result_handlers.has(mode):
-		var extra: String = result_handlers[mode].call(r)
-		if extra != "":
-			_message.text += "\n" + extra
+	var extra := ModeResults.apply(r, prof, GameData.db)
+	if extra != "":
+		_message.text += "\n" + extra
 	if rw["total"] > 0:
 		Sfx.play("coin")
 	SaveManager.save()

@@ -153,6 +153,18 @@ func _build_scene(home_team: TeamData, away_team: TeamData) -> void:
 		if phase == Phase.PLAY_CALL and _human_defense():
 			_snap())
 	runner.play_ended.connect(_on_play_ended)
+	runner.big_hit.connect(func(_at: Vector2, speed: float) -> void:
+		if _sim():
+			return
+		Sfx.play("hit")
+		if Settings.shake:
+			camera.add_trauma(clampf(speed / 14.0, 0.15, 0.6)))
+	runner.ball_thrown.connect(func(_t: Vector2) -> void:
+		if not _sim():
+			Sfx.play("throw"))
+	runner.carrier_changed.connect(func(a: PlayerAgent) -> void:
+		if not _sim() and runner.pass_thrown:
+			Sfx.play("catch" if a.team == PlayerAgent.Team.OFFENSE else "big"))
 
 
 ## Lineups: config overrides; else your franchise cards (if home is your franchise) vs the
@@ -164,8 +176,13 @@ func _resolve_lineups(home_abbr: String, away_abbr: String) -> void:
 		return
 	var prof: Profile = SaveManager.profile
 	if human != "" and prof.has_team() and prof.franchise_team == home_abbr and not prof.lineup.is_empty():
-		var mine := TeamRating.match_lineup(Collection.lineup_entries(prof, GameData.db))
-		var your_ovr := Collection.team_ovr(prof, GameData.db) + int(Collection.chemistry(prof, GameData.db))
+		var base_ovr := Collection.team_ovr(prof, GameData.db)
+		var chem := Collection.chemistry(prof, GameData.db)
+		# Franchise Chemistry: your starters play up to +3 OVR better.
+		var entries := TeamRating.rescale_entries(Collection.lineup_entries(prof, GameData.db), base_ovr,
+				int(round(base_ovr + chem)))
+		var mine := TeamRating.match_lineup(entries)
+		var your_ovr := int(round(base_ovr + chem))
 		mine["ovr"] = your_ovr
 		lineups[home_abbr] = mine
 		lineups[away_abbr] = GameData.opponent_lineup(away_abbr, your_ovr, int(config.get("difficulty", Settings.difficulty)))
@@ -231,6 +248,9 @@ func _kicker(team: String) -> Dictionary:
 func _start_game() -> void:
 	phase = Phase.PREGAME
 	hud.show_pause_button(human != "")
+	if config.has("challenge") and human != "":
+		_start_challenge(config["challenge"])
+		return
 	# Coin toss: the human (or the home team) receives the opening kickoff.
 	gs.opening_receiver = gs.home
 	var h: TeamData = teams[gs.home]
@@ -242,6 +262,8 @@ func _start_game() -> void:
 
 ## `kicker` kicks off; the other team starts a possession.
 func _kickoff(kicker: String) -> void:
+	if phase == Phase.FINAL:
+		return
 	var receiver := gs.other(kicker)
 	var x := KickModel.kickoff(tuning, rng, float(_kicker(kicker).get("kpw", 75)))
 	gs.start_possession(receiver, x)
@@ -257,6 +279,8 @@ func _situation() -> Dictionary:
 
 
 func _start_play_call() -> void:
+	if phase == Phase.FINAL or _check_challenge():
+		return
 	if gs.clock.expired():
 		_end_period()
 		return
@@ -318,6 +342,8 @@ func _start_play_call() -> void:
 		_after(0.8, func() -> void:
 			if phase == Phase.PLAY_CALL:
 				_snap())
+	else:
+		_coach_tips()
 
 
 func _ranked_defense(situation: Dictionary) -> Array[PlayDef]:
@@ -559,6 +585,7 @@ func _on_play_ended(r: Dictionary) -> void:
 		_spot_y = FieldGeo.CENTER_Y
 	if not _sim():
 		hud.show_banner(headline, sub, 1.5)
+		_play_juice(type, offense)
 	_update_scorebug()
 	match next:
 		GameState.Next.PAT:
@@ -582,10 +609,57 @@ func _yards_text(yards: int) -> String:
 	return "NO GAIN"
 
 
+## Sound + flash for the result of a play.
+func _play_juice(type: String, offense: String) -> void:
+	var ours := human != "" and offense == human
+	match type:
+		"td":
+			Sfx.play("td" if ours or human == "" else "bad")
+			hud.flash(UiTheme.ACCENT if ours else Color("#ff004d"), 0.55)
+			if Settings.shake:
+				camera.add_trauma(0.35)
+		"int", "int_td", "fumble":
+			Sfx.play("bad" if ours else "big")
+			hud.flash(Color("#ff004d") if ours else Color("#00e436"), 0.45)
+		"sack":
+			Sfx.play("hit")
+		_:
+			Sfx.play("whistle")
+
+
+## First-game coach tips (Settings.tutorial_done once offense and defense were explained).
+var _tips_seen: Dictionary = {}
+
+
+func _coach_tips() -> void:
+	if Settings.tutorial_done or _sim():
+		return
+	var key := ""
+	var text := ""
+	if _human_offense() and gs.downs.down == 4 and not _tips_seen.has("fourth"):
+		key = "fourth"
+		text = "4TH DOWN: PUNT OR KICK A FIELD GOAL WITH THE BUTTONS TOP RIGHT, OR PICK A PLAY TO GO FOR IT."
+	elif _human_offense() and not _tips_seen.has("offense"):
+		key = "offense"
+		text = "YOUR BALL. THE BEST CALL IS PRESELECTED (OR TAP ANOTHER / MORE). PRESS THE QB AND DRAG BACK TO AIM, RELEASE TO THROW. DRAG FORWARD TO RUN."
+	elif _human_defense() and not _tips_seen.has("defense"):
+		key = "defense"
+		text = "DEFENSE! PICK A CALL, THEN TAP THE FIELD. DRAG TO MOVE YOUR MAN (YELLOW RING). TAP THE BALL CARRIER TO DIVE. WHEN THEY THROW, TAP THE LANDING MARKER TO JUMP."
+	if key == "":
+		return
+	_tips_seen[key] = true
+	hud.show_tip(text)
+	if _tips_seen.has("offense") and _tips_seen.has("defense"):
+		Settings.tutorial_done = true
+		Settings.save_settings()
+
+
 # ---------------------------------------------------------------- kicks & tries
 
 func _punt() -> void:
 	phase = Phase.RESULT
+	if not _sim():
+		Sfx.play("kick")
 	var kicker := gs.possession
 	gs.stats[kicker]["punts"] += 1
 	var x := KickModel.punt(tuning, rng, float(_kicker(kicker).get("kpw", 75)), gs.downs.los_x)
@@ -612,6 +686,8 @@ func _field_goal_cpu(dist: float) -> void:
 
 func _resolve_field_goal(good: bool, dist: float, text: String) -> void:
 	phase = Phase.RESULT
+	if not _sim():
+		Sfx.play("kick")
 	var kicker := gs.possession
 	gs.stats[kicker]["fg_att"] += 1
 	gs.clock.tick_live(5.0 / gs.clock.speed)
@@ -644,6 +720,8 @@ func _resolve_field_goal(good: bool, dist: float, text: String) -> void:
 
 ## After a touchdown: kick the extra point or go for two.
 func _pat_phase() -> void:
+	if phase == Phase.FINAL:
+		return
 	var team := gs.possession
 	if team == human:
 		phase = Phase.PAT_CHOICE
@@ -758,6 +836,8 @@ func _ot_over() -> bool:
 func _end_period() -> void:
 	if phase == Phase.BREAK or phase == Phase.FINAL:
 		return
+	if _check_challenge(true):
+		return
 	phase = Phase.BREAK
 	var ended_q := gs.clock.quarter
 	var what := gs.clock.next_period()
@@ -794,6 +874,10 @@ func _end_period() -> void:
 
 
 func _final() -> void:
+	if phase == Phase.FINAL:
+		return
+	if not _chal.is_empty() and _check_challenge(false, true):
+		return
 	phase = Phase.FINAL
 	hud.show_play_bar(false)
 	hud.set_special_actions([] as Array[String])
@@ -819,7 +903,74 @@ func match_result(forfeit := false) -> Dictionary:
 			"def_ints": int(gs.stats[opp]["int"]), "def_sacks": int(gs.stats[opp]["sacks"]),
 			"difficulty": int(config.get("difficulty", Settings.difficulty)),
 			"mode": str(config.get("mode", "quick")), "extra": config.get("extra", {}),
-			"came_back": _comeback}
+			"came_back": _comeback, "challenge_won": _chal_won}
+
+
+# ---------------------------------------------------------------- challenges
+
+var _chal: Dictionary = {}
+var _chal_base: Dictionary = {}
+var _chal_won := false
+
+
+## Sets up a challenge's start state (no kickoff) and starts play.
+func _start_challenge(c: Dictionary) -> void:
+	_chal = c
+	var st: Dictionary = c["start"]
+	var opp := gs.other(human)
+	gs.clock.quarter = int(st["quarter"])
+	gs.clock.seconds_left = float(st["clock"])
+	gs.clock.stopped = true
+	gs.score[human] = int(st["you"])
+	gs.score[opp] = int(st["opp"])
+	gs.opening_receiver = gs.home
+	var team := human if st["ball"] == "you" else opp
+	gs.start_possession(team, FieldGeo.OWN_GOAL + float(st["yard"]))
+	gs.downs.down = int(st["down"])
+	gs.downs.first_down_x = minf(gs.downs.los_x + float(st["to_go"]), FieldGeo.OPP_GOAL)
+	_chal_base = {"you": gs.score[human], "opp": gs.score[opp], "ints": int(gs.stats[opp]["int"]),
+			"you_tds": _tds(human), "ball": team}
+	if not _sim():
+		hud.show_banner(c["title"], c["desc"], 2.6)
+	_after(2.6, _start_play_call)
+
+
+func _tds(team: String) -> int:
+	return int(gs.stats[team]["pass_td"]) + int(gs.stats[team]["rush_td"])
+
+
+## Checks the challenge goal; ends the match if decided. Returns true when it ended.
+func _check_challenge(period_over := false, game_over := false) -> bool:
+	if _chal.is_empty() or phase == Phase.FINAL:
+		return false
+	var opp := gs.other(human)
+	var ev := {
+		"you_tds": _tds(human) - int(_chal_base["you_tds"]),
+		"you_pts": int(gs.score[human]) - int(_chal_base["you"]),
+		"opp_pts": int(gs.score[opp]) - int(_chal_base["opp"]),
+		"ints": int(gs.stats[opp]["int"]) - int(_chal_base["ints"]),
+		"possession_lost": _chal_base["ball"] == human and gs.possession != human,
+		"their_drive_over": _chal_base["ball"] == opp and gs.possession != opp,
+		"period_over": period_over,
+		"game_over": game_over or (period_over and gs.clock.quarter >= 4 and gs.score[human] != gs.score[opp]),
+		"you_lead": gs.score[human] > gs.score[opp],
+	}
+	var res := ChallengeRules.evaluate(_chal["goal"], ev)
+	if res == 0:
+		return false
+	_chal_won = res > 0
+	phase = Phase.FINAL
+	hud.show_play_bar(false)
+	hud.set_special_actions([] as Array[String])
+	hud.set_hint("")
+	if _chal_won:
+		Sfx.play("big")
+		hud.flash(UiTheme.ACCENT, 0.5)
+	else:
+		Sfx.play("bad")
+	hud.show_choice("CHALLENGE COMPLETE!" if _chal_won else "CHALLENGE FAILED", _chal["title"],
+			["CONTINUE"] as Array[String])
+	return true
 
 
 func _final_summary() -> String:

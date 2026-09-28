@@ -13,6 +13,7 @@ var music_volume := 0.6
 var left_handed := false
 var shake := true                    ## screen shake on big hits
 var tutorial_done := false
+var season_games := 8                ## 8 (short) or 17
 
 
 func _ready() -> void:
@@ -20,6 +21,9 @@ func _ready() -> void:
 
 
 func load_settings() -> void:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--ai-vs-ai") or arg.begins_with("--sim="):
+			return   # batch runs use defaults, not the player's settings
 	var cfg := ConfigFile.new()
 	if cfg.load(PATH) != OK:
 		return
@@ -31,6 +35,7 @@ func load_settings() -> void:
 	left_handed = bool(cfg.get_value("controls", "left_handed", left_handed))
 	shake = bool(cfg.get_value("video", "shake", shake))
 	tutorial_done = bool(cfg.get_value("game", "tutorial_done", tutorial_done))
+	season_games = int(cfg.get_value("game", "season_games", season_games))
 
 
 func save_settings() -> void:
@@ -43,5 +48,6 @@ func save_settings() -> void:
 	cfg.set_value("controls", "left_handed", left_handed)
 	cfg.set_value("video", "shake", shake)
 	cfg.set_value("game", "tutorial_done", tutorial_done)
+	cfg.set_value("game", "season_games", season_games)
 	cfg.save(PATH)
 	changed.emit()

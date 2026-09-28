@@ -31,5 +31,20 @@ func snap_to_target() -> void:
 	reset_smoothing()
 
 
+## Screen shake: trauma 0..1 decays; offset = trauma² × max shake (whole pixels).
+var trauma := 0.0
+const SHAKE_PX := 5.0
+
+
+func add_trauma(amount: float) -> void:
+	trauma = clampf(trauma + amount, 0.0, 1.0)
+
+
 func _process(delta: float) -> void:
 	global_position = global_position.lerp(target_position(), 1.0 - exp(-FOLLOW_RATE * delta))
+	if trauma > 0.0:
+		trauma = maxf(0.0, trauma - delta * 1.8)
+		var mag := trauma * trauma * SHAKE_PX
+		offset = Vector2(randf_range(-mag, mag), randf_range(-mag, mag)).round()
+	elif offset != Vector2.ZERO:
+		offset = Vector2.ZERO

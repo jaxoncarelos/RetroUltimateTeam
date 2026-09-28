@@ -69,4 +69,10 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    (48x64 code-drawn), `MetaUI` helpers, `Sfx` autoload (synthesized chiptune).
    Debug: `-- --demo-profile --screen=store` (unsaved KC career). Progression sim in
    test_economy: OVR 65 → 73 (20 games) → 80 (45) → 83 (100).
-10. [ ] Phase 6 – season, challenges, polish.
+10. [x] Phase 6 – `SeasonRules` (league schedule, score model, standings, 7-seed playoffs,
+   Elite pack for the title) + season screen; `ChallengeRules` (11 scenarios + daily from the
+   date) + challenges screen + MatchController challenge mode; `ModeResults` feeds results
+   back; settings screen; Franchise Chemistry boosts your players in matches; juice (hit
+   shake, TD/turnover flash, synthesized SFX); first-game coach tips (Settings.tutorial_done).
+   Not done: left-handed mode, iOS export, on-device perf pass, music.
+Next ideas (after the owner's playtest): see MORNING_NOTES.md.

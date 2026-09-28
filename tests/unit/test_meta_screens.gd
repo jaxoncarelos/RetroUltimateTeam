@@ -71,3 +71,15 @@ func test_hub_processes_rewards() -> void:
 	add_child_autofree(node)
 	await wait_process_frames(2)
 	assert_gt(prof.coins, coins + EconomyRules.WIN_COINS)
+
+
+func test_season_screen() -> void:
+	await _smoke("res://scenes/meta/season.tscn")
+
+
+func test_challenges_screen() -> void:
+	await _smoke("res://scenes/meta/challenges.tscn")
+
+
+func test_settings_screen() -> void:
+	await _smoke("res://scenes/meta/settings.tscn")

@@ -16,7 +16,7 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 | 3 | Full game (clock, both halves, AI opponent) | ✅ main scene (`scenes/match/match.tscn`) |
 | 4 | Roster import, cards affect gameplay | ✅ team picker → your real players as cards |
 | 5 | Packs, economy, collection | ✅ store, packs, collection, lineup, sets, save |
-| 6 | Season, challenges, polish | — |
+| 6 | Season, challenges, polish | ✅ season + playoffs, 11 challenges + daily, settings, SFX, coach tips |
 
 ## Running
 

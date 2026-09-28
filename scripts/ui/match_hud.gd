@@ -9,6 +9,7 @@ signal special_pressed(action: String)
 signal pause_pressed
 ## A choice panel option was picked (index into the options passed to show_choice).
 signal choice_made(index: int)
+signal tip_closed
 
 const WARN_COLOR := Color("#ff004d")
 const BAR_SIZE := 4
@@ -37,6 +38,9 @@ var _banner_sub: Label
 var _hint: Label
 var _warning: Label
 var _tag: Label
+var _flash: ColorRect
+var _tip: PanelContainer
+var _tip_label: Label
 var _play_bar: HBoxContainer
 var _restart: Button
 var _buttons: Dictionary = {}
@@ -83,6 +87,36 @@ func _ready() -> void:
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_hint)
+
+	_flash = ColorRect.new()
+	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_flash.color = Color(1, 1, 1, 0)
+	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_flash)
+
+	_tip = PanelContainer.new()
+	_anchor(_tip, Vector2(0.5, 0.0), Rect2(-150, 40, 300, 60))
+	_tip.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_tip.visible = false
+	root.add_child(_tip)
+	var tip_box := VBoxContainer.new()
+	tip_box.add_theme_constant_override("separation", 4)
+	_tip.add_child(tip_box)
+	var coach := Label.new()
+	coach.text = "COACH SAYS:"
+	coach.add_theme_color_override("font_color", UiTheme.ACCENT)
+	tip_box.add_child(coach)
+	_tip_label = Label.new()
+	_tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tip_label.custom_minimum_size = Vector2(290, 0)
+	tip_box.add_child(_tip_label)
+	var ok := Button.new()
+	ok.text = "GOT IT"
+	ok.custom_minimum_size = Vector2(80, 20)
+	ok.pressed.connect(func() -> void:
+		_tip.visible = false
+		tip_closed.emit())
+	tip_box.add_child(ok)
 
 	_tag = Label.new()
 	_anchor(_tag, Vector2(0.0, 1.0), Rect2(6, -68, 220, 10))
@@ -394,6 +428,24 @@ func set_scorebug(down_text: String, drive_text: String) -> void:
 	_drive_label.text = drive_text
 
 
+## Full-screen color flash (touchdowns, turnovers).
+func flash(color: Color, strength := 0.7) -> void:
+	_flash.color = Color(color, strength)
+	var tw := create_tween()
+	tw.tween_property(_flash, "color:a", 0.0, 0.45)
+
+
+## Coach tip panel (tutorial). Emits tip_closed when dismissed.
+func show_tip(text: String) -> void:
+	_tip_label.text = text
+	_tip.visible = true
+	_tip.reset_size.call_deferred()
+
+
+func tip_open() -> bool:
+	return _tip.visible
+
+
 ## Name/number of the player the human controls ("" hides it).
 func set_player_tag(text: String) -> void:
 	_tag.text = text
@@ -428,8 +480,8 @@ func _process(delta: float) -> void:
 func is_point_over_ui(p: Vector2) -> bool:
 	if _restart.visible and _restart.get_global_rect().has_point(p):
 		return true
-	if _grid.visible or _choice.visible:
-		return true   # the playbook grid and choice panels are modal
+	if _grid.visible or _choice.visible or _tip.visible:
+		return true   # the playbook grid, choice panels and coach tips are modal
 	if _pause.visible and _pause.get_global_rect().has_point(p):
 		return true
 	for b in _specials.get_children():
