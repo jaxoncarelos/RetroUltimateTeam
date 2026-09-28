@@ -1,0 +1,53 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/def_base.tres" id="1_u8yww"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_7s484"]
+
+[resource]
+script = ExtResource("2_7s484")
+id = "cover2"
+display_name = "Cover 2 Zone"
+side = "defense"
+category = "ZONE"
+formation = ExtResource("1_u8yww")
+assignments = {
+"CB1": {
+"center": Vector2(4, -14),
+"size": Vector2(10, 12),
+"type": "zone"
+},
+"CB2": {
+"center": Vector2(4, 14),
+"size": Vector2(10, 12),
+"type": "zone"
+},
+"DL1": {
+"type": "rush"
+},
+"DL2": {
+"type": "rush"
+},
+"DL3": {
+"type": "rush"
+},
+"LB1": {
+"center": Vector2(7, -5),
+"size": Vector2(9, 10),
+"type": "zone"
+},
+"LB2": {
+"center": Vector2(7, 5),
+"size": Vector2(9, 10),
+"type": "zone"
+},
+"S1": {
+"center": Vector2(18, -10),
+"size": Vector2(24, 26),
+"type": "zone"
+},
+"S2": {
+"center": Vector2(18, 10),
+"size": Vector2(24, 26),
+"type": "zone"
+}
+}

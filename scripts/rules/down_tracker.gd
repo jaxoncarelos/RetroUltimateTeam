@@ -1,0 +1,54 @@
+class_name DownTracker
+extends RefCounted
+## Downs, distance and line of scrimmage for the team driving toward +x.
+## Spots are snapped to whole yards.
+
+enum Outcome { NEXT_DOWN, FIRST_DOWN, TOUCHDOWN, TURNOVER_ON_DOWNS, SAFETY }
+
+var down := 1
+var los_x := 35.0
+var first_down_x := 45.0
+var plays := 0
+
+
+func start_drive(x: float) -> void:
+	down = 1
+	plays = 0
+	los_x = round(x)
+	first_down_x = minf(los_x + 10.0, FieldGeo.OPP_GOAL)
+
+
+func to_go() -> int:
+	return int(first_down_x - los_x)
+
+
+func is_goal_to_go() -> bool:
+	return first_down_x >= FieldGeo.OPP_GOAL
+
+
+## Apply the dead-ball spot of a play. Incomplete passes pass the current los_x.
+func apply_spot(spot_x: float, scored_td := false) -> Outcome:
+	plays += 1
+	var spot := clampf(round(spot_x), 0.0, FieldGeo.LENGTH)
+	if scored_td or spot >= FieldGeo.OPP_GOAL:
+		los_x = FieldGeo.OPP_GOAL
+		return Outcome.TOUCHDOWN
+	if spot <= FieldGeo.OWN_GOAL:
+		los_x = FieldGeo.OWN_GOAL
+		return Outcome.SAFETY
+	if spot >= first_down_x:
+		down = 1
+		los_x = spot
+		first_down_x = minf(spot + 10.0, FieldGeo.OPP_GOAL)
+		return Outcome.FIRST_DOWN
+	los_x = spot
+	if down >= 4:
+		return Outcome.TURNOVER_ON_DOWNS
+	down += 1
+	return Outcome.NEXT_DOWN
+
+
+func down_text() -> String:
+	var ordinal: String = ["1ST", "2ND", "3RD", "4TH"][clampi(down - 1, 0, 3)]
+	var dist := "GOAL" if is_goal_to_go() else str(to_go())
+	return "%s & %s" % [ordinal, dist]

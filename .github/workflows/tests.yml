@@ -1,0 +1,23 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  gut:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Godot
+        uses: actions/cache@v4
+        with:
+          path: ~/.godot-bin
+          key: godot-4.7.2-linux
+      - name: Install Godot
+        run: |
+          source tools/install_godot_linux.sh
+          echo "GODOT=$GODOT" >> "$GITHUB_ENV"
+      - name: Unit tests + sim smoke test
+        run: bash tools/run_tests.sh "$GODOT"

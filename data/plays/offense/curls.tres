@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_shotgun.tres" id="1_ay05i"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_usffi"]
+
+[resource]
+script = ExtResource("2_usffi")
+id = "curls"
+display_name = "Curl Flat"
+formation = ExtResource("1_ay05i")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"drop": 2.0,
+"type": "pass"
+},
+"RB": {
+"end": "continue",
+"path": PackedVector2Array(0, -3, 4, -9),
+"type": "route"
+},
+"TE": {
+"end": "sit",
+"path": PackedVector2Array(6, 0, 6, -5),
+"type": "route"
+},
+"WR1": {
+"end": "sit",
+"path": PackedVector2Array(11, 0, 9, 1),
+"type": "route"
+},
+"WR2": {
+"end": "continue",
+"path": PackedVector2Array(8, 0, 8, 6),
+"type": "route"
+}
+}

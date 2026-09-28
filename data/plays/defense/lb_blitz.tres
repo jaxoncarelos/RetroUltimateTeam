@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/def_base.tres" id="1_ayk30"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_qh5kf"]
+
+[resource]
+script = ExtResource("2_qh5kf")
+id = "lb_blitz"
+display_name = "LB Blitz"
+side = "defense"
+category = "BLITZ"
+formation = ExtResource("1_ayk30")
+assignments = {
+"CB1": {
+"target": "WR1",
+"type": "man"
+},
+"CB2": {
+"target": "WR2",
+"type": "man"
+},
+"DL1": {
+"type": "rush"
+},
+"DL2": {
+"type": "rush"
+},
+"DL3": {
+"type": "rush"
+},
+"LB1": {
+"type": "rush"
+},
+"LB2": {
+"type": "rush"
+},
+"S1": {
+"target": "TE",
+"type": "man"
+},
+"S2": {
+"center": Vector2(16, 0),
+"size": Vector2(22, 30),
+"type": "zone"
+}
+}

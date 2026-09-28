@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="FormationDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/formation_def.gd" id="1_l88bn"]
+
+[resource]
+script = ExtResource("1_l88bn")
+id = "off_iform"
+display_name = "I-Form"
+slots = {
+"OL1": {
+"at": Vector2(-1, -3.6),
+"pos": "OL"
+},
+"OL2": {
+"at": Vector2(-1, -1.2),
+"pos": "OL"
+},
+"OL3": {
+"at": Vector2(-1, 1.2),
+"pos": "OL"
+},
+"OL4": {
+"at": Vector2(-1, 3.6),
+"pos": "OL"
+},
+"QB": {
+"at": Vector2(-1, 0),
+"pos": "QB"
+},
+"RB": {
+"at": Vector2(-6, 0),
+"pos": "RB"
+},
+"TE": {
+"at": Vector2(-1, 6.2),
+"pos": "TE"
+},
+"WR1": {
+"at": Vector2(-0.5, -15),
+"pos": "WR"
+},
+"WR2": {
+"at": Vector2(-0.5, 14),
+"pos": "WR"
+}
+}

@@ -1,0 +1,17 @@
+# Godot 4
+.godot/
+/android/
+*.tmp
+*.translation
+
+# Exports
+/export/
+*.apk
+*.aab
+*.ipa
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

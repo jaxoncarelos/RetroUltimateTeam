@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="PlaybookDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="1_2api8"]
+[ext_resource type="Resource" path="res://data/plays/defense/cover1.tres" id="2_bxlqi"]
+[ext_resource type="Resource" path="res://data/plays/defense/cover2.tres" id="3_8wlcg"]
+[ext_resource type="Resource" path="res://data/plays/defense/cover3.tres" id="4_0kjcu"]
+[ext_resource type="Resource" path="res://data/plays/defense/lb_blitz.tres" id="5_qmtg7"]
+[ext_resource type="Script" path="res://scripts/models/playbook_def.gd" id="6_ccvsf"]
+
+[resource]
+script = ExtResource("6_ccvsf")
+id = "defense_basic"
+plays = Array[ExtResource("1_2api8")]([ExtResource("2_bxlqi"), ExtResource("3_8wlcg"), ExtResource("4_0kjcu"), ExtResource("5_qmtg7")])

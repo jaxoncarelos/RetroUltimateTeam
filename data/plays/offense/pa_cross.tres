@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_iform.tres" id="1_o6n0c"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_54nyt"]
+
+[resource]
+script = ExtResource("2_54nyt")
+id = "pa_cross"
+display_name = "PA Cross"
+category = "DEEP"
+formation = ExtResource("1_o6n0c")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"drop": 4.0,
+"type": "pass"
+},
+"RB": {
+"end": "continue",
+"path": PackedVector2Array(1, -2, 4, -8),
+"type": "route"
+},
+"TE": {
+"end": "continue",
+"path": PackedVector2Array(10, 0, 20, 8),
+"type": "route"
+},
+"WR1": {
+"end": "continue",
+"path": PackedVector2Array(12, 0, 12, 16),
+"type": "route"
+},
+"WR2": {
+"end": "continue",
+"path": PackedVector2Array(5, 0, 5, -22),
+"type": "route"
+}
+}

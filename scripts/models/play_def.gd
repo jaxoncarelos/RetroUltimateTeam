@@ -1,0 +1,22 @@
+class_name PlayDef
+extends Resource
+## One play call. Assignments map slot -> behavior dictionary:
+##   offense: {"type": "pass"}                         QB drops back (drop = yards)
+##            {"type": "handoff", "to": "RB", "mesh": Vector2}   QB hands off at mesh (rel. ball)
+##            {"type": "route", "path": PackedVector2Array, "end": "continue"|"sit"}
+##            {"type": "carry", "path": PackedVector2Array}      runner path; takes the handoff
+##            {"type": "block"}
+##   defense: {"type": "rush"} | {"type": "man", "target": "WR1"}
+##            {"type": "zone", "center": Vector2, "size": Vector2}  (rel. ball, x = depth)
+## Route/carry paths are waypoints relative to the player's alignment.
+
+@export var id := ""
+@export var display_name := ""
+@export_enum("offense", "defense") var side := "offense"
+@export var category := "SHORT"   ## RUN/SHORT/DEEP | MAN/ZONE/BLITZ
+@export var formation: FormationDef
+@export var assignments: Dictionary = {}
+
+
+func is_run() -> bool:
+	return category == "RUN"

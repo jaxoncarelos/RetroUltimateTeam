@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_iform.tres" id="1_qoywi"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_iuq00"]
+
+[resource]
+script = ExtResource("2_iuq00")
+id = "hb_sweep"
+display_name = "HB Sweep"
+category = "RUN"
+formation = ExtResource("1_qoywi")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"mesh": Vector2(-2.6, 1.2),
+"to": "RB",
+"type": "handoff"
+},
+"RB": {
+"path": PackedVector2Array(2, 2, 5, 7, 8, 9, 25, 9),
+"type": "carry"
+},
+"TE": {
+"type": "block"
+},
+"WR1": {
+"type": "block"
+},
+"WR2": {
+"type": "block"
+}
+}

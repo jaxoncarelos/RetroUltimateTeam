@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PlaybookDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="1_bk86y"]
+[ext_resource type="Resource" path="res://data/plays/offense/slants.tres" id="2_b6ycc"]
+[ext_resource type="Resource" path="res://data/plays/offense/curls.tres" id="3_525dk"]
+[ext_resource type="Resource" path="res://data/plays/offense/deep_shot.tres" id="4_kskvx"]
+[ext_resource type="Resource" path="res://data/plays/offense/hb_dive.tres" id="5_vgfsy"]
+[ext_resource type="Resource" path="res://data/plays/offense/hb_sweep.tres" id="6_awxxs"]
+[ext_resource type="Resource" path="res://data/plays/offense/pa_cross.tres" id="7_uwi1g"]
+[ext_resource type="Script" path="res://scripts/models/playbook_def.gd" id="8_q745l"]
+
+[resource]
+script = ExtResource("8_q745l")
+id = "offense_basic"
+plays = Array[ExtResource("1_bk86y")]([ExtResource("2_b6ycc"), ExtResource("3_525dk"), ExtResource("4_kskvx"), ExtResource("5_vgfsy"), ExtResource("6_awxxs"), ExtResource("7_uwi1g")])
