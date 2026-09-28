@@ -43,8 +43,10 @@ func bind(p_runner: PlayRunner, input: TouchInput, p_tuning: GameplayTuning) -> 
 	runner.carrier_changed.connect(func(_a: PlayerAgent) -> void: _cancel_aim())
 
 
+## Only while the human has the ball team; on defense these gestures belong to HumanDefenseControl.
 func _live() -> bool:
-	return runner != null and runner.phase == PlayRunner.Phase.LIVE
+	return runner != null and runner.phase == PlayRunner.Phase.LIVE \
+			and runner.human_team == PlayerAgent.Team.OFFENSE
 
 
 func _pre_snap() -> bool:
