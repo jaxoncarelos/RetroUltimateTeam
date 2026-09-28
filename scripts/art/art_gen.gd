@@ -2,17 +2,32 @@ class_name ArtGen
 extends RefCounted
 ## Code-generated original pixel art shared by the UI (cards, matchup screens, title).
 ## CONTRACT (used by UI code): keep these signatures stable; results are cached textures.
-## Every piece is deterministic: a portrait depends only on its arguments (the face is seeded
-## by player_id), a helmet only on the team abbreviation and colors.
+## Every piece is deterministic: a portrait depends only on its arguments plus the player's
+## look (roster.csv appearance columns, registered by GameData; unknown features are seeded by
+## player_id), a helmet only on the team abbreviation and colors.
 ## The *_image() variants return the raw Image (tools/gen_art_preview.gd dumps them to PNG).
 
 static var _cache: Dictionary = {}
+## player_id -> PlayerData.look, registered at boot (GameData) so every portrait (cards, pack
+## walkout, collection, lineup) gets the real player's look from just its id.
+static var looks: Dictionary = {}
 
 const OUTLINE := Color("#141018")
 const HAIR_COLORS := [Color("#1a1412"), Color("#2b1d14"), Color("#4a2f1c"), Color("#6b4423"),
 		Color("#c89b52"), Color("#e2c275"), Color("#9c4a22"), Color("#8e8e8e")]
 const SKIN := [Color("#f1c9a0"), Color("#e0ac69"), Color("#c68642"), Color("#a86b3c"),
 		Color("#8d5524"), Color("#5c3a21")]
+## Look keywords (roster.csv) -> indices. HAIR_COLOR_NAMES follows HAIR_COLORS.
+const HAIR_STYLES := ["bald", "buzz", "short", "part", "flattop", "curly", "afro", "long", "dreads",
+		"fade", "braids", "mohawk", "twists", "mullet", "bun"]
+const HAIR_COLOR_NAMES := ["black", "dark_brown", "brown", "light_brown", "dirty_blonde", "blonde", "red", "gray"]
+const BEARDS := ["none", "stubble", "full", "goatee", "mustache", "chinstrap", "short", "long"]
+const LOOK_ALIASES := {
+	"locs": "dreads", "dreadlocks": "dreads", "cornrows": "braids", "shaved": "bald", "crew": "short",
+	"side_part": "part", "flat_top": "flattop", "man_bun": "bun", "ponytail": "bun", "clean": "none",
+	"beard": "full", "grey": "gray", "blond": "blonde", "auburn": "red", "ginger": "red",
+	"brunette": "brown", "chin_strap": "chinstrap", "trimmed": "short",
+}
 const DIGITS := {
 	"0": ["111", "101", "101", "101", "111"], "1": ["010", "110", "010", "010", "111"],
 	"2": ["111", "001", "111", "100", "111"], "3": ["111", "001", "011", "001", "111"],
@@ -24,14 +39,38 @@ const DIGITS := {
 
 ## Head-and-shoulders card portrait, 32x32 px, transparent background.
 ## colors = TeamData.uniform_colors() ({primary, secondary, helmet, pants}).
-## jersey < 0 hides the chest number.
-static func portrait(player_id: String, pos: String, colors: Dictionary, jersey: int) -> Texture2D:
-	var key := "p:%s:%s:%d:%s" % [player_id, pos, jersey, _ckey(colors)]
+## jersey < 0 hides the chest number. look = PlayerData.look; empty = the registered look for
+## player_id (see `looks`), else a seeded random face.
+static func portrait(player_id: String, pos: String, colors: Dictionary, jersey: int,
+		look: Dictionary = {}) -> Texture2D:
+	var lk := resolve_look(player_id, look)
+	var key := "p:%s:%s:%d:%s:%s" % [player_id, pos, jersey, _ckey(colors), _lkey(lk)]
 	if _cache.has(key):
 		return _cache[key]
-	var tex := ImageTexture.create_from_image(portrait_image(player_id, pos, colors, jersey))
+	var tex := ImageTexture.create_from_image(portrait_image(player_id, pos, colors, jersey, lk))
 	_cache[key] = tex
 	return tex
+
+
+## Registers every player's look (id -> PlayerData.look) for portraits looked up by id.
+static func register_looks(players: Dictionary) -> void:
+	looks.clear()
+	for id in players:
+		var p: PlayerData = players[id]
+		if not p.look.is_empty():
+			looks[id] = p.look
+
+
+## `look` if given, else the registered look for player_id (may be empty).
+static func resolve_look(player_id: String, look: Dictionary = {}) -> Dictionary:
+	return look if not look.is_empty() else looks.get(player_id, {})
+
+
+static func _lkey(look: Dictionary) -> String:
+	var parts := []
+	for k in ["skin", "hair", "hair_color", "beard", "visor"]:
+		parts.append(str(look.get(k, "")))
+	return "|".join(parts)
 
 
 ## Side-view team helmet, 64x48 px, facing right unless facing_left. No logos: team colors
@@ -122,31 +161,70 @@ static func _cdist(a: Color, b: Color) -> float:
 
 # ---------------------------------------------------------------- portraits
 
-static func portrait_image(player_id: String, pos: String, colors: Dictionary, jersey: int) -> Image:
+## Resolved face for a portrait: {skin, hair_color, hair_style, beard (indices into SKIN,
+## HAIR_COLORS, HAIR_STYLES, BEARDS), mouth, brow, eye_black}. Known look fields win; the rest
+## is seeded by player_id. Every random draw is always made, so a known field never reshuffles
+## the other (seeded) ones.
+static func face(player_id: String, look: Dictionary = {}) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(player_id)
+	var f := {}
+	f["skin"] = rng.randi() % SKIN.size()
+	f["hair_color"] = _weighted(rng, [5, 5, 4, 3, 2, 1, 1, 1])
+	var dark_roll := rng.randf()
+	var dark_pick := rng.randi() % 2
+	f["hair_style"] = _weighted(rng, [1, 3, 3, 2, 2, 2, 2, 1, 1, 2, 1, 0, 1, 0, 0])
+	f["beard"] = _weighted(rng, [5, 2, 2, 2, 1, 1, 1, 0])
+	f["mouth"] = _weighted(rng, [4, 3, 2, 1])
+	f["brow"] = rng.randi() % 3
+	f["eye_black"] = rng.randf() < 0.18
+	var tone := int(look.get("skin", 0))
+	if tone >= 1 and tone <= SKIN.size():
+		f["skin"] = tone - 1
+	var hc := HAIR_COLOR_NAMES.find(_alias(look.get("hair_color", "")))
+	if hc >= 0:
+		f["hair_color"] = hc
+	elif int(f["skin"]) >= 3 and int(f["hair_color"]) >= 4 and (dark_roll < 0.8 or look.has("skin")):
+		f["hair_color"] = dark_pick   # blond/red/gray is rare on darker skin tones
+	var hs := HAIR_STYLES.find(_alias(look.get("hair", "")))
+	if hs >= 0:
+		f["hair_style"] = hs
+	var bd := BEARDS.find(_alias(look.get("beard", "")))
+	if bd >= 0:
+		f["beard"] = bd
+	return f
+
+
+static func _alias(v: Variant) -> String:
+	var s := str(v).strip_edges().to_lower().replace(" ", "_").replace("-", "_")
+	return LOOK_ALIASES.get(s, s)
+
+
+static func portrait_image(player_id: String, pos: String, colors: Dictionary, jersey: int,
+		look: Dictionary = {}) -> Image:
+	var fc := face(player_id, resolve_look(player_id, look))
 	var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
 	var primary: Color = colors.get("primary", Color("#c0392b"))
 	var secondary: Color = colors.get("secondary", Color.WHITE)
 	var big := pos in ["OL", "DL", "LT", "LG", "C", "RG", "RT", "DT", "DE"]
-	var skin: Color = SKIN[rng.randi() % SKIN.size()]
+	var skin: Color = SKIN[int(fc["skin"])]
 	var skin_d := skin.darkened(0.22)
 	var skin_l := skin.lightened(0.12)
-	var hair: Color = HAIR_COLORS[_weighted(rng, [5, 5, 4, 3, 2, 1, 1, 1])]
-	if skin.get_luminance() < 0.35 and hair.get_luminance() > 0.35 and rng.randf() < 0.8:
-		hair = HAIR_COLORS[rng.randi() % 2]
+	var hair: Color = HAIR_COLORS[int(fc["hair_color"])]
 	var hair_d := hair.darkened(0.35) if hair.get_luminance() > 0.12 else hair.lightened(0.12)
-	var hair_style: int = _weighted(rng, [1, 3, 3, 2, 2, 2, 2, 1, 1])
-	var beard: int = _weighted(rng, [5, 2, 2, 2, 1, 1])
-	var mouth: int = _weighted(rng, [4, 3, 2, 1])
-	var brow: int = rng.randi() % 3
-	var eye_black := rng.randf() < 0.18
+	var hair_style: int = fc["hair_style"]
+	var beard: int = fc["beard"]
+	var mouth: int = fc["mouth"]
+	var brow: int = fc["brow"]
+	var eye_black: bool = fc["eye_black"]
 	var b := 1 if big else 0
+	var l := 10 - b
+	var r := 21 + b
 	# Half width of the face per row (rows 6..19), center x = 15.5.
 	var hw := {6: 4, 7: 5, 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 6, 14: 6, 15: 6, 16: 6, 17: 5, 18: 4, 19: 3}
 
-	# Back hair (behind the head): afro, long, dreads.
+	# Back hair (behind the head): afro, long, dreads, braids, mullet.
 	if hair_style == 6:
 		for y in range(0, 17):
 			for x in range(4, 28):
@@ -166,6 +244,24 @@ static func portrait_image(player_id: String, pos: String, colors: Dictionary, j
 				if y == 24 and (x % 2 == 1):
 					continue
 				_put(img, x, y, c)
+	elif hair_style == 10:
+		# Braids hanging behind the ears to the shoulders.
+		for y in range(9, 23):
+			for x in [l - 2, l - 1, r + 1, r + 2]:
+				if y == 22 and x % 2 == 0:
+					continue
+				_put(img, x, y, hair if (x + y) % 2 == 0 else hair_d)
+	elif hair_style == 13:
+		# Mullet: business on top (drawn later), long in the back.
+		for y in range(9, 23):
+			var half := 8.0 + b - maxf(0.0, y - 19.0) * 0.7
+			for x in range(int(16 - half), int(16 + half)):
+				if y > 16 and absf(x - 15.5) < 4.5:
+					continue
+				if y == 22 and x % 2 == 1:
+					continue
+				var edge := x == int(16 - half) or x == int(16 + half) - 1
+				_put(img, x, y, hair_d if edge or (x + y) % 4 == 0 else hair)
 
 	# Jersey: shoulders + chest, shoulder stripes, collar, number.
 	var sh_w := 13 + b
@@ -211,7 +307,7 @@ static func portrait_image(player_id: String, pos: String, colors: Dictionary, j
 		_put(img, 9 - b, y, skin_d if y == 11 or y == 14 else skin)
 		_put(img, 22 + b, y, skin_d)
 
-	_hair(img, hair_style, hair, hair_d, b, rng)
+	_hair(img, hair_style, hair, hair_d, b)
 
 	# Eyes (white + pupil), brows, nose, mouth.
 	var ey := 12
@@ -224,6 +320,8 @@ static func portrait_image(player_id: String, pos: String, colors: Dictionary, j
 		for x in [12, 13, 18, 19]:
 			_put(img, x, ey + 2, Color("#111111"))
 	var bc := hair_d if hair_style != 0 or hair.get_luminance() < 0.3 else skin.darkened(0.45)
+	if skin.get_luminance() < 0.3 and bc.get_luminance() > skin.get_luminance() - 0.05:
+		bc = Color("#120e0c")   # brows must still read on the darkest tones
 	match brow:
 		0:
 			_rect(img, 11, 10, 3, 1, bc)
@@ -273,9 +371,16 @@ static func _weighted(rng: RandomNumberGenerator, weights: Array) -> int:
 	return 0
 
 
-## Hair on top of the head. Styles: 0 bald, 1 buzz, 2 short, 3 side part, 4 flat-top,
-## 5 curly, 6 afro (mostly drawn behind), 7 long, 8 dreads.
-static func _hair(img: Image, style: int, hair: Color, hair_d: Color, b: int, rng: RandomNumberGenerator) -> void:
+## Blends `c` at `alpha` over head pixels only (fades, shaved sides); skips transparent pixels.
+static func _tint(img: Image, x: int, y: int, c: Color, alpha: float) -> void:
+	if _pget(img, x, y).a > 0.5:
+		_put(img, x, y, Color(c, alpha))
+
+
+## Hair on top of the head (index into HAIR_STYLES): 0 bald, 1 buzz, 2 short, 3 side part,
+## 4 flat-top, 5 curly, 6 afro (mostly drawn behind), 7 long, 8 dreads, 9 fade, 10 braids
+## (cornrows; the hanging part is drawn behind), 11 mohawk, 12 twists, 13 mullet, 14 bun.
+static func _hair(img: Image, style: int, hair: Color, hair_d: Color, b: int) -> void:
 	var l := 10 - b
 	var r := 21 + b
 	match style:
@@ -286,7 +391,7 @@ static func _hair(img: Image, style: int, hair: Color, hair_d: Color, b: int, rn
 			for y in range(6, 9):
 				for x in range(l + (1 if y == 6 else 0), r + 1 - (1 if y == 6 else 0)):
 					_put(img, x, y, hair_d if (x + y) % 2 == 0 else hair)
-		2, 3, 5, 7, 8:
+		2, 3, 5, 7, 8, 10, 13, 14:
 			var top := 4 if style != 5 else 3
 			for y in range(top, 10):
 				var inset := 2 if y == top else (1 if y == top + 1 else 0)
@@ -296,6 +401,8 @@ static func _hair(img: Image, style: int, hair: Color, hair_d: Color, b: int, rn
 						c = hair_d
 					if style == 5 and (x + y * 2) % 3 == 0:
 						c = hair_d
+					if style == 10 and x % 2 == 0:
+						c = hair_d   # cornrow lines front to back
 					_put(img, x, y, c)
 			for y in range(10, 13):
 				_put(img, l - 1, y, hair)
@@ -309,6 +416,10 @@ static func _hair(img: Image, style: int, hair: Color, hair_d: Color, b: int, rn
 					_put(img, x, 2, hair)
 			if style == 7 or style == 8:
 				_rect(img, l - 1, 8, r - l + 3, 2, hair)
+			if style == 14:
+				_rect(img, 14, 1, 4, 1, hair_d)
+				_rect(img, 13, 2, 6, 2, hair)
+				_rect(img, 14, 2, 2, 1, hair.lightened(0.15))
 		4:
 			for y in range(1, 9):
 				for x in range(l, r + 1):
@@ -320,20 +431,50 @@ static func _hair(img: Image, style: int, hair: Color, hair_d: Color, b: int, rn
 			for x in range(l, r + 1):
 				_put(img, x, 6, hair)
 				_put(img, x, 7, hair_d if x % 2 == 0 else hair)
-	if style in [2, 3] and rng.randf() < 0.3:
-		_put(img, l - 1, 13, hair_d)
-		_put(img, r + 1, 13, hair_d)
+		9:   # fade: full on top, skin showing through toward the ears
+			for y in range(3, 9):
+				var inset := 2 if y == 3 else (1 if y == 4 else 0)
+				for x in range(l + inset, r + 1 - inset):
+					_put(img, x, y, hair_d if y == 3 or (x * 3 + y) % 5 == 0 else hair)
+			for y in range(8, 12):
+				var a := 0.7 - (y - 8) * 0.15
+				_tint(img, l, y, hair, a)
+				_tint(img, l + 1, y, hair, a * 0.6)
+				_tint(img, r, y, hair_d, a)
+				_tint(img, r - 1, y, hair_d, a * 0.6)
+		11:   # mohawk: a tall center strip, shaved sides
+			for y in range(1, 9):
+				for x in range(13, 19):
+					_put(img, x, y, hair_d if y == 1 or x == 13 or (x + y) % 3 == 0 else hair)
+			for y in range(6, 10):
+				for x in range(l, r + 1):
+					if x < 13 or x > 18:
+						_tint(img, x, y, hair, 0.3)
+		12:   # twists / short locs: spiky top, tight sides
+			for x in range(l - 1, r + 2):
+				var edge := x == l - 1 or x == r + 1
+				var top := (5 if edge else (2 if x % 2 == 0 else 3))
+				for y in range(top, 10):
+					_put(img, x, y, hair_d if x % 2 == 0 or y == top else hair)
+			for y in range(10, 12):
+				_tint(img, l, y, hair, 0.5)
+				_tint(img, r, y, hair_d, 0.5)
 
 
-## Beards: 0 none, 1 stubble, 2 full, 3 goatee, 4 mustache, 5 chin strap.
+## Beards (index into BEARDS): 0 none, 1 stubble, 2 full, 3 goatee, 4 mustache, 5 chin strap,
+## 6 short (trimmed full), 7 long.
 static func _beard(img: Image, style: int, hair: Color, hair_d: Color, skin_d: Color, b: int) -> void:
 	match style:
-		1:
+		1:   # stubble: a soft shadow over jaw and upper lip
+			var sc := hair.lerp(skin_d.darkened(0.3), 0.4)
 			for y in range(15, 20):
 				for x in range(10 - b, 22 + b):
-					if (x + y) % 2 == 0 and _pget(img, x, y).a > 0 and not (y == 17 and x >= 13 and x <= 18):
-						_put(img, x, y, Color(skin_d.darkened(0.25), 0.8))
-		2:
+					if y == 17 and x >= 13 and x <= 18:
+						continue   # lips
+					if y < 16 and x > 11 - b and x < 20 + b and not (y == 15 and x >= 13 and x <= 18):
+						continue   # cheeks stay clear
+					_tint(img, x, y, sc, 0.3 if (x + y) % 2 == 0 else 0.22)
+		2, 7:
 			for y in range(13, 21):
 				var h := 6 - maxi(0, y - 17) + b
 				for x in range(16 - h, 16 + h):
@@ -345,17 +486,35 @@ static func _beard(img: Image, style: int, hair: Color, hair_d: Color, skin_d: C
 			_rect(img, 13, 16, 6, 1, hair)
 			_put(img, 12, 16, hair)
 			_put(img, 19, 16, hair)
+			if style == 7:   # long: flows down over the collar
+				for y in range(19, 26):
+					var h := 5 - (y - 19) / 2 + b
+					for x in range(16 - h, 16 + h):
+						_put(img, x, y, hair_d if (x + y) % 3 == 0 or x == 16 - h or x == 15 + h else hair)
 		3:
 			_rect(img, 14, 18, 4, 2, hair)
 			_rect(img, 14, 16, 4, 1, hair_d)
-		4:
+		4:   # mustache with a slight droop at the ends
 			_rect(img, 13, 16, 6, 1, hair)
+			_put(img, 13, 17, hair_d)
+			_put(img, 18, 17, hair_d)
 		5:
 			for y in range(13, 20):
 				var h := 6 - maxi(0, y - 16) + b
 				_put(img, 16 - h, y, hair)
 				_put(img, 15 + h, y, hair_d)
 			_rect(img, 13, 19, 6, 1, hair)
+		6:   # short: close-trimmed full beard, skin slightly showing
+			for y in range(14, 20):
+				var h := 6 - maxi(0, y - 17) + b
+				for x in range(16 - h, 16 + h):
+					if y >= 16 and y <= 18 and x >= 13 and x <= 18:
+						continue
+					if y < 16 and x > 11 - b and x < 20 + b:
+						continue
+					_put(img, x, y, Color(hair, 0.9) if (x + y) % 2 == 0 else Color(hair_d, 0.75))
+			_rect(img, 13, 16, 6, 1, hair)
+			_rect(img, 14, 19, 4, 1, hair)
 
 
 # ---------------------------------------------------------------- helmet
@@ -665,7 +824,7 @@ static func _swap(frame: Image, scheme: Array, skin_i: int) -> void:
 		"ff0000": p, "800000": _shade(p), "00ff00": s, "008000": _shade(s),
 		"0000ff": hl, "000080": _shade(hl), "8080ff": hl.lerp(Color.WHITE, 0.55),
 		"00ffff": PlayerSprites.stripe_color(hl, p, s),
-		"ffff00": pa, "808000": _shade(pa), "ff00ff": skin, "800080": _shade(skin),
+		"ffff00": pa, "808000": _shade(pa), "ff00ff": skin, "800080": _shade(skin), "ff80ff": skin,
 		"808080": PlayerSprites.mask_color(hl),
 	}
 	for y in frame.get_height():

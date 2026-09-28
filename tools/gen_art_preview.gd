@@ -1,7 +1,8 @@
 extends SceneTree
 ## Dumps ArtGen output to PNGs for eyeballing (not used by the game).
 ## Run:  godot --headless --path . --script res://tools/gen_art_preview.gd -- <out_dir>
-## Writes portraits.png (8x4 sample sheet, 3x), helmets.png (3x) and title.png (1x).
+## Writes portraits.png (8x4 sample sheet, 3x), stars.png (real players with their roster.csv
+## look, 3x), helmets.png (3x) and title.png (1x).
 
 func _init() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -25,6 +26,7 @@ func _init() -> void:
 		sheet.blend_rect(p, Rect2i(0, 0, 32, 32), Vector2i((i % 8) * 36 + 2, (i / 8) * 36 + 2))
 	sheet.resize(sheet.get_width() * 3, sheet.get_height() * 3, Image.INTERPOLATE_NEAREST)
 	sheet.save_png(out.path_join("portraits.png"))
+	_stars(out)
 	var hs := Image.create(4 * 68, 2 * 52, false, Image.FORMAT_RGBA8)
 	hs.fill(Color("#3a5aa8"))
 	var abbrs := ["KC", "PHI", "CHI", "GB", "LAR", "MIN", "NO", "DEN"]
@@ -36,3 +38,34 @@ func _init() -> void:
 	ArtGen.title_image().save_png(out.path_join("title.png"))
 	print("art preview written to ", out)
 	quit()
+
+
+## Well-known players rendered with their roster.csv appearance (likeness check).
+const STARS := ["mahomes_patrick", "allen_josh", "jackson_lamar", "burrow_joe", "hurts_jalen",
+		"lawrence_trevor", "rodgers_aaron", "herbert_justin", "stroud_cj", "daniels_jayden",
+		"henry_derrick", "barkley_saquon", "mccaffrey_christian", "robinson_bijan", "chubb_nick",
+		"jefferson_justin", "chase_jamarr", "lamb_ceedee", "hill_tyreek", "hopkins_deandre",
+		"kelce_travis", "kittle_george", "bowers_brock", "garrett_myles", "watt_tj",
+		"crosby_maxx", "parsons_micah", "hunter_danielle", "gardner_sauce", "minshew_gardner",
+		"hunter_travis", "mcglinchey_mike", "dalton_andy", "campbell_will", "skattebo_cam", "warner_fred"]
+
+
+func _stars(out: String) -> void:
+	var teams := TeamData.load_all()
+	var db := RosterDB.new()
+	db.load_file(RosterDB.ROSTER_PATH, teams.keys())
+	var cols := 9
+	var rows := int(ceil(STARS.size() / float(cols)))
+	var sheet := Image.create(cols * 36, rows * 36, false, Image.FORMAT_RGBA8)
+	sheet.fill(Color("#3a5aa8"))
+	for i in STARS.size():
+		var pd: PlayerData = db.players.get(STARS[i])
+		if pd == null:
+			push_warning("unknown star id " + STARS[i])
+			continue
+		var t: TeamData = teams.get(pd.team)
+		var colors: Dictionary = t.uniform_colors() if t != null else {}
+		var img := ArtGen.portrait_image(pd.id, pd.pos, colors, pd.jersey, pd.look)
+		sheet.blend_rect(img, Rect2i(0, 0, 32, 32), Vector2i((i % cols) * 36 + 2, (i / cols) * 36 + 2))
+	sheet.resize(sheet.get_width() * 3, sheet.get_height() * 3, Image.INTERPOLATE_NEAREST)
+	sheet.save_png(out.path_join("stars.png"))

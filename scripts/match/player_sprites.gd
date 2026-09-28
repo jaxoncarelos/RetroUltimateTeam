@@ -48,7 +48,10 @@ static func frame_texture(idx: int, tex: Texture2D = null) -> AtlasTexture:
 	return at
 
 
-static func make_material(colors: Dictionary, skin_seed: int) -> ShaderMaterial:
+## look = PlayerData.look (optional): "skin" 1-6 picks the real player's tone (same scale as the
+## card portraits, ArtGen.SKIN), "visor" ("clear"/"tinted") tints the eye line. Without it the
+## skin is seeded from `skin_seed` (generated players, crowd).
+static func make_material(colors: Dictionary, skin_seed: int, look: Dictionary = {}) -> ShaderMaterial:
 	if _shader == null:
 		_shader = load(SHADER)
 	var m := ShaderMaterial.new()
@@ -60,10 +63,31 @@ static func make_material(colors: Dictionary, skin_seed: int) -> ShaderMaterial:
 	m.set_shader_parameter("secondary", secondary)
 	m.set_shader_parameter("helmet", helmet)
 	m.set_shader_parameter("pants", colors.get("pants", Color.WHITE))
-	m.set_shader_parameter("skin", SKIN_TONES[absi(skin_seed) % SKIN_TONES.size()])
+	m.set_shader_parameter("skin", skin_color(skin_seed, look))
+	m.set_shader_parameter("visor", visor_color(str(look.get("visor", ""))))
 	m.set_shader_parameter("stripe", colors.get("stripe", stripe_color(helmet, primary, secondary)))
 	m.set_shader_parameter("mask", colors.get("mask", mask_color(helmet)))
 	return m
+
+
+## Field skin tone: the player's known tone (look.skin 1-6) or a seeded random one.
+static func skin_color(skin_seed: int, look: Dictionary = {}) -> Color:
+	var tone := int(look.get("skin", 0))
+	if tone >= 1 and tone <= ArtGen.SKIN.size():
+		return ArtGen.SKIN[tone - 1]
+	return SKIN_TONES[absi(skin_seed) % SKIN_TONES.size()]
+
+
+## Visor tint for the shader (alpha 0 = no visor).
+static func visor_color(kind: String) -> Color:
+	match kind:
+		"tinted", "dark", "smoke":
+			return Color(0.08, 0.08, 0.11, 1.0)
+		"clear":
+			return Color(0.78, 0.9, 1.0, 0.45)
+		"":
+			return Color(0, 0, 0, 0)
+	return Color(0.35, 0.55, 0.85, 0.85)   # colored/mirrored visors
 
 
 ## Helmet stripe: the secondary color unless it disappears on the helmet, then the primary.

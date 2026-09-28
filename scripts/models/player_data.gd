@@ -13,6 +13,12 @@ var attrs: Dictionary = {}
 var generated := false   ## depth filler created by GameData (not in the CSV)
 var age := 0             ## 0 = unknown
 var pot := 60            ## potential (development ceiling); = ovr for veterans
+## Appearance for portraits/sprites (roster.csv skin/hair/hair_color/beard/visor). Only the
+## known keys are present: {"skin": 1-6 light->dark, "hair", "hair_color", "beard", "visor"}.
+## Missing keys fall back to the seeded random look (ArtGen).
+var look: Dictionary = {}
+
+const LOOK_KEYS := ["hair", "hair_color", "beard", "visor"]
 
 
 static func create(p_id: String, p_name: String, p_team: String, p_pos: String, p_jersey: int,
@@ -38,6 +44,19 @@ func set_development(p_age: int, p_pot := 0) -> void:
 ## Young and not yet at his ceiling (UI "ROOKIE"/"PROSPECT" badge).
 func is_prospect() -> bool:
 	return pot > ovr
+
+
+## Appearance dict from a CSV row (blank-safe; invalid skin values are dropped).
+static func parse_look(row: Dictionary) -> Dictionary:
+	var out := {}
+	var skin := str(row.get("skin", "")).strip_edges()
+	if skin.is_valid_int() and int(skin) >= 1 and int(skin) <= 6:
+		out["skin"] = int(skin)
+	for k in LOOK_KEYS:
+		var v := str(row.get(k, "")).strip_edges().to_lower()
+		if v != "":
+			out[k] = v
+	return out
 
 
 const SUFFIXES := ["JR.", "JR", "SR.", "II", "III", "IV"]

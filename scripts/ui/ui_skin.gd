@@ -410,6 +410,22 @@ static func draw_text_c(ci: CanvasItem, center_x: float, baseline_y: float, text
 	draw_text(ci, Vector2(roundf(center_x - w * 0.5), baseline_y), text, size, color, outline, shadow)
 
 
+## Size-8 text centered on `center_x` that never exceeds `max_w`: switches to the condensed
+## face (then cuts with ".") for long names. Optional 1 px drop shadow.
+static func draw_text_fit(ci: CanvasItem, center_x: float, baseline_y: float, text: String, max_w: int, color: Color,
+		shadow := Color(0, 0, 0, 0)) -> void:
+	var f := PixelFont.fit(text, max_w)
+	var x := roundf(center_x - float(f["width"]) * 0.5)
+	if not f["condensed"]:
+		if shadow.a > 0.0:
+			ci.draw_string(PixelFont.get_font(), Vector2(x, baseline_y + 1), f["text"], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, shadow)
+		ci.draw_string(PixelFont.get_font(), Vector2(x, baseline_y), f["text"], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, color)
+		return
+	if shadow.a > 0.0:
+		PixelFont.draw_condensed(ci, Vector2(x, baseline_y - 6), f["text"], shadow)
+	PixelFont.draw_condensed(ci, Vector2(x, baseline_y - 7), f["text"], color)
+
+
 ## A 7x7 pixel star (times `s`), `frac` 0..1 of it filled with `col` from the left.
 static func draw_star(ci: CanvasItem, at: Vector2, col: Color, frac := 1.0, s := 1.0, empty := STAR_EMPTY,
 		outline := Color(0.02, 0.03, 0.15, 1.0)) -> void:

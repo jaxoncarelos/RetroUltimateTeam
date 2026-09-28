@@ -5,13 +5,16 @@ extends CanvasLayer
 ## the gesture hint, dark name-tag pills above your receivers before the snap, a compact
 ## CHANGE PLAY panel (opens the playbook grid), the quick play bar (top calls + BEST tag +
 ## MORE), PUNT / FG / TIMEOUT pills, outlined result banners, coach tips, choice panels
-## (PAT, pause, final) and the kick meter.
+## (PAT, pause, final) and the kick meter. On defense: a big SWITCH button (bottom right)
+## and a yellow name pill over the defender you control.
 
 signal play_selected(play: PlayDef)
 signal restart_pressed
 ## PUNT / FG / TIMEOUT buttons (by name).
 signal special_pressed(action: String)
 signal pause_pressed
+## The SWITCH button (defense): take the defender nearest the ball.
+signal switch_pressed
 ## A choice panel option was picked (index into the options passed to show_choice).
 signal choice_made(index: int)
 signal tip_closed
@@ -19,6 +22,7 @@ signal tip_closed
 const WARN_COLOR := Color("#ff004d")
 const BAR_SIZE := 4
 const BAR_H := 11
+const SWITCH_SIZE := Vector2(78, 46)
 
 ## Set by the match: name tags read the agents' positions from it (optional).
 var runner: PlayRunner
@@ -53,6 +57,7 @@ var _tip: RetroPanel
 var _tip_label: Label
 var _play_bar: HBoxContainer
 var _restart: Button
+var _switch: Button
 var _buttons: Dictionary = {}
 
 
@@ -209,6 +214,31 @@ func _ready() -> void:
 	_choice_buttons = VBoxContainer.new()
 	_choice_buttons.add_theme_constant_override("separation", 4)
 	cbox.add_child(_choice_buttons)
+
+	# SWITCH: big and thumb-sized in the bottom-right corner (moved up over the play bar
+	# while calling a play so the two never overlap).
+	_switch = Button.new()
+	_switch.text = "SWITCH"
+	_switch.theme_type_variation = "PillButton"
+	_switch.focus_mode = Control.FOCUS_NONE
+	_switch.add_theme_font_size_override("font_size", 16)
+	_switch.add_theme_color_override("font_color", UiSkin.YELLOW)
+	var sw_box := StyleBoxFlat.new()
+	sw_box.bg_color = Color(0.03, 0.04, 0.08, 0.82)
+	sw_box.border_color = UiSkin.YELLOW
+	sw_box.set_border_width_all(2)
+	sw_box.set_corner_radius_all(6)
+	for st in ["normal", "hover", "focus"]:
+		_switch.add_theme_stylebox_override(st, sw_box)
+	var sw_press := sw_box.duplicate() as StyleBoxFlat
+	sw_press.bg_color = Color(UiSkin.YELLOW, 0.35)
+	_switch.add_theme_stylebox_override("pressed", sw_press)
+	_anchor(_switch, Vector2(1.0, 1.0), Rect2(-SWITCH_SIZE.x - 6, -SWITCH_SIZE.y - BAR_H - 6, SWITCH_SIZE.x, SWITCH_SIZE.y))
+	_switch.pressed.connect(func() -> void:
+		Sfx.play("tap")
+		switch_pressed.emit())
+	_switch.visible = false
+	_root.add_child(_switch)
 
 	_restart = MetaUI.yellow("NEW DRIVE", Vector2(96, 24), func() -> void: restart_pressed.emit())
 	_anchor(_restart, Vector2(0.5, 0.5), Rect2(-48, 10, 96, 24))
@@ -447,6 +477,15 @@ func show_restart(on: bool) -> void:
 	_restart.visible = on
 
 
+## The defense SWITCH button (pre-snap and live defensive snaps only).
+func show_switch(on: bool) -> void:
+	_switch.visible = on
+
+
+func is_switch_visible() -> bool:
+	return _switch.visible
+
+
 # ---------------------------------------------------------------- bars / tags / banners
 
 ## Back-compat (drive sandbox): free text for the top bar's left and right.
@@ -504,7 +543,11 @@ func _process(_delta: float) -> void:
 	var vp := get_viewport().get_visible_rect().size
 	_play_bar.position.x = roundf((vp.x - _play_bar.size.x) * 0.5)
 	_play_bar.position.y = vp.y - _play_bar.size.y - BAR_H - 3
-	_tags.visible = _play_bar.visible and runner != null
+	# SWITCH sits in the corner, lifted above the play bar while the bar is up.
+	var lift := _play_bar.size.y + 6.0 if _play_bar.visible else 0.0
+	_switch.offset_top = -SWITCH_SIZE.y - BAR_H - 6 - lift
+	_switch.offset_bottom = -BAR_H - 6 - lift
+	_tags.visible = runner != null
 	if _tags.visible:
 		_tags.queue_redraw()
 
@@ -512,6 +555,8 @@ func _process(_delta: float) -> void:
 ## True when a viewport point lies over an interactive HUD control.
 func is_point_over_ui(p: Vector2) -> bool:
 	if _restart.visible and _restart.get_global_rect().has_point(p):
+		return true
+	if _switch.visible and _switch.get_global_rect().grow(4).has_point(p):
 		return true
 	if _grid.visible or _choice.visible or _tip.visible:
 		return true   # the playbook grid, choice panels and coach tips are modal
@@ -598,8 +643,16 @@ class _BottomBar:
 			UiSkin.draw_text(self, Vector2(x, 9), tag, 8, Color.WHITE)
 			x += PixelFont.text_width(tag) + 12
 		if hint != "":
-			var w := PixelFont.text_width(hint)
-			UiSkin.draw_text(self, Vector2(maxf(x, size.x - 5 - w), 9), hint, 8, Color(1, 1, 1, 0.6))
+			var h := fit_hint(hint, size.x - 5 - x)
+			var w := PixelFont.text_width(h)
+			UiSkin.draw_text(self, Vector2(maxf(x, size.x - 5 - w), 9), h, 8, Color(1, 1, 1, 0.6))
+
+	## Drops trailing "  ·  " parts of a hint until it fits `room` px (never runs off screen).
+	static func fit_hint(text: String, room: float) -> String:
+		var h := text
+		while PixelFont.text_width(h) > room and h.contains("  ·  "):
+			h = h.substr(0, h.rfind("  ·  "))
+		return h
 
 
 ## Dark name-tag pills above your receivers before the snap (Retro Bowl "J.P" tags).
@@ -612,7 +665,12 @@ class _NameTags:
 
 	func _draw() -> void:
 		var r: PlayRunner = hud.runner
-		if r == null or not is_instance_valid(r) or r.human_team != PlayerAgent.Team.OFFENSE:
+		if r == null or not is_instance_valid(r):
+			return
+		if r.human_team == PlayerAgent.Team.DEFENSE:
+			_draw_defender(r)
+			return
+		if r.human_team != PlayerAgent.Team.OFFENSE or not hud._play_bar.visible:
 			return
 		for a in r.offense:
 			if not is_instance_valid(a) or not a.is_eligible() or a == r.qb:
@@ -624,6 +682,23 @@ class _NameTags:
 			draw_rect(box, Color(0.03, 0.04, 0.06, 0.85))
 			draw_rect(Rect2(box.position.x + 1, box.end.y, box.size.x - 2, 1), Color(0.03, 0.04, 0.06, 0.6))
 			UiSkin.draw_text(self, box.position + Vector2(3, 8), t, 8, Color.WHITE)
+
+	## Yellow pill "#54 F.WARNER" with a little pointer over the defender you control.
+	func _draw_defender(r: PlayRunner) -> void:
+		var a := r.controlled
+		if a == null or not is_instance_valid(a) or r.phase not in [PlayRunner.Phase.PRE_SNAP, PlayRunner.Phase.LIVE]:
+			return
+		if a == r.carrier:
+			return   # returning an interception: the carrier arrow marks him
+		var at := a.get_global_transform_with_canvas().origin
+		var t := "#%d %s" % [a.jersey, _short(a.display_name)] if a.jersey > 0 else _short(a.display_name)
+		var w := PixelFont.text_width(t) + 6
+		var box := Rect2(roundf(at.x - w * 0.5), roundf(at.y - 40 + a.z_height * -6.0), w, 10)
+		draw_rect(box.grow(1), Color(0.03, 0.04, 0.06, 0.9))
+		draw_rect(box, UiSkin.YELLOW)
+		var tip := Vector2(roundf(at.x), box.end.y + 4)
+		draw_colored_polygon(PackedVector2Array([tip, tip + Vector2(-3, -4), tip + Vector2(3, -4)]), UiSkin.YELLOW)
+		UiSkin.draw_text(self, box.position + Vector2(3, 8), t, 8, Color(0.03, 0.04, 0.06), Color(0, 0, 0, 0))
 
 	static func _short(n: String) -> String:
 		return n.to_upper().replace(". ", ".")

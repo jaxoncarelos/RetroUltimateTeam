@@ -76,13 +76,27 @@ func is_prime() -> bool:
 	return card != null and card.has_method("is_prime") and card.is_prime()
 
 
+## Mouse only: touches arrive as emulated mouse clicks (and project.godot also emulates
+## touch from the mouse, so handling both would fire twice per tap). Squishes while held.
 func _gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		tapped.emit(self)
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_press(true)
+			tapped.emit(self)
+		else:
+			_press(false)
 		accept_event()
-	elif event is InputEventScreenTouch and event.pressed:
-		tapped.emit(self)
-		accept_event()
+
+
+func _press(down: bool) -> void:
+	if card_scale > 1 or not is_inside_tree():
+		return
+	pivot_offset = size * 0.5
+	var tw := create_tween()
+	if down:
+		tw.tween_property(self, "scale", Vector2(0.94, 0.94), 0.05)
+	else:
+		tw.tween_property(self, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _process(delta: float) -> void:
@@ -204,10 +218,7 @@ func _draw_front(tc: Color) -> void:
 	var plate := Rect2(2, ART_H, W - 4, H - ART_H - 2)
 	draw_rect(plate, UiSkin.NAVY)
 	draw_rect(Rect2(plate.position.x, plate.position.y, plate.size.x, 1), tc.lightened(0.25))
-	var nm := player.last_name().to_upper()
-	if nm.length() > 8:
-		nm = nm.left(8)
-	UiSkin.draw_text_c(self, W * 0.5, ART_H + 10, nm, 8, Color.WHITE)
+	UiSkin.draw_text_fit(self, W * 0.5, ART_H + 10, player.last_name().to_upper(), W - 6, Color.WHITE)
 	var stars := UiSkin.ovr_stars(ovr())
 	for i in 5:
 		UiSkin.draw_star(self, Vector2(W * 0.5 - 22 + i * 9, ART_H + 13), UiSkin.YELLOW, clampf(stars - i, 0.0, 1.0),

@@ -27,6 +27,7 @@ var _pack_art: PackArt
 var _prompt: Label
 var _skip_btn: Button
 var _coins: CoinPill
+var _sell_btn: Button
 var _walk_nodes: Array[Node] = []
 var _hero: CardView
 var _summary: Control
@@ -479,7 +480,8 @@ func _show_summary(instant := false) -> void:
 	_summary.add_child(bar)
 	var sell_total := _dupe_value()
 	if sell_total > 0:
-		bar.add_child(MetaUI.button("QUICK SELL DUPES +%d" % sell_total, Vector2(150, 26), _sell_dupes))
+		_sell_btn = MetaUI.button("QUICK SELL DUPES +%s" % CoinPill.fmt(sell_total), Vector2(150, 26), _sell_dupes)
+		bar.add_child(_sell_btn)
 	if _pack != null and _pack.price > 0:
 		var again := MetaUI.button("OPEN ANOTHER  %s" % CoinPill.fmt(_pack.price), Vector2(140, 26), _open_another)
 		again.disabled = not EconomyRules.can_buy(_prof, _pack)
@@ -540,7 +542,10 @@ func _sell_dupes() -> void:
 			Fx.fly_coins(self, v.global_position + v.size * 0.5, _coins.coin_global(), 4)
 			v.dim = true
 	_coins.set_coins(_prof.coins)
-	MetaUI.toast(self, "+%d COINS" % gained)
+	MetaUI.toast(self, "+%s COINS" % CoinPill.fmt(gained))
+	if is_instance_valid(_sell_btn):
+		_sell_btn.text = "SOLD +%s" % CoinPill.fmt(gained)
+		_sell_btn.disabled = true
 
 
 func _open_another() -> void:

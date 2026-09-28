@@ -3,6 +3,8 @@ extends RefCounted
 ## Blocks (engage/hold/shed) and tackles, using RatingModel soft probabilities.
 
 var ctx: PlayRunner
+## Tackle counters across plays (sims print them): CPU/human tries and tackles, CPU dives.
+static var stats := {"tries": 0, "tackles": 0, "human_tries": 0, "human_tackles": 0, "dives": 0, "dive_tries": 0}
 
 
 func _init(p_ctx: PlayRunner) -> void:
@@ -43,6 +45,8 @@ func _engage(b: PlayerAgent, d: PlayerAgent) -> void:
 		d.shed_timer *= t.open_field_shed_mult
 	if ctx.is_run_play():
 		d.shed_timer *= 1.0 - ctx.def_ai.shed_cut * ctx.key_level
+	if d == ctx.controlled and d.team == ctx.human_team:
+		d.shed_timer *= t.human_shed_mult   # your man fights off blocks fast
 
 
 static func rush_rating(d: PlayerAgent) -> float:
@@ -102,6 +106,12 @@ func _hold(b: PlayerAgent, d: PlayerAgent, dt: float) -> void:
 	b.field_pos = d.field_pos + sep.normalized() * 0.9
 
 
+## True for the defender the human controls (ring + name pill): he gets the human tackle
+## range and bonus ("Human tackling" in GameplayTuning), steered or not.
+func is_human_tackler(d: PlayerAgent) -> bool:
+	return d == ctx.controlled and d.team == ctx.human_team and ctx.carrier != d
+
+
 func _tackles() -> void:
 	var c := ctx.carrier
 	if c == null or c.is_down or c.dive_timer > 0.0 and c.z_height > 0.3:
@@ -109,26 +119,65 @@ func _tackles() -> void:
 	var t := ctx.tuning
 	var opponents := ctx.defense if c.team == PlayerAgent.Team.OFFENSE else ctx.offense
 	for d in opponents:
-		if d.engaged_with != null or d.tackle_cd > 0.0 or d.is_down:
+		if d.tackle_cd > 0.0 or d.is_down:
 			continue
 		var diving := d.dive_timer > 0.0
 		if not diving and not d.can_act():
 			continue
+		var human := is_human_tackler(d)
 		var dist := d.field_pos.distance_to(c.field_pos)
+		if d.engaged_with != null:
+			# Blocked: only an arm tackle on a carrier who runs right past him.
+			if dist <= t.engaged_tackle_range and _roll(d, c, false, human, t.engaged_tackle_mult):
+				return
+			continue
 		var reach := t.dive_tackle_range if diving else t.tackle_range
+		if human:
+			reach = t.human_dive_tackle_range if diving else t.human_tackle_range
 		if dist > reach:
 			# CPU defenders close the last yard with a dive.
 			if not diving and not d.human and dist < t.cpu_dive_range:
 				d.start_dive(t, c.field_pos + c.velocity * 0.15 - d.field_pos, t.dive_recover)
+				stats["dives"] += 1
 			continue
-		var p := RatingModel.tackle_prob(t, d.attr("tak"), c.attr("elu"), c.attr("str"), c.juke_timer > 0.0)
-		if diving:
-			p = minf(p + t.dive_tackle_bonus, t.tackle_max)
-		if ctx.rng.randf() < p:
-			ctx.on_tackle(d, c)
+		if _roll(d, c, diving, human):
 			return
-		if not diving:
-			d.knock_down(t.missed_tackle_stun)
-		d.tackle_cd = 1.2
-		c.velocity *= 0.75
-		ctx.broken_tackles += 1
+
+
+## One tackle attempt by `d` on carrier `c`. Returns true when he brings him down.
+func _roll(d: PlayerAgent, c: PlayerAgent, diving: bool, human: bool, mult := 1.0) -> bool:
+	var t := ctx.tuning
+	var p := RatingModel.tackle_prob(t, d.attr("tak"), c.attr("elu"), c.attr("str"), c.juke_timer > 0.0)
+	# Every tackle he already broke this play makes the next one likelier (legs tire, help arrives).
+	p += t.broken_tackle_bonus * ctx.broken_tackles
+	if diving:
+		p += t.dive_tackle_bonus
+	var cap := t.tackle_max
+	if human:
+		p += t.human_tackle_bonus + (t.human_dive_bonus if diving else 0.0)
+		p += t.human_assist_bonus * _helpers(d, c)
+		cap = t.human_tackle_max
+	p = minf(p * mult, cap)
+	stats["human_tries" if human else "tries"] += 1
+	if diving and not human:
+		stats["dive_tries"] += 1
+	if ctx.rng.randf() < p:
+		stats["human_tackles" if human else "tackles"] += 1
+		ctx.on_tackle(d, c)
+		return true
+	if not diving and d.engaged_with == null:
+		d.knock_down(t.human_missed_stun if human else t.missed_tackle_stun)
+	d.tackle_cd = t.missed_tackle_cd
+	c.velocity *= t.missed_tackle_slow
+	ctx.broken_tackles += 1
+	return false
+
+
+## CPU teammates close enough to help wrap up the human's tackle.
+func _helpers(d: PlayerAgent, c: PlayerAgent) -> int:
+	var n := 0
+	for m in ctx.defense if d.team == PlayerAgent.Team.DEFENSE else ctx.offense:
+		if m != d and m.can_act() and m.engaged_with == null \
+				and m.field_pos.distance_to(c.field_pos) <= ctx.tuning.human_assist_range:
+			n += 1
+	return n

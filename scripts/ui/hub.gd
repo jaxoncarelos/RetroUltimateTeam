@@ -213,9 +213,20 @@ func _objectives_panel() -> Control:
 		Fx.pulse.call_deferred(btn, 1.03, 0.9)
 	else:
 		var next := _next_objective()
-		btn.text = "    %s  +%d" % [str(next.get("desc", "PLAY GAMES TO EARN COINS")).to_upper().left(26),
-				int(next.get("reward", 0))] if not next.is_empty() else "    OBJECTIVES: EARN COINS"
+		btn.text = "    %s  +%s" % [_short(str(next.get("desc", "PLAY GAMES TO EARN COINS")).to_upper(), 26),
+				CoinPill.fmt(int(next.get("reward", 0)))] if not next.is_empty() else "    OBJECTIVES: EARN COINS"
 	return btn
+
+
+## `t` cut to `n` characters at a word boundary, with ".." when shortened.
+static func _short(t: String, n: int) -> String:
+	if t.length() <= n:
+		return t
+	var cut := t.left(n - 2)
+	var sp := cut.rfind(" ")
+	if sp > n / 2:
+		cut = cut.left(sp)
+	return cut.strip_edges() + ".."
 
 
 func _next_objective() -> Dictionary:

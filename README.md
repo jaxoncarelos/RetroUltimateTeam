@@ -36,13 +36,11 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 | Ball carrier | follows the play's lane on his own · hold + drag up/down to steer · drag back to slow |
 | | flick up/down = juke · double-tap = dive |
 | CPU defense | learns your tendencies: repeat a play and it gets **keyed** (red "DEFENSE IS KEYING ON …" warning) |
-| **Defense** (`-- --defend`) | pick a call (BEST preselected), tap the field when ready |
-| | drag anywhere = move your defender (yellow ring) · tap the ball carrier = dive tackle |
-| | tap the ball's landing marker = leap to swat/pick (time it for the ball's arrival; from far away it sprints you there) |
-| | tap any defender = take control · INT return: drag up/down to steer |
-| 4th down | **PUNT** / **FG** buttons (top right) · FG/PAT: tap when the meter needle is in the green |
-| After a TD | choose KICK PAT or GO FOR 2 |
-| Anytime | **II** = pause (defense pace, quarter length, restart) · **TIMEOUT** button between plays |
+| **Defense** pre-snap | pick a call (BEST preselected) · **tap a defender** to control him (yellow ring + name tag; your pick is remembered) · tap the field when ready |
+| Defense live | drag anywhere = move your man · **run into the ball carrier to tackle** (your man wraps up farther and far more surely than CPU defenders) · tap the carrier = dive |
+| | tap the ball's landing marker = leap to swat/pick · INT return: drag up/down to steer |
+| | **SWITCH** (big button bottom right; Tab/Space) = jump to the defender nearest the ball. You stay on your man until you switch; tapping any defender also takes him |
+| Anytime | **II** / **Esc** / Android **back** = pause (resume, defense pace, quarter length, **QUIT TO MENU** — leaving counts as a loss) · **TIMEOUT** button between plays |
 | Keyboard | `R` restarts the drive (sandbox) · `F1` AI debug overlay (three-finger tap on a phone) |
 
 ### Debug arguments
@@ -52,6 +50,10 @@ godot --path . -- --demo-profile --screen=store   # any meta screen with an unsa
                                                   #  prematch, results, pack_open, season, settings, ...)
 godot --path . -- --demo-profile --screen=pack_open --elite --auto-open   # watch an Elite walkout
 godot --path . -- --demo-profile --screen=hub --no-popups                 # skip the daily check-in
+godot --path . -- --demo-profile --screen=store --coins=5000000           # test the store with lots of coins
+godot --path . -- --demo-profile --screen=lineup --pick=WR1 [--defense]   # lineup with a slot picker open
+godot --path . -- --demo-profile --screen=collection --sell-dupes         # squad with SELL DUPES confirm
+godot --headless --path . -- --sandbox --sim=300 --defend --bot=0.5       # a bot plays your defender
 godot --headless --path . -- --ai-vs-ai=40 --pass-log   # CPU games + passing stats (deep %, lobs, tips)
 godot --path . -- --watch                 # CPU vs CPU full game (demo)
 godot --headless --path . -- --ai-vs-ai=100   # 100 headless CPU-vs-CPU games, prints averages

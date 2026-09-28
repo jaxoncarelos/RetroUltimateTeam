@@ -45,7 +45,7 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
 5. [x] Field detail: `StadiumArt` (turf grain/mow stripes, crowd tiles), `CrowdView` (animated
    stands, benches, sideline players), `FieldView` (emblem, goalposts, pylons, arrows, chains,
    down box). `--look=X,Y` pins the camera for screenshots.
-6. [x] Phase 2 – playable defense: `DefenseSwitcher` (auto + tap-to-switch with hold),
+6. [x] Phase 2 – playable defense: `DefenseSwitcher` (manual: pre-snap tap to pick, SWITCH button / tap during play; no auto-switch),
    `HumanDefenseControl` (drag stick, tap carrier = dive, tap ball marker = leap/sprint, INT
    returns), jump timing (`RatingModel.jump_*`), INT returns/pick six, simple fumbles,
    `DebugOverlay` (F1 / 3 fingers), `DefensePace` + `Settings` autoload. Sandbox `--defend`,

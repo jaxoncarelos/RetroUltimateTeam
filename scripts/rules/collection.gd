@@ -195,7 +195,8 @@ static func auto_lineup(profile: Profile, db: RosterDB) -> void:
 		profile.lineup[slot] = best[slot]["key"]
 
 
-## slot -> {name, jersey, attrs, ovr, pos, uid} for the profile's lineup.
+## slot -> {name, jersey, attrs, ovr, pos, uid, look} for the profile's lineup (look =
+## PlayerData.look, used for the field sprite's skin tone/visor).
 static func lineup_entries(profile: Profile, db: RosterDB) -> Dictionary:
 	var out := {}
 	for slot in profile.lineup:
@@ -209,7 +210,8 @@ static func lineup_entries(profile: Profile, db: RosterDB) -> Dictionary:
 		var extra := int(e.get("boost", 0)) + int(e.get("dev", 0))
 		var ovr := card_ovr(db, e)
 		out[slot] = {"name": p.short_name(), "jersey": p.jersey, "pos": p.pos, "uid": int(e["uid"]),
-				"attrs": CardRules.card_attrs(p.attrs, p.ovr, c.ovr, ovr - c.ovr if extra > 0 else 0), "ovr": ovr}
+				"attrs": CardRules.card_attrs(p.attrs, p.ovr, c.ovr, ovr - c.ovr if extra > 0 else 0), "ovr": ovr,
+				"look": p.look}
 	return out
 
 

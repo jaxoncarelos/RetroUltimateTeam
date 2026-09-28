@@ -72,7 +72,7 @@ var sprite: AnimatedSprite2D
 
 
 func setup(p_team: int, p_slot: String, p_pos: String, p_attrs: Dictionary, t: GameplayTuning,
-		colors: Dictionary, p_name := "", p_jersey := 0) -> void:
+		colors: Dictionary, p_name := "", p_jersey := 0, p_look: Dictionary = {}) -> void:
 	team = p_team
 	slot = p_slot
 	pos_code = p_pos
@@ -87,7 +87,7 @@ func setup(p_team: int, p_slot: String, p_pos: String, p_attrs: Dictionary, t: G
 	sprite.sprite_frames = PlayerSprites.frames()
 	sprite.centered = false
 	sprite.offset = PlayerSprites.OFFSET
-	sprite.material = PlayerSprites.make_material(colors, hash(p_slot + p_name) + jersey)
+	sprite.material = PlayerSprites.make_material(colors, hash(p_slot + p_name) + jersey, p_look)
 	sprite.play("idle")
 	add_child(sprite)
 
@@ -158,7 +158,7 @@ func step(dt: float, t: GameplayTuning) -> void:
 	juke_cd = maxf(0.0, juke_cd - dt)
 	throw_anim = maxf(0.0, throw_anim - dt)
 	if is_down:
-		velocity = velocity.move_toward(Vector2.ZERO, 25.0 * dt)
+		velocity = velocity.move_toward(Vector2.ZERO, t.down_slide_decel * dt)
 		field_pos += velocity * dt
 		return
 	if dive_timer > 0.0:

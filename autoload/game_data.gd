@@ -14,6 +14,7 @@ func _ready() -> void:
 		push_warning("roster.csv: " + e)
 	db.fill_depth(teams.keys())
 	db.build_catalog()
+	ArtGen.register_looks(db.players)
 
 
 func player(id: String) -> PlayerData:

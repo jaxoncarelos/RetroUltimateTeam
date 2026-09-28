@@ -82,6 +82,8 @@ static var pass_log := {"att": 0, "comp": 0, "int": 0, "deep_att": 0, "deep_comp
 
 var _pending_result: Dictionary = {}
 var _dead_timer := 0.0
+## The dead-ball spot is read off the ball once the downed carrier's slide stops.
+var _spot_at_ball := false
 
 
 func _init() -> void:
@@ -178,7 +180,7 @@ func setup_play(p_off: PlayDef, p_def: PlayDef, p_los_x: float, p_ball_y: float,
 func _spawn(team: int, slot: String, pos: String, at: Vector2, info: Dictionary, colors: Dictionary) -> PlayerAgent:
 	var a := PlayerAgent.new()
 	var attrs: Dictionary = info.get("attrs", RatingModel.fill_attrs(pos, 70))
-	a.setup(team, slot, pos, attrs, tuning, colors, info.get("name", slot), info.get("jersey", 0))
+	a.setup(team, slot, pos, attrs, tuning, colors, info.get("name", slot), info.get("jersey", 0), info.get("look", {}))
 	a.field_pos = at
 	a.start_pos = at
 	a.in_stance = pos in ["OL", "DL", "TE"]
@@ -510,18 +512,27 @@ func start_scramble() -> void:
 	_set_carrier(qb)
 
 
-## Yards a tackled carrier falls forward (toward his goal) from his momentum.
+## Yards a tackled carrier falls forward (toward his goal) from his momentum. It is a
+## visible slide (on_tackle), never hidden yardage: the spot is where the ball comes to rest.
 func fall_forward(a: PlayerAgent) -> float:
 	var fwd := 1.0 if a.team == PlayerAgent.Team.OFFENSE else -1.0
-	return fwd * clampf(a.tackled_speed * fwd * tuning.fall_forward_time, 0.0, tuning.fall_forward_max)
+	var yards := clampf(a.tackled_speed * fwd * tuning.fall_forward_time, 0.0, tuning.fall_forward_max)
+	# The slide never carries the ball over the goal line he is running at.
+	var ball_x := a.field_pos.x + a.facing * Ball.HOLD_AHEAD
+	var room := (FieldGeo.OPP_GOAL - 0.3 - ball_x) if fwd > 0.0 else (ball_x - FieldGeo.OWN_GOAL - 0.3)
+	return fwd * clampf(yards, 0.0, maxf(room, 0.0))
 
 
 func on_tackle(tackler: PlayerAgent, runner: PlayerAgent) -> void:
 	runner.tackled_speed = runner.velocity.x
+	var speed := runner.velocity.length()
+	var slide := fall_forward(runner)
 	runner.knock_down()
 	tackler.knock_down(0.6)
 	tackler.velocity = runner.velocity * 0.5
-	big_hit.emit(runner.field_pos, runner.velocity.length())
+	# He goes down straight ahead, sliding exactly `slide` yards (v² = 2·a·d).
+	runner.velocity = Vector2(signf(slide) * sqrt(2.0 * tuning.down_slide_decel * absf(slide)), 0.0)
+	big_hit.emit(runner.field_pos, speed)
 	# Simple fumbles: the ball pops out on the hit and whoever is closest recovers it.
 	if runner.team == PlayerAgent.Team.OFFENSE:
 		var p := RatingModel.fumble_prob(tuning, runner.attr("car"), tackler.attr("tak"), tackler.attr("str"))
@@ -545,13 +556,14 @@ func _fumble(runner: PlayerAgent) -> void:
 		_end_play("fumble", spot, "FUMBLE! TURNOVER")
 
 
-## The human's defender at the snap: the middle linebacker-ish player (first LB, else nearest
-## defender to the ball).
+## The human's defender at the snap: the best-placed second-level player — the linebacker
+## nearest the ball (safeties next), else the nearest defender.
 func default_defender() -> PlayerAgent:
 	var best: PlayerAgent = null
 	var best_d := INF
 	for d in defense:
-		var dist := d.field_pos.distance_to(Vector2(los_x + 5.0, ball_y)) - (4.0 if d.pos_code == "LB" else 0.0)
+		var bonus := 4.0 if d.pos_code == "LB" else (2.0 if d.pos_code == "S" else 0.0)
+		var dist := d.field_pos.distance_to(Vector2(los_x + 5.0, ball_y)) - bonus
 		if dist < best_d:
 			best_d = dist
 			best = d
@@ -572,6 +584,8 @@ func _set_controlled(a: PlayerAgent) -> void:
 	controlled = a
 	if a != null:
 		a.highlight = true
+		if a.team == human_team and a.engaged_with != null and phase == Phase.LIVE:
+			a.shed_timer *= tuning.human_shed_mult   # your man fights off his block fast
 
 
 func _set_carrier(a: PlayerAgent, lane := PackedVector2Array()) -> void:
@@ -631,6 +645,8 @@ func _physics_process(dt: float) -> void:
 		ball.step(dt)
 		_dead_timer -= dt
 		if _dead_timer <= 0.0 and not _pending_result.is_empty():
+			if _spot_at_ball:
+				_set_spot(_pending_result, ball.field_pos)
 			var r := _pending_result
 			_pending_result = {}
 			phase = Phase.IDLE
@@ -693,18 +709,22 @@ func _check_carrier() -> void:
 		_end_play("td", p, "TOUCHDOWN!")
 		return
 	if p.y < 0.0 or p.y > FieldGeo.WIDTH:
-		_end_play("out", p, "OUT OF BOUNDS")
+		# Out where the ball crossed the sideline; it stays there (the runner coasts on).
+		var at := Vector2(ball.field_pos.x, clampf(ball.field_pos.y, 0.0, FieldGeo.WIDTH))
+		_end_play("out", at, "OUT OF BOUNDS")
+		ball.place(at)
 		return
 	if carrier.is_down:
 		if p.x <= FieldGeo.OWN_GOAL:
 			_end_play("safety", p, "SAFETY!")
 		elif carrier == qb and not pass_thrown and not is_run_play() and p.x < los_x:
-			_end_play("sack", p, "SACKED!")
+			_end_play("sack", ball.field_pos, "SACKED!")
+			_spot_at_ball = true
 		else:
-			# Falling forward gains yards but can't carry a downed runner into the end zone.
-			var spot := p + Vector2(fall_forward(carrier), 0.0)
-			spot.x = minf(spot.x, FieldGeo.OPP_GOAL - 0.5)
-			_end_play("tackle", spot, "")
+			# Spotted where the ball comes to rest after his slide (finalized when the play
+			# ends); a runner downed short of the goal line is never a touchdown.
+			_end_play("tackle", ball.field_pos, "")
+			_spot_at_ball = true
 
 
 ## Interception return (the defense runs toward -x): pick six, or down where tackled.
@@ -715,9 +735,11 @@ func _check_return(p: Vector2) -> void:
 		big_moment.emit("td", p)
 		_end_play("int_td", p, "PICK SIX!")
 	elif p.y < 0.0 or p.y > FieldGeo.WIDTH:
-		_end_play("int", p, "INTERCEPTED!")
+		_end_play("int", ball.field_pos, "INTERCEPTED!")
+		ball.place(ball.field_pos)
 	elif carrier.is_down:
-		_end_play("int", p - Vector2(fall_forward(carrier) * -1.0, 0.0), "INTERCEPTED!")
+		_end_play("int", ball.field_pos, "INTERCEPTED!")
+		_spot_at_ball = true
 
 
 ## Human defender's jump at the ball (swat / pick). Timing is judged at the catch point.
@@ -867,12 +889,9 @@ func _end_play(type: String, spot: Vector2, text: String) -> void:
 	_set_controlled(null)
 	for a in agents:
 		a.human = false
-	var spot_x := clampf(spot.x, 0.0, FieldGeo.LENGTH)
+	_spot_at_ball = false
 	_pending_result = {
 		"type": type,
-		"spot_x": spot_x,
-		"spot_y": clampf(spot.y, 0.0, FieldGeo.WIDTH),
-		"yards": int(round(spot_x) - round(los_x)),
 		"text": text,
 		"turnover": type in ["int", "int_td", "fumble"],
 		"broken_tackles": broken_tackles,
@@ -880,3 +899,20 @@ func _end_play(type: String, spot: Vector2, text: String) -> void:
 		"air_yards": ball.to.x - los_x if pass_thrown else 0.0,
 		"throw_kind": int(throw_plan.get("kind", -1)),
 	}
+	_set_spot(_pending_result, spot)
+
+
+## Dead-ball spot and yards. "yards" is exactly the change in the line of scrimmage the
+## down tracker will make (whole-yard spot, never past the 1 unless the play scored), so
+## the result banner always matches the markers.
+func _set_spot(r: Dictionary, spot: Vector2) -> void:
+	var spot_x := clampf(spot.x, 0.0, FieldGeo.LENGTH)
+	r["spot_x"] = spot_x
+	r["spot_y"] = clampf(spot.y, 0.0, FieldGeo.WIDTH)
+	var type: String = r["type"]
+	if type == "td":
+		r["yards"] = int(FieldGeo.OPP_GOAL - los_x)
+	elif type == "incomplete":
+		r["yards"] = 0
+	else:
+		r["yards"] = int(DownTracker.spot_yard(spot_x) - roundf(los_x))

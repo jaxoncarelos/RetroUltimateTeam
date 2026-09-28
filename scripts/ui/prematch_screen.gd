@@ -84,7 +84,9 @@ func _record(abbr: String) -> String:
 			return "%d-%d%s" % [r["w"], r["l"], "-%d" % r["t"] if int(r["t"]) > 0 else ""]
 	if abbr == prof.franchise_team:
 		return "%d-%d" % [prof.stats["wins"], prof.stats["losses"]]
-	return ""
+	# No record to show: their division, so both sides line up.
+	var t: TeamData = GameData.team(abbr)
+	return ("%s %s" % [t.conf, t.div.to_upper()]).strip_edges() if t != null else ""
 
 
 ## The opponent plays at a difficulty-scaled OVR (GameData.opponent_lineup).

@@ -27,6 +27,11 @@ func _init(p_color := Color("#ffcf40"), p_label := "GOLD", p_scale := 1.0) -> vo
 
 static func for_pack(pack: PackDef, p_scale := 1.0) -> PackArt:
 	var short := pack.display_name.replace(" PACK", "") if pack != null else "PACK"
+	if pack != null and pack.team == "FRANCHISE":
+		# "FRANCHISE" is too long for the band even condensed: show your team's nickname.
+		var team: TeamData = GameData.team(SaveManager.profile.franchise_team)
+		var nick := team.team_name.to_upper() if team != null else ""
+		short = nick if nick != "" and PixelFont.condensed_width(nick) <= W - 4 else "MY TEAM"
 	return PackArt.new(pack.color if pack != null else UiSkin.YELLOW, short, p_scale)
 
 
@@ -71,13 +76,8 @@ func _draw() -> void:
 	draw_texture_rect(em, Rect2(W * 0.5 - 7.5, 12, 15, 16), false)
 	draw_rect(Rect2(1, 33, W - 2, 11), UiSkin.SHADOW)
 	draw_rect(Rect2(1, 34, W - 2, 9), UiSkin.NAVY)
-	var lw := PixelFont.text_width(label)
-	var fs := 8
-	if lw > W - 4:
-		label = label.left(7)
-		lw = PixelFont.text_width(label)
-	draw_string(PixelFont.get_font(), Vector2(roundf((W - lw) * 0.5), 42), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs,
-			color.lightened(0.3))
+	# Long names ("RECEIVER", "FRANCHISE") switch to the condensed face instead of cutting.
+	UiSkin.draw_text_fit(self, W * 0.5, 42, label, W - 4, color.lightened(0.3))
 	# Sheen sweep.
 	var ph := fmod(_t, 2.2) / 2.2
 	var sx := lerpf(-40.0, W + 20.0, ph)

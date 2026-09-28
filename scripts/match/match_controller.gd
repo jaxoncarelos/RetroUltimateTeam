@@ -11,6 +11,12 @@ extends Node2D
 ##   --pace=P               defense pace override (every | key | highlights)
 
 enum Phase { PREGAME, PLAY_CALL, LIVE, RESULT, PAT_CHOICE, KICK_METER, BREAK, FINAL, PAUSED }
+## What the choice panel is showing while PAUSED: the pause menu or the leave-game confirm.
+enum PauseMenu { MAIN, CONFIRM_QUIT }
+
+const DEFENSE_PRESNAP_HINT := "TAP A DEFENDER TO PICK HIM  ·  TAP THE FIELD WHEN READY"
+const DEFENSE_LIVE_HINT := "DRAG TO MOVE  ·  RUN INTO THE CARRIER  ·  TAP HIM TO DIVE"
+const DEFENSE_AIR_HINT := "TAP THE BALL MARKER TO JUMP  ·  SWITCH = MAN NEAREST THE BALL"
 
 const DT := 1.0 / 60.0
 
@@ -43,6 +49,9 @@ var _two_point := false
 var _kick_kind := ""                ## "fg" / "pat" while the kick meter is up
 var _queued: Callable               ## sim mode: next transition (instead of a timer)
 var _paused_from := Phase.PLAY_CALL
+var _pause_menu := PauseMenu.MAIN
+var _pause_queued := false           ## back/Esc outside a pausable moment: pause at the next play call
+var _quit_on_back_was := true
 var _kickoff_pending := ""           ## team that must kick off when the next quarter starts
 var _comeback := false               ## the human trailed by 10+ at some point
 var _sim_totals: Dictionary = {}
@@ -87,6 +96,10 @@ func _ready() -> void:
 	if not teams.has(away_abbr) or away_abbr == home_abbr:
 		away_abbr = "PHI" if home_abbr != "PHI" else "KC"
 	human = "" if watch or sim_games > 0 else home_abbr
+	# Android back opens the pause menu instead of quitting the app (restored on exit).
+	_quit_on_back_was = get_tree().quit_on_go_back
+	if human != "":
+		get_tree().quit_on_go_back = false
 	memory = DefenseMemory.new(def_ai)
 	_build_scene(teams[home_abbr], teams[away_abbr])
 	_resolve_lineups(home_abbr, away_abbr)
@@ -130,7 +143,10 @@ func _build_scene(home_team: TeamData, away_team: TeamData) -> void:
 	add_child(hud)
 	hud.play_selected.connect(_on_play_selected)
 	hud.special_pressed.connect(_on_special)
-	hud.pause_pressed.connect(_pause)
+	hud.pause_pressed.connect(request_pause)
+	hud.switch_pressed.connect(func() -> void:
+		if _human_defense() and phase in [Phase.PLAY_CALL, Phase.LIVE]:
+			dcontrol.switch_to_ball())
 	hud.choice_made.connect(_on_choice)
 	hud.kick_meter.kicked.connect(_on_kicked)
 	touch = TouchInput.new()
@@ -326,7 +342,7 @@ func _start_play_call() -> void:
 		hud.set_play_options(ranked_d, defense_book.plays)
 		hud.set_selected(def_play)
 		hud.set_keyed(defense_book.plays, "")
-		hud.set_hint("PICK A DEFENSE  ·  TAP THE FIELD WHEN READY")
+		hud.set_hint(DEFENSE_PRESNAP_HINT)
 		_offer_specials()
 	else:
 		off_play = PlayAdvisor.pick(offense_book.plays, situation, rng)
@@ -336,6 +352,7 @@ func _start_play_call() -> void:
 	last_def_call = def_play
 	_setup_formation()
 	hud.show_play_bar(human != "")
+	hud.show_switch(_human_defense())
 	_update_scorebug()
 	if not _sim():
 		camera.snap_to_target()
@@ -345,6 +362,8 @@ func _start_play_call() -> void:
 				_snap())
 	else:
 		_coach_tips()
+		if _pause_queued:
+			_pause()
 
 
 func _ranked_defense(situation: Dictionary) -> Array[PlayDef]:
@@ -397,7 +416,7 @@ func _setup_formation() -> void:
 	field.los_x = gs.downs.los_x
 	field.first_down_x = gs.downs.first_down_x
 	field.down = gs.downs.down
-	dcontrol.switcher.reset()
+	dcontrol.on_play_setup()
 
 
 var _spot_y := FieldGeo.CENTER_Y
@@ -466,6 +485,9 @@ var _tagged: PlayerAgent = null
 
 
 func _process(delta: float) -> void:
+	if phase == Phase.LIVE and _human_defense() and runner.human_team == PlayerAgent.Team.DEFENSE:
+		var in_air := runner.ball.state == Ball.State.AIR
+		hud.set_hint(DEFENSE_AIR_HINT if in_air else DEFENSE_LIVE_HINT)
 	# Name + number of the player you control.
 	var ctrl := runner.controlled if human != "" else null
 	if ctrl != _tagged:
@@ -515,10 +537,11 @@ func _snap() -> void:
 	var cpu_passing := not _human_offense() and not off_play.is_run()
 	passer = CpuPasser.new(runner, rng) if cpu_passing else null
 	if auto_sim and not _sim():
+		hud.show_switch(false)
 		_simulate_play()
 		return
 	if _human_defense():
-		hud.set_hint("DRAG TO MOVE  ·  TAP THE CARRIER TO DIVE  ·  TAP THE BALL MARKER TO JUMP")
+		hud.set_hint(DEFENSE_LIVE_HINT)
 	elif _human_offense():
 		hud.set_hint("DRAG UP/DOWN TO STEER  ·  FLICK TO JUKE  ·  DOUBLE-TAP TO DIVE" if off_play.is_run()
 				else "DRAG BACK TO AIM, RELEASE TO THROW  ·  DRAG FORWARD TO RUN")
@@ -559,6 +582,7 @@ func _on_play_ended(r: Dictionary) -> void:
 	phase = Phase.RESULT
 	runner.human_team = -1
 	hud.set_hint("")
+	hud.show_switch(false)
 	if int(runner.play_time) >= int(PlayRunner.WATCHDOG_SECONDS):
 		r["watchdog"] = 1
 	if _human_offense():
@@ -642,7 +666,7 @@ func _coach_tips() -> void:
 		text = "YOUR BALL. THE BEST CALL IS PRESELECTED (OR TAP ANOTHER / MORE). PRESS THE QB AND DRAG BACK TO AIM, RELEASE TO THROW. DRAG FORWARD TO RUN."
 	elif _human_defense() and not _tips_seen.has("defense"):
 		key = "defense"
-		text = "DEFENSE! PICK A CALL, THEN TAP THE FIELD. DRAG TO MOVE YOUR MAN (YELLOW RING). TAP THE BALL CARRIER TO DIVE. WHEN THEY THROW, TAP THE LANDING MARKER TO JUMP."
+		text = "DEFENSE! PICK A CALL, TAP A DEFENDER TO CONTROL HIM (YELLOW TAG), THEN TAP THE FIELD. DRAG TO MOVE HIM AND RUN INTO THE CARRIER TO TACKLE. YOU STAY ON HIM UNTIL YOU HIT SWITCH (NEAREST MAN TO THE BALL)."
 	if key == "":
 		return
 	_tips_seen[key] = true
@@ -982,43 +1006,142 @@ func _final_summary() -> String:
 
 # ---------------------------------------------------------------- pause menu
 
-func _pause() -> void:
-	if phase not in [Phase.PLAY_CALL, Phase.LIVE] or human == "":
+func _can_pause() -> bool:
+	return human != "" and phase in [Phase.PLAY_CALL, Phase.LIVE] and not hud.is_choice_open()
+
+
+## II button, Esc or the Android back button. Outside a play call / live play (banners,
+## kicks, PAT choice) the request waits for the next play call so nothing half-finished
+## is frozen; while paused, back/Esc resumes (or backs out of the leave confirm).
+func request_pause() -> void:
+	if human == "" or phase == Phase.FINAL:
 		return
+	if phase == Phase.PAUSED:
+		if _pause_menu == PauseMenu.CONFIRM_QUIT:
+			_show_pause_menu()
+		else:
+			hud.hide_choice()
+			_resume()
+		return
+	if _can_pause():
+		_pause()
+	else:
+		_pause_queued = true
+
+
+func _pause() -> void:
+	if not _can_pause():
+		return
+	_pause_queued = false
 	_paused_from = phase
 	phase = Phase.PAUSED
 	runner.set_physics_process(false)
+	hud.show_switch(false)
+	_show_pause_menu()
+
+
+func _show_pause_menu() -> void:
+	_pause_menu = PauseMenu.MAIN
+	hud.show_choice("PAUSED", "%s  ·  %s %d  %s %d" % [gs.clock.label(), gs.home, gs.score[gs.home], gs.away, gs.score[gs.away]],
+			pause_options())
+
+
+## Pause menu entries (index = choice): RESUME, pace, quarter length, [RESTART GAME,] QUIT TO MENU.
+func pause_options() -> Array[String]:
 	var opts: Array[String] = ["RESUME", "DEFENSE PACE: %s" % DefensePace.NAMES[pace],
-			"QUARTER: %.1f MIN (NEXT GAME)" % Settings.quarter_minutes,
-			"QUIT (FORFEIT)" if config.get("from_hub", false) else "RESTART GAME"]
-	hud.show_choice("PAUSED", "%s  ·  %s %d  %s %d" % [gs.clock.label(), gs.home, gs.score[gs.home], gs.away, gs.score[gs.away]], opts)
+			"QUARTER: %.1f MIN (NEXT GAME)" % Settings.quarter_minutes]
+	if not config.get("from_hub", false):
+		opts.append("RESTART GAME")
+	opts.append("QUIT TO MENU")
+	return opts
+
+
+func _is_challenge() -> bool:
+	return not _chal.is_empty() or str(config.get("mode", "")) == "challenge"
 
 
 func _on_pause_choice(index: int) -> void:
-	match index:
-		1:
+	if _pause_menu == PauseMenu.CONFIRM_QUIT:
+		if index == 1:
+			_quit_to_menu()
+		else:
+			_show_pause_menu()
+		return
+	var opts := pause_options()
+	var opt: String = opts[index] if index >= 0 and index < opts.size() else "RESUME"
+	match opt.get_slice(":", 0):
+		"DEFENSE PACE":
 			pace = (pace + 1) % DefensePace.NAMES.size()
 			Settings.defense_pace = pace
 			Settings.save_settings()
-			phase = _paused_from
-			_pause()
-			return
-		2:
+			_show_pause_menu()
+		"QUARTER":
 			var lengths := [1.5, 2.5, 3.5, 5.0]
 			var i := lengths.find(Settings.quarter_minutes)
 			Settings.quarter_minutes = lengths[(i + 1) % lengths.size()]
 			Settings.save_settings()
-			phase = _paused_from
-			_pause()
-			return
-		3:
-			if config.get("from_hub", false):
-				SceneRouter.goto(SceneRouter.RESULTS, {"last_result": match_result(true)})
+			_show_pause_menu()
+		"RESTART GAME":
+			Engine.time_scale = 1.0
+			get_tree().reload_current_scene()
+		"QUIT TO MENU":
+			_pause_menu = PauseMenu.CONFIRM_QUIT
+			if _is_challenge():
+				hud.show_choice("LEAVE THE CHALLENGE?", "YOU CAN TRY IT AGAIN ANYTIME", ["STAY", "LEAVE"] as Array[String])
+			elif config.get("from_hub", false):
+				hud.show_choice("LEAVE THE GAME?", "IT COUNTS AS A LOSS", ["STAY", "LEAVE"] as Array[String])
 			else:
-				get_tree().reload_current_scene()
-			return
+				hud.show_choice("LEAVE THE GAME?", "BACK TO THE TITLE SCREEN", ["STAY", "LEAVE"] as Array[String])
+		_:
+			_resume()
+
+
+func _resume() -> void:
 	phase = _paused_from
+	_pause_menu = PauseMenu.MAIN
 	runner.set_physics_process(true)
+	hud.show_switch(_human_defense() and phase in [Phase.PLAY_CALL, Phase.LIVE]
+			and runner.human_team == PlayerAgent.Team.DEFENSE)
+
+
+## Leaves the match: a normal hub game goes through the results screen as a forfeit (a
+## loss); a challenge just goes back to the challenge list; a debug launch to the title.
+func _quit_to_menu() -> void:
+	phase = Phase.FINAL
+	runner.set_physics_process(false)
+	hud.hide_choice()
+	hud.show_play_bar(false)
+	hud.show_switch(false)
+	hud.set_special_actions([] as Array[String])
+	hud.set_hint("")
+	Engine.time_scale = 1.0
+	if _is_challenge() and config.get("from_hub", false):
+		SceneRouter.goto(SceneRouter.CHALLENGES)
+	elif config.get("from_hub", false):
+		SceneRouter.goto(SceneRouter.RESULTS, {"last_result": match_result(true)})
+	else:
+		SceneRouter.goto(SceneRouter.TITLE)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		request_pause()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	var k := event as InputEventKey
+	if k == null or not k.pressed or k.echo:
+		return
+	if k.keycode == KEY_ESCAPE:
+		request_pause()
+		get_viewport().set_input_as_handled()
+	elif k.keycode in [KEY_TAB, KEY_SPACE] and _human_defense() and phase in [Phase.PLAY_CALL, Phase.LIVE]:
+		dcontrol.switch_to_ball()
+		get_viewport().set_input_as_handled()
+
+
+func _exit_tree() -> void:
+	get_tree().quit_on_go_back = _quit_on_back_was
 
 
 # ---------------------------------------------------------------- ai vs ai batch

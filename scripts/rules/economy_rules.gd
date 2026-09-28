@@ -187,6 +187,100 @@ static func quicksell(profile: Profile, db: RosterDB, uid: int) -> int:
 	return value
 
 
+## Which cards SELL DUPLICATES would quick-sell: for every player you own more than one
+## card of, the best copy stays (starting > locked > highest effective OVR > most
+## development > oldest uid) and every other unlocked, benched copy goes.
+## Returns {"sell_uids": Array[int], "coins": int, "players": int (players trimmed)}.
+static func duplicate_plan(profile: Profile, db: RosterDB) -> Dictionary:
+	var by_player := {}
+	for e in profile.cards:
+		var c: CardDef = db.cards.get(e.get("def", ""))
+		if c == null:
+			continue   # retired: not a duplicate of anything
+		if not by_player.has(c.player_id):
+			by_player[c.player_id] = []
+		by_player[c.player_id].append(e)
+	var sell: Array[int] = []
+	var coins := 0
+	var players := 0
+	for pid in by_player:
+		var copies: Array = by_player[pid]
+		if copies.size() < 2:
+			continue
+		copies.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return _keep_first(profile, db, a, b))
+		var trimmed := false
+		var keep_ovr := Collection.card_ovr(db, copies[0])
+		for i in range(1, copies.size()):
+			var e: Dictionary = copies[i]
+			var uid := int(e["uid"])
+			# Never sell starters, locked cards, or a bench copy better than the one starting
+			# (that's a lineup upgrade waiting to happen).
+			if e.get("locked", false) or profile.in_lineup(uid) or Collection.card_ovr(db, e) > keep_ovr:
+				continue
+			sell.append(uid)
+			coins += quicksell_value(db, e)
+			trimmed = true
+		if trimmed:
+			players += 1
+	return {"sell_uids": sell, "coins": coins, "players": players}
+
+
+## Whether copy `a` is a better keeper than `b` (see duplicate_plan).
+static func _keep_first(profile: Profile, db: RosterDB, a: Dictionary, b: Dictionary) -> bool:
+	var ka := [1 if profile.in_lineup(int(a["uid"])) else 0, 1 if a.get("locked", false) else 0,
+			Collection.card_ovr(db, a), int(a.get("dev", 0)) * 100000 + int(a.get("xp", 0)), -int(a["uid"])]
+	var kb := [1 if profile.in_lineup(int(b["uid"])) else 0, 1 if b.get("locked", false) else 0,
+			Collection.card_ovr(db, b), int(b.get("dev", 0)) * 100000 + int(b.get("xp", 0)), -int(b["uid"])]
+	for i in ka.size():
+		if ka[i] != kb[i]:
+			return ka[i] > kb[i]
+	return false
+
+
+## Bench cards that would improve a lineup slot (the lineup screen's green "▲+N" badges):
+## slot -> {"uid", "ovr", "delta"} for every slot where you own a better card of that
+## position whose player isn't already starting elsewhere (a better copy of the slot's own
+## player counts). Empty slots count as OVR 0. Effective OVR incl. development.
+static func lineup_upgrades(profile: Profile, db: RosterDB) -> Dictionary:
+	var starting := {}   # player_id -> slot
+	var cur := {}        # slot -> {ovr, player}
+	for slot in profile.lineup:
+		var e := profile.find(int(profile.lineup[slot]))
+		var c: CardDef = db.cards.get(e.get("def", "")) if not e.is_empty() else null
+		if c == null:
+			continue
+		starting[c.player_id] = slot
+		cur[slot] = {"ovr": Collection.card_ovr(db, e), "player": c.player_id}
+	var out := {}
+	for slot in TeamRating.ALL_SLOTS:
+		var pos := TeamRating.slot_pos(slot)
+		var here: Dictionary = cur.get(slot, {"ovr": 0, "player": ""})
+		var best := {}
+		for e in profile.cards:
+			var uid := int(e["uid"])
+			if profile.in_lineup(uid):
+				continue
+			var c: CardDef = db.cards.get(e.get("def", ""))
+			if c == null or db.players[c.player_id].pos != pos:
+				continue
+			if starting.has(c.player_id) and c.player_id != here["player"]:
+				continue
+			var o := Collection.card_ovr(db, e)
+			if o > int(here["ovr"]) and (best.is_empty() or o > int(best["ovr"])):
+				best = {"uid": uid, "ovr": o, "delta": o - int(here["ovr"])}
+		if not best.is_empty():
+			out[slot] = best
+	return out
+
+
+## Quick-sells every card duplicate_plan() picks. Returns coins gained.
+static func sell_duplicates(profile: Profile, db: RosterDB) -> int:
+	var total := 0
+	for uid: int in duplicate_plan(profile, db)["sell_uids"]:
+		total += quicksell(profile, db, uid)
+	return total
+
+
 ## Whether `fodder_uid` could train `target_uid` (same player, unlocked, benched, and the
 ## target still has a boost left or room to develop).
 static func can_train(profile: Profile, db: RosterDB, target_uid: int, fodder_uid: int) -> bool:

@@ -46,6 +46,9 @@ func _ready() -> void:
 	next.pressed.connect(func() -> void: _turn(1))
 	next.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(next)
+	_buttons["dupes"] = MetaUI.button("SELL DUPES", Vector2(74, 19), _confirm_sell_dupes)
+	_buttons["dupes"].size_flags_vertical = Control.SIZE_SHRINK_END   # room for the count badge
+	_ui["top_right"].add_child(_buttons["dupes"])
 	var nav: HBoxContainer = _ui["nav"]
 	_buttons["pos"] = MetaUI.nav_button("POS: ALL", _cycle.bind("pos"), 62)
 	_buttons["tier"] = MetaUI.nav_button("TIER: ALL", _cycle.bind("tier"), 70)
@@ -57,6 +60,11 @@ func _ready() -> void:
 	nav.add_child(MetaUI.stat_box("OFFENSE", MetaUI.stars(ss["off"], UiSkin.STAR_BLUE), Vector2(62, 28)))
 	nav.add_child(MetaUI.stat_box("DEFENSE", MetaUI.stars(ss["def"], UiSkin.STAR_RED), Vector2(62, 28)))
 	_refresh()
+	for arg in OS.get_cmdline_user_args():   # debug: open a popup for screenshots
+		if arg == "--sell-dupes":
+			_confirm_sell_dupes.call_deferred()
+		elif arg == "--detail" and _grid.get_child_count() > 0:
+			_show_detail.call_deferred(_grid.get_child(0))
 
 
 func _cycle(which: String) -> void:
@@ -113,6 +121,80 @@ func _refresh() -> void:
 		tw.tween_property(v, "modulate:a", 1.0, 0.12)
 		i += 1
 	(_ui["coins"] as CoinPill).set_coins(prof.coins)
+	_refresh_dupes.call_deferred()
+
+
+func _refresh_dupes() -> void:
+	var n: int = EconomyRules.duplicate_plan(SaveManager.profile, GameData.db)["sell_uids"].size()
+	MetaUI.badge(_buttons["dupes"], n)
+
+
+func _confirm_sell_dupes() -> void:
+	var prof := SaveManager.profile
+	var plan := EconomyRules.duplicate_plan(prof, GameData.db)
+	var uids: Array = plan["sell_uids"]
+	if uids.is_empty():
+		MetaUI.toast(self, "NO SPARE COPIES TO SELL", UiSkin.WHITE)
+		return
+	Sfx.play("flip")
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 5)
+	body.add_child(MetaUI.label("SELL %d SPARE CARD%s OF %d PLAYER%s?" % [uids.size(), "" if uids.size() == 1 else "S",
+			int(plan["players"]), "" if int(plan["players"]) == 1 else "S"], UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_CENTER))
+	# A peek at what goes (up to 6 cards, best first).
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 5)
+	var shown: Array = []
+	for uid in uids:
+		shown.append(prof.find(int(uid)))
+	shown.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return Collection.card_ovr(GameData.db, a) > Collection.card_ovr(GameData.db, b))
+	for e in shown.slice(0, 6):
+		var v := CardView.new(GameData.card(e["def"]), e, 1)
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(v)
+	if shown.size() > 6:
+		var more := MetaUI.label("+%d
+MORE" % (shown.size() - 6), UiSkin.MUTED, 8, HORIZONTAL_ALIGNMENT_CENTER)
+		more.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(more)
+	body.add_child(row)
+	var total := HBoxContainer.new()
+	total.alignment = BoxContainer.ALIGNMENT_CENTER
+	total.add_theme_constant_override("separation", 4)
+	total.add_child(MetaUI.label("+" + CoinPill.fmt(int(plan["coins"])), UiSkin.YELLOW, 16))
+	var coin := TextureRect.new()
+	coin.texture = UiSkin.coin_tex()
+	coin.custom_minimum_size = Vector2(14, 14)
+	coin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	total.add_child(coin)
+	body.add_child(total)
+	body.add_child(MetaUI.label("YOUR BEST COPY OF EACH PLAYER STAYS.
+STARTERS AND LOCKED CARDS ARE NEVER SOLD.", UiSkin.MUTED,
+			8, HORIZONTAL_ALIGNMENT_CENTER))
+	MetaUI.popup(self, "SELL DUPLICATES", body, [["CANCEL", Callable()],
+			["SELL +%s" % CoinPill.fmt(int(plan["coins"])), _sell_dupes, true]])
+
+
+func _sell_dupes() -> void:
+	var prof := SaveManager.profile
+	var n: int = EconomyRules.duplicate_plan(prof, GameData.db)["sell_uids"].size()
+	var coins := EconomyRules.sell_duplicates(prof, GameData.db)
+	if coins <= 0:
+		return
+	SaveManager.save()
+	Sfx.play("claim")
+	var pill: CoinPill = _ui["coins"]
+	Fx.fly_coins(_ui["layer"], get_viewport_rect().size * 0.5, pill.coin_global(), clampi(n * 2, 8, 20))
+	get_tree().create_timer(0.55).timeout.connect(func() -> void:
+		if is_instance_valid(pill):
+			pill.set_coins(prof.coins))
+	MetaUI.toast(self, "SOLD %d CARD%s  +%s COINS" % [n, "" if n == 1 else "S", CoinPill.fmt(coins)])
+	_page = 0
+	_refresh()
+	pill.set_coins(prof.coins - coins, false)
 
 
 func _show_detail(v: CardView) -> void:
@@ -154,14 +236,32 @@ func _show_detail(v: CardView) -> void:
 	else:
 		col.add_child(MetaUI.label("FULLY DEVELOPED", UiSkin.MUTED))
 	var starter: bool = info.get("in_lineup", false)
-	col.add_child(MetaUI.label("STARTER" if starter else "BENCH", UiSkin.GREEN if starter else UiSkin.MUTED))
+	var copies := 0
+	for e in prof.cards:
+		var oc: CardDef = GameData.card(e["def"])
+		if oc != null and oc.player_id == v.card.player_id:
+			copies += 1
+	var st := MetaUI.label("STARTER" if starter else "BENCH", UiSkin.GREEN if starter else UiSkin.MUTED)
+	if copies > 1:
+		st.text += "  -  YOU OWN %d COPIES" % copies
+	col.add_child(st)
+	# Quick-sell line: value, or why it can't be sold.
+	var sell_txt := "QUICK SELL: %s COINS" % CoinPill.fmt(EconomyRules.quicksell_value(GameData.db, v.entry))
+	var sell_col := UiSkin.YELLOW
+	if starter:
+		sell_txt = "STARTERS CAN'T BE SOLD"
+		sell_col = UiSkin.MUTED
+	elif v.entry["locked"]:
+		sell_txt = "LOCKED - UNLOCK TO SELL"
+		sell_col = UiSkin.MUTED
+	col.add_child(MetaUI.label(sell_txt, sell_col))
 	var dupe := _find_dupe(uid)
 	var btns: Array = [["CLOSE", Callable()]]
 	btns.append(["UNLOCK" if v.entry["locked"] else "LOCK", _toggle_lock.bind(uid)])
 	if dupe >= 0 and EconomyRules.can_train(prof, GameData.db, uid, dupe):
 		btns.append(["TRAIN (DUPE)", _train.bind(uid, dupe)])
 	if not starter and not v.entry["locked"]:
-		btns.append(["SELL +%d" % EconomyRules.quicksell_value(GameData.db, v.entry), _sell.bind(uid), true])
+		btns.append(["SELL +%s ●" % CoinPill.fmt(EconomyRules.quicksell_value(GameData.db, v.entry)), _sell.bind(uid), true])
 	MetaUI.popup(self, "PLAYER CARD", row, btns)
 
 

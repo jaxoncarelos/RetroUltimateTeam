@@ -12,7 +12,7 @@ extends Resource
 @export var cut_keep_min := 0.45       ## velocity kept through a route cut at route running 0
 @export var cut_keep_max := 0.9        ## … at route running 99
 @export var carrier_speed_mult := 0.94 ## ball carriers run a bit slower than their top speed
-@export var pursuit_speed_mult := 1.05 ## pursuing defenders run a bit faster (effort + angles)
+@export var pursuit_speed_mult := 1.07 ## pursuing defenders run a bit faster (effort + angles)
 
 @export_group("Passing")
 @export var throw_speed_base := 17.0   ## yd/s
@@ -80,28 +80,34 @@ extends Resource
 @export var cpu_min_throw_time := 0.75 ## earliest throw (plus 0.12 s per yard of drop)
 @export var cpu_max_hold := 2.6        ## after this the QB takes the best option or throws it away
 @export var cpu_checkdown_open := 0.6
-@export var cpu_deep_caution := 0.06   ## yards of openness the CPU QB wants per air yard beyond 15
+@export var cpu_deep_caution := 0.12   ## yards of openness the CPU QB wants per air yard beyond 15
 @export var cpu_zone_closing := 0.55   ## share of a defender's closing speed during the flight the CPU QB respects
 
 @export_group("Contact")
-@export var tackle_range := 0.85
+@export var tackle_range := 0.9
 @export var tackle_bias := 1.4         ## sigmoid offset: >0 favors the tackler
 @export var tackle_k := 14.0
 @export var tackle_min := 0.3
 @export var tackle_max := 0.95
 @export var juke_tackle_mult := 0.45
-@export var missed_tackle_stun := 0.7
+@export var missed_tackle_stun := 0.45
+@export var missed_tackle_cd := 0.8    ## s before a defender who missed may try again
+@export var missed_tackle_slow := 0.55 ## carrier keeps this share of his speed through a broken tackle
+@export var broken_tackle_bonus := 0.12 ## each tackle a runner already broke this play adds this to the next try
+@export var engaged_tackle_range := 0.6 ## a blocked defender can still arm-tackle a carrier this close…
+@export var engaged_tackle_mult := 0.3 ## …at this share of his normal chance
 @export var cpu_dive_range := 1.9      ## CPU defenders launch a dive tackle inside this range
-@export var dive_tackle_range := 1.15
+@export var dive_tackle_range := 1.3 
 @export var dive_tackle_bonus := 0.08
-@export var dive_recover := 0.8        ## seconds a defender stays down after a dive
+@export var dive_recover := 0.45       ## seconds a defender stays down after a dive
 @export var open_field_shed_mult := 0.35 ## blocks after the catch/handoff hold this much shorter
 @export var engage_range := 1.2
 @export var run_engage_range := 1.6    ## run blockers latch on from a bit farther
 @export var snap_engage_range := 2.8   ## on run plays linemen fire off and engage the man over them at the snap
 @export var run_seal_push := 0.15      ## yd/s run blockers drive their man sideways, away from the carrier's lane
-@export var fall_forward_time := 0.3  ## tackled carriers fall forward: spot += forward speed × this
-@export var fall_forward_max := 2.8
+@export var fall_forward_time := 0.26 ## tackled carriers visibly slide forward: forward speed × this (yards)…
+@export var fall_forward_max := 2.2    ## …capped here. The spot is where the ball comes to rest.
+@export var down_slide_decel := 25.0   ## yd/s² a downed player's slide slows at
 @export var shed_base := 1.9           ## seconds a block holds at equal ratings
 @export var shed_per_point := 0.035
 @export var shed_min := 0.5
@@ -118,16 +124,25 @@ extends Resource
 @export var jump_start_range := 4.5    ## yards from the landing spot a leap can start
 @export var jump_perfect := 0.09       ## s of timing error for a perfect jump
 @export var jump_good := 0.22          ## s of timing error that still gets a hand on it
-@export var jump_int_perfect := 0.55   ## base INT chance on a perfect jump (scaled by coverage/hands)
+@export var jump_int_perfect := 0.45   ## base INT chance on a perfect jump (scaled by coverage/hands)
 @export var jump_deflect_good := 0.75  ## swat chance on a good (not perfect) jump
 @export var stick_deadzone := 6.0      ## px before the defense stick moves the player
 @export var stick_full := 26.0         ## px of drag for full speed
-@export var tap_carrier_radius := 3.5  ## yards: a tap this close to the ball carrier is a dive
-@export var human_dive_range := 2.8    ## yards: max distance for the human's dive tackle
-@export var tap_switch_radius := 2.2   ## yards: tapping this close to a defender switches to him
+@export var tap_carrier_radius := 4.5  ## yards: a tap this close to the ball carrier is a dive
+@export var human_dive_range := 3.4    ## yards: max distance for the human's dive tackle
+@export var tap_switch_radius := 2.6   ## yards: tapping this close to a defender switches to him
 @export var tap_ball_radius := 5.0     ## yards: a tap this close to the landing marker is a jump
-@export var switch_manual_hold := 1.5  ## s a manual switch holds before auto-switch may override
-@export var switch_margin := 0.35      ## s of intercept time a new auto pick must be better by
+@export_subgroup("Human tackling")
+@export var human_tackle_range := 1.3  ## yards: your defender wraps up a carrier this close (CPU: tackle_range)
+@export var human_dive_tackle_range := 1.7 ## … while diving (CPU: dive_tackle_range)
+@export var human_tackle_bonus := 0.18 ## added to your defender's tackle chance
+@export var human_dive_bonus := 0.3    ## added on your dives (on top of the tackle chance)
+@export var human_tackle_max := 0.97
+@export var human_missed_stun := 0.15  ## your defender barely stumbles on a miss
+@export var human_speed_mult := 1.04  ## your defender runs this much faster while you steer him
+@export var human_shed_mult := 0.6     ## blocks on your defender hold this share as long
+@export var human_assist_range := 2.2  ## CPU teammates this close to your tackle attempt help wrap up…
+@export var human_assist_bonus := 0.1  ## …adding this each
 
 @export_group("Kicking")
 @export var touchback_yard := 25.0        ## kickoff touchback spot (yards from own goal)

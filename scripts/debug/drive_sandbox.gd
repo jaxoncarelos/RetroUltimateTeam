@@ -15,6 +15,9 @@ extends Node2D
 ##   --aim-demo   (with --autoplay) the CPU QB shows the human aim preview for ~0.6 s before
 ##                it throws (screenshots of the arc / reticle / ghost markers)
 ##   --autosnap   (with --defend) snap automatically so the human-defense view can be recorded
+##   --bot[=S]    (with --defend) a "human-like" DefenderBot plays your defender (skill S 0..1,
+##                default 0.5); with --sim it measures how a human defense fares
+##   --off-ovr=N --def-ovr=N   team strengths (default 80 vs 78)
 
 enum State { PLAY_CALL, LIVE, RESULT, DRIVE_OVER }
 
@@ -60,6 +63,10 @@ var use_memory := true
 var smart_calls := false
 var autosnap := false
 var aim_demo := false
+var bot: DefenderBot
+var bot_skill := -1.0
+var off_ovr := OFF_OVR
+var def_ovr := DEF_OVR
 var _aim_demo_t := -1.0
 var stats := {"plays": 0, "yards": 0, "att": 0, "comp": 0, "int": 0, "sack": 0, "td": 0,
 		"runs": 0, "run_yds": 0, "pass_yds": 0, "broken": 0, "keyed": 0, "drives": 0, "fumble": 0}
@@ -88,6 +95,14 @@ func _ready() -> void:
 			autosnap = true
 		elif arg == "--aim-demo":
 			aim_demo = true
+		elif arg == "--bot":
+			bot_skill = 0.5
+		elif arg.begins_with("--bot="):
+			bot_skill = float(arg.get_slice("=", 1))
+		elif arg.begins_with("--off-ovr="):
+			off_ovr = int(arg.get_slice("=", 1))
+		elif arg.begins_with("--def-ovr="):
+			def_ovr = int(arg.get_slice("=", 1))
 		elif arg.begins_with("--look="):
 			var xy := arg.get_slice("=", 1).split(",")
 			(func() -> void: camera.pinned = Vector2(float(xy[0]), float(xy[1]))).call_deferred()
@@ -105,7 +120,8 @@ func _ready() -> void:
 	runner = PlayRunner.new()
 	runner.tuning = tuning
 	runner.def_ai = def_ai
-	runner.human_team = -1 if autoplay else human_side
+	var bot_on := bot_skill >= 0.0 and human_side == PlayerAgent.Team.DEFENSE
+	runner.human_team = human_side if bot_on or not autoplay else -1
 	runner.rng.randomize()
 	runner.off_colors = off_team.uniform_colors()
 	runner.def_colors = def_team.uniform_colors()
@@ -131,6 +147,7 @@ func _ready() -> void:
 	camera.make_current()
 
 	hud = MatchHUD.new()
+	hud.runner = runner
 	add_child(hud)
 	hud.play_selected.connect(_on_play_selected)
 	hud.restart_pressed.connect(_restart_drive)
@@ -159,10 +176,13 @@ func _ready() -> void:
 		dcontrol.ready_tapped.connect(func() -> void:
 			if state == State.PLAY_CALL:
 				_snap())
+		hud.switch_pressed.connect(dcontrol.switch_to_ball)
+		if bot_on:
+			bot = DefenderBot.new(dcontrol, runner, bot_skill)
 
 	runner.play_ended.connect(_on_play_ended)
-	off_lineup = _generic_lineup(offense_book.plays[0].formation, OFF_OVR)
-	def_lineup = _generic_lineup(defense_book.plays[0].formation, DEF_OVR)
+	off_lineup = _generic_lineup(offense_book.plays[0].formation, off_ovr)
+	def_lineup = _generic_lineup(defense_book.plays[0].formation, def_ovr)
 	selected_play = offense_book.plays[0]
 	def_play = defense_book.plays[0]
 	_restart_drive()
@@ -187,6 +207,8 @@ func _run_sim() -> void:
 				_snap()
 			State.LIVE:
 				_cpu_offense_step(DT)
+				if bot != null:
+					bot.step(DT)
 				runner._physics_process(DT)
 			State.RESULT:
 				_start_play_call()
@@ -233,9 +255,10 @@ func _start_play_call() -> void:
 		hud.set_play_options(ranked, defense_book.plays)
 		hud.set_selected(def_play)
 		hud.set_keyed(defense_book.plays, "")
-		hud.set_hint("PICK A DEFENSE  ·  TAP THE FIELD WHEN READY")
+		hud.set_hint("TAP A DEFENDER TO PICK HIM  ·  TAP THE FIELD WHEN READY")
+		hud.show_switch(not autoplay or bot != null)
 		_update_scorebug()
-		if (autoplay or autosnap) and sim_target == 0:
+		if (autoplay or autosnap or bot != null) and sim_target == 0:
 			get_tree().create_timer(0.5 if autoplay else 1.2).timeout.connect(func() -> void:
 				if state == State.PLAY_CALL:
 					_snap())
@@ -287,7 +310,7 @@ func _setup_formation() -> void:
 	field.first_down_x = downs.first_down_x
 	field.down = downs.down
 	if dcontrol != null:
-		dcontrol.switcher.reset()
+		dcontrol.on_play_setup()
 
 
 func _update_scorebug() -> void:
@@ -339,7 +362,7 @@ func _snap() -> void:
 	hud.set_keyed(offense_book.plays, "")
 	var cpu_offense := autoplay or _human_defense()
 	# Defense pace: snaps the human doesn't play are simulated instantly.
-	var auto_sim := _human_defense() and not autoplay and not DefensePace.human_plays(pace, _situation())
+	var auto_sim := _human_defense() and not autoplay and bot == null and not DefensePace.human_plays(pace, _situation())
 	if auto_sim:
 		runner.human_team = -1
 	runner.snap()
@@ -348,7 +371,7 @@ func _snap() -> void:
 		_simulate_current_play()
 		return
 	if _human_defense():
-		hud.set_hint("DRAG TO MOVE  ·  TAP THE CARRIER TO DIVE  ·  TAP THE BALL MARKER TO JUMP")
+		hud.set_hint("DRAG TO MOVE  ·  RUN INTO THE CARRIER  ·  TAP HIM TO DIVE")
 	elif selected_play.is_run():
 		hud.set_hint("DRAG UP/DOWN TO STEER  ·  FLICK TO JUKE  ·  DOUBLE-TAP TO DIVE")
 	else:
@@ -370,6 +393,8 @@ func _physics_process(dt: float) -> void:
 	_cpu_offense_step(dt)
 	if dcontrol != null and state == State.LIVE:
 		dcontrol.update(dt)
+		if bot != null:
+			bot.step(dt)
 
 
 func _cpu_offense_step(dt: float) -> void:
@@ -445,12 +470,18 @@ func _print_stats() -> void:
 		s["runs"], s["run_yds"], float(s["run_yds"]) / maxf(s["runs"], 1), s["td"], s["fumble"],
 		s["broken"], s["keyed"], 7.0 * s["td"] / maxf(s["drives"], 1), s["drives"]])
 	print(PlayRunner.pass_log_text())
+	var cs := ContactResolver.stats
+	print("TACKLES cpu %d/%d (%.0f%%), %d dives (%d reached him) | human %d/%d (%.0f%%)%s" % [cs["tackles"], cs["tries"],
+			100.0 * cs["tackles"] / maxf(cs["tries"], 1), cs["dives"], cs["dive_tries"], cs["human_tackles"], cs["human_tries"],
+			100.0 * cs["human_tackles"] / maxf(cs["human_tries"], 1),
+			"" if bot == null else " | bot switches %d, dives %d, jumps %d" % [bot.stats["switches"], bot.stats["dives"], bot.stats["jumps"]]])
 
 
 func _on_play_ended(result: Dictionary) -> void:
 	_record(result)
 	state = State.RESULT
 	hud.set_hint("")
+	hud.show_switch(false)
 	var type: String = result["type"]
 	var yards: int = result["yards"]
 	var headline: String = result["text"]

@@ -1,64 +1,79 @@
 class_name DefenseSwitcher
 extends RefCounted
-## Picks which defender the human controls (PLAN.md §4 "Auto-control"):
-##   pre-throw  - the defender best placed on the receiver the CPU QB is reading;
-##   ball in air - the defender who can reach the landing spot soonest;
-##   ball carried - the pursuer with the quickest intercept that is not behind the play.
-## A manual pick (tap on a defender) holds for `switch_manual_hold` seconds; auto picks
-## need to be better by `switch_margin` seconds so control doesn't flicker.
-
-const THINK_INTERVAL := 0.2
+## Which defender the human controls. There is NO automatic switching during a play: you
+## keep the man you picked until you switch yourself (playtest feedback: auto-switching
+## yanked control away mid-pursuit).
+##   pre-snap  - default = the best-placed linebacker (or your last pick's slot); tap a
+##               defender to take him, SWITCH cycles through the second level;
+##   live      - SWITCH jumps to the defender nearest the play (landing spot while the ball
+##               is in the air, else the one with the quickest intercept on the carrier);
+##               tapping any defender still takes him.
+## The only forced change is an interception: you run the return with the man who caught it.
 
 var ctx: PlayRunner
-var manual_until := -1.0
-var _think := 0.0
+## Slot the human last picked pre-snap; reused on the next play when the formation has it.
+var preferred_slot := ""
 
 
 func _init(p_ctx: PlayRunner) -> void:
 	ctx = p_ctx
 
 
-func reset() -> void:
-	manual_until = -1.0
-	_think = 0.0
-
-
-## Human tapped a defender: take him now and hold the choice for a moment.
+## Human tapped a defender: take him. A pre-snap pick is remembered for later plays.
 func manual(d: PlayerAgent) -> void:
 	ctx.set_controlled_defender(d)
-	manual_until = ctx.play_time + ctx.tuning.switch_manual_hold
+	if ctx.phase == PlayRunner.Phase.PRE_SNAP and ctx.controlled == d:
+		preferred_slot = d.slot
 
 
-## Call every physics frame while the play is live. `force` re-picks immediately
-## (throw, catch, handoff) ignoring the flicker margin but not a fresh manual pick.
-func update(dt: float, force := false) -> void:
-	if ctx.human_team != PlayerAgent.Team.DEFENSE or ctx.phase != PlayRunner.Phase.LIVE:
-		return
+## Pre-snap default: your last pick's slot if the defense has it, else the runner's pick.
+func apply_preferred() -> void:
+	if preferred_slot != "" and ctx.def_slots.has(preferred_slot):
+		ctx.set_controlled_defender(ctx.def_slots[preferred_slot])
+
+
+## The SWITCH button. Live: the defender nearest the play (never the current man unless
+## he is the only choice). Pre-snap: cycles linebackers and safeties front to back.
+func switch_to_ball() -> PlayerAgent:
+	if ctx.human_team != PlayerAgent.Team.DEFENSE:
+		return null
 	var cur := ctx.controlled
 	if cur != null and cur == ctx.carrier:
-		return   # the human is returning an interception
-	if ctx.play_time < manual_until:
-		return
-	_think -= dt
-	if _think > 0.0 and not force:
-		return
-	# Pre-throw reads change constantly; re-evaluate them less often than pursuit.
-	var pre_throw := ctx.ball.state != Ball.State.AIR and ctx.carrier == ctx.qb and not ctx.scrambling \
-			and not ctx.is_run_play()
-	_think = THINK_INTERVAL * (2.5 if pre_throw else 1.0)
-	var best := best_defender()
-	if best == null or best == cur:
-		return
-	if cur != null and not force and cur.can_act():
-		if score(cur) - score(best) < ctx.tuning.switch_margin:
-			return
-	ctx.set_controlled_defender(best)
+		return null   # returning an interception
+	var pick: PlayerAgent = null
+	if ctx.phase == PlayRunner.Phase.PRE_SNAP:
+		pick = _next_presnap(cur)
+		if pick != null:
+			preferred_slot = pick.slot
+	elif ctx.phase == PlayRunner.Phase.LIVE:
+		pick = best_defender(cur)
+	if pick != null:
+		ctx.set_controlled_defender(pick)
+	return pick
 
 
-func best_defender() -> PlayerAgent:
+func _next_presnap(cur: PlayerAgent) -> PlayerAgent:
+	var order: Array[PlayerAgent] = []
+	for d in ctx.defense:
+		if d.pos_code in ["LB", "S"]:
+			order.append(d)
+	if order.is_empty():
+		order = ctx.defense.duplicate()
+	order.sort_custom(func(a: PlayerAgent, b: PlayerAgent) -> bool:
+		if not is_equal_approx(a.field_pos.x, b.field_pos.x):
+			return a.field_pos.x < b.field_pos.x
+		return a.field_pos.y < b.field_pos.y)
+	var i := order.find(cur)
+	return order[(i + 1) % order.size()] if not order.is_empty() else null
+
+
+## The defender best placed to make a play now, skipping `exclude`.
+func best_defender(exclude: PlayerAgent = null) -> PlayerAgent:
 	var best: PlayerAgent = null
 	var best_s := INF
 	for d in ctx.defense:
+		if d == exclude:
+			continue
 		var s := score(d)
 		if s < best_s:
 			best_s = s
@@ -72,7 +87,7 @@ func score(d: PlayerAgent) -> float:
 	if d.is_down:
 		penalty += 3.0
 	if d.engaged_with != null:
-		penalty += 1.5
+		penalty += 1.0
 	var spd := maxf(d.max_speed, 1.0)
 	if ctx.ball.state == Ball.State.AIR:
 		return d.field_pos.distance_to(ctx.ball.to) / spd + penalty

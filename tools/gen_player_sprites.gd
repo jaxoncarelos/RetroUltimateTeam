@@ -14,6 +14,7 @@ extends SceneTree
 ##   jersey primary FF0000 (shade 800000) · secondary 00FF00 (shade 008000)
 ##   helmet 0000FF (shade 000080, highlight 8080FF) · helmet stripe 00FFFF
 ##   pants FFFF00 (shade 808000) · skin FF00FF (shade 800080) · facemask 808080
+##   visor band FF80FF (eye line inside the facemask: skin, or tinted by the player's visor)
 ## Everything else (outline, eyes, shoes) is a fixed color.
 ##
 ## The figure is a tiny rig: helmet and torso are hand-drawn stamps (ASCII below); arms and
@@ -31,7 +32,7 @@ const PAL := {
 	"H": Color8(0, 0, 255), "h": Color8(0, 0, 128), "W": Color8(128, 128, 255),
 	"C": Color8(0, 255, 255),
 	"Y": Color8(255, 255, 0), "y": Color8(128, 128, 0),
-	"S": Color8(255, 0, 255), "s": Color8(128, 0, 128),
+	"S": Color8(255, 0, 255), "s": Color8(128, 0, 128), "V": Color8(255, 128, 255),
 	"M": Color8(128, 128, 128),
 	"E": Color8(26, 22, 30), "D": Color8(40, 36, 48),
 	"K": Color8(30, 28, 38), "k": Color8(232, 232, 236),
@@ -42,8 +43,8 @@ const HEAD := [
 	"..CCCCC...",
 	".HHHHHHWH.",
 	"HHHHHHHHWH",
-	"HHHHHHHSSM",
-	"hHHHHHSEsM",
+	"HHHHHHHVVM",
+	"hHHHHHVEsM",
 	".hHHHHSSSM",
 	"..hhhhsMM.",
 ]

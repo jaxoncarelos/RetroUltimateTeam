@@ -144,3 +144,85 @@ static func text_width(text: String, size := BASE_SIZE) -> int:
 	if text.length() > 0 and not text.ends_with(" "):
 		w -= 1
 	return w * maxi(1, size / BASE_SIZE)
+
+
+# ---------------------------------------------------------------- condensed (names)
+## Narrow 3-4 px glyphs (M/W keep 5) for long player names on 56 px cards: drawn
+## pixel-by-pixel by draw_condensed(), advance = glyph width + 1. Missing characters fall
+## back to the regular 5x7 glyph.
+const CONDENSED := {
+	"A": ["0110", "1001", "1001", "1111", "1001", "1001", "1001"],
+	"B": ["1110", "1001", "1001", "1110", "1001", "1001", "1110"],
+	"C": ["0110", "1001", "1000", "1000", "1000", "1001", "0110"],
+	"D": ["1110", "1001", "1001", "1001", "1001", "1001", "1110"],
+	"E": ["1111", "1000", "1000", "1110", "1000", "1000", "1111"],
+	"F": ["1111", "1000", "1000", "1110", "1000", "1000", "1000"],
+	"G": ["0110", "1001", "1000", "1011", "1001", "1001", "0111"],
+	"H": ["1001", "1001", "1001", "1111", "1001", "1001", "1001"],
+	"I": ["111", "010", "010", "010", "010", "010", "111"],
+	"J": ["0011", "0001", "0001", "0001", "0001", "1001", "0110"],
+	"K": ["1001", "1001", "1010", "1100", "1010", "1001", "1001"],
+	"L": ["1000", "1000", "1000", "1000", "1000", "1000", "1111"],
+	"M": ["10001", "11011", "10101", "10101", "10001", "10001", "10001"],
+	"N": ["1001", "1001", "1101", "1011", "1001", "1001", "1001"],
+	"O": ["0110", "1001", "1001", "1001", "1001", "1001", "0110"],
+	"P": ["1110", "1001", "1001", "1110", "1000", "1000", "1000"],
+	"Q": ["0110", "1001", "1001", "1001", "1001", "1010", "0101"],
+	"R": ["1110", "1001", "1001", "1110", "1010", "1001", "1001"],
+	"S": ["0111", "1000", "1000", "0110", "0001", "0001", "1110"],
+	"T": ["111", "010", "010", "010", "010", "010", "010"],
+	"U": ["1001", "1001", "1001", "1001", "1001", "1001", "0110"],
+	"V": ["101", "101", "101", "101", "101", "101", "010"],
+	"W": ["10001", "10001", "10001", "10101", "10101", "10101", "01010"],
+	"X": ["1001", "1001", "1001", "0110", "1001", "1001", "1001"],
+	"Y": ["101", "101", "101", "010", "010", "010", "010"],
+	"Z": ["1111", "0001", "0001", "0010", "0100", "1000", "1111"],
+	"-": ["000", "000", "000", "111", "000", "000", "000"],
+	".": ["0", "0", "0", "0", "0", "0", "1"],
+	"'": ["1", "1", "0", "0", "0", "0", "0"],
+	" ": ["00", "00", "00", "00", "00", "00", "00"],
+}
+
+
+static func _cglyph(ch: String) -> Array:
+	var g: Variant = CONDENSED.get(ch.to_upper())
+	if g == null:
+		g = GLYPHS.get(ch.to_upper(), GLYPHS["?"])
+	return g
+
+
+## Pixel width of `text` in the condensed face (size 8), without the trailing gap.
+static func condensed_width(text: String) -> int:
+	var w := 0
+	for ch in text:
+		w += (_cglyph(ch)[0] as String).length() + 1
+	return maxi(0, w - 1)
+
+
+## Draws `text` in the condensed face at `pos` (top-left of the 7 px glyph box).
+static func draw_condensed(ci: CanvasItem, pos: Vector2, text: String, color: Color) -> void:
+	var x := pos.x
+	for ch in text:
+		var g := _cglyph(ch)
+		for y in g.size():
+			var row: String = g[y]
+			for i in row.length():
+				if row[i] == "1":
+					ci.draw_rect(Rect2(x + i, pos.y + y, 1, 1), color)
+		x += (g[0] as String).length() + 1
+
+
+## How `text` fits in `max_w` px: {"text", "condensed": bool, "width"}. Regular face if it
+## fits, else the condensed face, else condensed and cut with a trailing ".".
+static func fit(text: String, max_w: int) -> Dictionary:
+	var w := text_width(text)
+	if w <= max_w:
+		return {"text": text, "condensed": false, "width": w}
+	var cw := condensed_width(text)
+	if cw <= max_w:
+		return {"text": text, "condensed": true, "width": cw}
+	var t := text
+	while t.length() > 1 and condensed_width(t + ".") > max_w:
+		t = t.left(t.length() - 1)
+	t = t.rstrip(" -.") + "."
+	return {"text": t, "condensed": true, "width": condensed_width(t)}

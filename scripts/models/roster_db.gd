@@ -1,7 +1,8 @@
 class_name RosterDB
 extends RefCounted
 ## Parses data/roster.csv (skipping '#' comments and blank lines; blank cells = position
-## defaults; optional `age`/`pot` columns drive development), reports bad rows instead of
+## defaults; optional `age`/`pot` columns drive development, optional skin/hair/hair_color/
+## beard/visor columns the look), reports bad rows instead of
 ## crashing, fills a team's thin spots with generated depth players only as a last resort,
 ## and builds the card catalog (one base card per player + Prime cards for stars).
 ## Node-free (unit-tested).
@@ -63,6 +64,7 @@ func parse(text: String, team_abbrs: Array = []) -> void:
 		var age_s: String = row.get("age", "")
 		var pot_s: String = row.get("pot", "")
 		p.set_development(int(age_s) if age_s.is_valid_int() else 0, int(pot_s) if pot_s.is_valid_int() else 0)
+		p.look = PlayerData.parse_look(row)
 		_add(p)
 
 
@@ -156,7 +158,7 @@ func franchise_star(abbr: String) -> PlayerData:
 	return best
 
 
-## A team's real lineup (auto-best by real OVR): slot -> {id, name, jersey, attrs, ovr}.
+## A team's real lineup (auto-best by real OVR): slot -> {id, name, jersey, attrs, ovr, pos, look}.
 func team_entries(abbr: String) -> Dictionary:
 	var cands := []
 	for p: PlayerData in by_team.get(abbr, []):
@@ -166,7 +168,7 @@ func team_entries(abbr: String) -> Dictionary:
 	for slot in best:
 		var p: PlayerData = best[slot]["key"]
 		out[slot] = {"id": p.id, "name": p.short_name(), "jersey": p.jersey, "attrs": p.attrs, "ovr": p.ovr,
-				"pos": p.pos}
+				"pos": p.pos, "look": p.look}
 	return out
 
 

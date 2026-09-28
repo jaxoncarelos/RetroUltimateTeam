@@ -11,6 +11,9 @@ var _standings := false
 var _nav_extra: Array[Control] = []
 
 
+var _arrows: Array[Control] = []
+
+
 func _ready() -> void:
 	_ui = MetaUI.screen(self, "SCHEDULE")
 	var root: VBoxContainer = _ui["root"]
@@ -19,6 +22,7 @@ func _ready() -> void:
 	row.add_theme_constant_override("separation", 6)
 	root.add_child(row)
 	var prev := IconButton.new("back", Vector2(24, 40))
+	_arrows.append(prev)
 	prev.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	prev.pressed.connect(func() -> void: _page(-1))
 	row.add_child(prev)
@@ -26,6 +30,7 @@ func _ready() -> void:
 	_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(_panel)
 	var next := IconButton.new("play", Vector2(24, 40))
+	_arrows.append(next)
 	next.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	next.pressed.connect(func() -> void: _page(1))
 	row.add_child(next)
@@ -59,19 +64,13 @@ func _refresh() -> void:
 		c.queue_free()
 	_nav_extra.clear()
 	var nav: HBoxContainer = _ui["nav"]
+	for a in _arrows:
+		a.modulate.a = 1.0 if _active() and not _standings and s.get("phase", "") == "regular" else 0.0
+		a.mouse_filter = Control.MOUSE_FILTER_STOP if a.modulate.a > 0.0 else Control.MOUSE_FILTER_IGNORE
 	if not _active():
 		_panel.title = "NEW SEASON"
-		var col := VBoxContainer.new()
-		col.alignment = BoxContainer.ALIGNMENT_CENTER
-		col.add_theme_constant_override("separation", 6)
-		col.add_child(MetaUI.label("PLAY A %d-GAME SEASON AGAINST REAL TEAMS," % Settings.season_games, UiSkin.WHITE, 8,
-				HORIZONTAL_ALIGNMENT_CENTER))
-		col.add_child(MetaUI.label("THEN THE PLAYOFFS. MAKING THEM PAYS %d COINS," % ModeResults.PLAYOFF_BERTH_COINS,
-				UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_CENTER))
-		col.add_child(MetaUI.label("EVERY PLAYOFF WIN %d. CHAMPIONS GET AN ELITE PACK!" % ModeResults.PLAYOFF_WIN_COINS,
-				UiSkin.YELLOW, 8, HORIZONTAL_ALIGNMENT_CENTER))
-		_body = col
-		_panel.add_child(col)
+		_body = _new_season_view()
+		_panel.add_child(_body)
 		_add_nav(MetaUI.spacer())
 		_add_nav(MetaUI.continue_button("START SEASON", _new_season, true, 150))
 		return
@@ -118,6 +117,46 @@ func _refresh() -> void:
 			col2.add_child(MetaUI.label(str(line), UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_CENTER))
 		_body = col2
 	_panel.add_child(_body)
+
+
+## The pitch for a new season: your helmet, name and OVR, the format and what it pays.
+func _new_season_view() -> Control:
+	var prof := SaveManager.profile
+	var team: TeamData = GameData.team(prof.franchise_team)
+	var col := VBoxContainer.new()
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", 8)
+	var top := HBoxContainer.new()
+	top.alignment = BoxContainer.ALIGNMENT_CENTER
+	top.add_theme_constant_override("separation", 12)
+	col.add_child(top)
+	if team != null:
+		var helm := TextureRect.new()
+		helm.texture = ArtGen.helmet(team.abbr, team.uniform_colors(), false)
+		helm.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+		top.add_child(helm)
+	var who := VBoxContainer.new()
+	who.alignment = BoxContainer.ALIGNMENT_CENTER
+	who.add_theme_constant_override("separation", 3)
+	top.add_child(who)
+	who.add_child(MetaUI.label(team.team_name.to_upper() if team != null else "YOUR TEAM", UiSkin.YELLOW, 16))
+	who.add_child(MetaUI.label("TEAM OVR %d" % Collection.team_ovr(prof, GameData.db), UiSkin.WHITE))
+	who.add_child(MetaUI.label("%d GAMES VS REAL TEAMS, THEN THE PLAYOFFS" % Settings.season_games, UiSkin.MUTED))
+	var rw := RetroPanel.new("SEASON REWARDS", UiSkin.NAVY_DEEP, 5)
+	rw.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(rw)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 30)
+	grid.add_theme_constant_override("v_separation", 2)
+	rw.add_child(grid)
+	for line in [["EVERY GAME", "MATCH COINS", UiSkin.WHITE], ["MAKE THE PLAYOFFS", "+%s" % CoinPill.fmt(ModeResults.PLAYOFF_BERTH_COINS), UiSkin.YELLOW],
+			["EACH PLAYOFF WIN", "+%s" % CoinPill.fmt(ModeResults.PLAYOFF_WIN_COINS), UiSkin.YELLOW],
+			["WIN IT ALL", "ELITE PACK", CardRules.COLORS[CardRules.Tier.ELITE].lightened(0.3)]]:
+		grid.add_child(MetaUI.label(line[0], UiSkin.WHITE))
+		grid.add_child(MetaUI.label(line[1], line[2], 8, HORIZONTAL_ALIGNMENT_RIGHT))
+	col.add_child(MetaUI.label("SEASON LENGTH CAN BE CHANGED IN OPTIONS", UiSkin.GREY, 8, HORIZONTAL_ALIGNMENT_CENTER))
+	return col
 
 
 func _add_nav(c: Control) -> void:

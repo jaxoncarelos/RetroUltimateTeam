@@ -41,3 +41,36 @@ func test_human_match_runs_through_many_plays() -> void:
 	assert_gte(snaps, 14, "the match kept moving")
 	assert_true(m.gs.clock.seconds_left < GameClock.QUARTER or m.gs.clock.quarter > 1, "the clock ran")
 	gut.p("snaps %d, possessions %s, score %s, clock %s" % [snaps, possessions.keys(), m.gs.score, m.gs.clock.label()])
+
+
+## II / Esc / Android back: pause → QUIT TO MENU → confirm (STAY goes back); never soft-locks.
+func test_pause_menu_offers_quit_with_confirm() -> void:
+	var m: MatchController = load("res://scenes/match/match.tscn").instantiate()
+	m.config = {"home": "KC", "away": "PHI", "quarter_minutes": 1.5, "from_hub": true}
+	add_child_autofree(m)
+	assert_false(get_tree().quit_on_go_back, "Android back is handled by the match")
+	var frames := 0
+	while m.phase != MatchController.Phase.PLAY_CALL and frames < 2000:
+		await wait_frames(1)
+		frames += 1
+	assert_eq(m.phase, MatchController.Phase.PLAY_CALL)
+	m.hud.hide_choice()
+	m.request_pause()
+	assert_eq(m.phase, MatchController.Phase.PAUSED)
+	var opts := m.pause_options()
+	assert_eq(opts[-1], "QUIT TO MENU")
+	assert_false("RESTART GAME" in opts, "hub games can't restart (only quit)")
+	m._on_choice(opts.size() - 1)
+	assert_true(m.hud.is_choice_open(), "leaving asks first")
+	assert_eq(m._pause_menu, MatchController.PauseMenu.CONFIRM_QUIT)
+	m._on_choice(0)   # STAY
+	assert_eq(m._pause_menu, MatchController.PauseMenu.MAIN)
+	assert_eq(m.phase, MatchController.Phase.PAUSED)
+	m.request_pause()   # back again = resume
+	assert_eq(m.phase, MatchController.Phase.PLAY_CALL)
+	assert_true(m.runner.is_physics_processing())
+	# Back during a result banner waits for the next play call instead of freezing it.
+	m.phase = MatchController.Phase.RESULT
+	m.request_pause()
+	assert_eq(m.phase, MatchController.Phase.RESULT)
+	assert_true(m._pause_queued)

@@ -7,6 +7,8 @@ enum State { DEAD, HELD, AIR }
 const HELD_Z := 1.3
 const RELEASE_Z := 2.0
 const CATCH_Z := 1.3
+## Yards ahead of the carrier's feet the held ball is drawn (and spotted).
+const HOLD_AHEAD := 0.35
 
 var state := State.DEAD
 var carrier: PlayerAgent = null
@@ -61,7 +63,7 @@ func step(dt: float) -> bool:
 	match state:
 		State.HELD:
 			if carrier != null:
-				field_pos = carrier.field_pos + Vector2(carrier.facing * 0.35, 0.05)
+				field_pos = carrier.field_pos + Vector2(carrier.facing * HOLD_AHEAD, 0.05)
 				z = HELD_Z + carrier.z_height
 		State.AIR:
 			t = minf(1.0, t + dt / duration)
