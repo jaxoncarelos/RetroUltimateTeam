@@ -44,6 +44,7 @@ func update(dt: float) -> Dictionary:
 	if read_timer <= 0.0:
 		read_timer = read_interval
 		read_idx = (read_idx + 1) % progression.size()
+	ctx.qb_target_hint = progression[read_idx]
 	var look := QBReadLogic.evaluate(ctx, progression[read_idx])
 	if not look.is_empty() and float(look["openness"]) + rng.randfn(0.0, noise) > t.cpu_open_threshold:
 		return _throw(look)

@@ -19,6 +19,7 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 
 Events="*res://autoload/events.gd"
 UiTheme="*res://autoload/ui_theme.gd"
+Settings="*res://autoload/settings.gd"
 
 [display]
 

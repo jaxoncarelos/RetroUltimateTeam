@@ -6,6 +6,8 @@ const LOOK_AHEAD_PX := 70.0
 const FOLLOW_RATE := 5.0
 
 var runner: PlayRunner
+## Debug: when set (field yards), the camera stays on this point (--look=X,Y).
+var pinned := Vector2(-1, -1)
 
 
 func _ready() -> void:
@@ -17,6 +19,8 @@ func _ready() -> void:
 
 
 func target_position() -> Vector2:
+	if pinned.x >= 0.0:
+		return FieldProjection.to_screen(pinned)
 	if runner == null:
 		return global_position
 	return FieldProjection.to_screen(runner.focus_point()) + Vector2(LOOK_AHEAD_PX, 0.0)

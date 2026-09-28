@@ -51,13 +51,17 @@ static func rush_rating(d: PlayerAgent) -> float:
 
 func _blocks(dt: float) -> void:
 	var t := ctx.tuning
-	for b in ctx.offense:
+	# On an interception return the defense becomes the blocking team.
+	var returning := ctx.carrier != null and ctx.carrier.team == PlayerAgent.Team.DEFENSE
+	var blockers := ctx.defense if returning else ctx.offense
+	var rushers := ctx.offense if returning else ctx.defense
+	for b in blockers:
 		if b.engaged_with != null:
 			_hold(b, b.engaged_with, dt)
 			continue
 		if b == ctx.carrier or not b.can_act() or b.block_cd > 0.0 or not (b.brain is BlockBrain):
 			continue
-		for d in ctx.defense:
+		for d in rushers:
 			if d == ctx.carrier or d.engaged_with != null or not d.can_act() or d.block_cd > 0.0:
 				continue
 			var reach := t.run_engage_range if ctx.is_run_play() else t.engage_range

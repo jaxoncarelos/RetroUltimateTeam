@@ -38,8 +38,13 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    aims/scrambles/steers; tap still snaps; QB grab ring + chevrons in `PlayOverlay`.
    Balance (sim, `--smart` mix ≈ 3.0 pts/drive; every `--spam=X` lower). Known: INT rate high
    (~6%), run game ~2.5 ypc, sacks ~5% — retune in the Phase 3 ai_vs_ai pass.
-5. [ ] Field detail: crowd/stands strip, midfield emblem, goalposts, pylons, down marker, turf texture.
-6. [ ] Phase 2 – playable defense (PLAN.md §4).
+5. [x] Field detail: `StadiumArt` (turf grain/mow stripes, crowd tiles), `CrowdView` (animated
+   stands, benches, sideline players), `FieldView` (emblem, goalposts, pylons, arrows, chains,
+   down box). `--look=X,Y` pins the camera for screenshots.
+6. [ ] Phase 2 – playable defense (PLAN.md §4). IN PROGRESS: `DefenseSwitcher`,
+   `HumanDefenseControl`, `DebugOverlay` (F1/3 fingers), `DefensePace`, `Settings` autoload,
+   jump/swat timing, INT returns, fumbles, sandbox `--defend`/`--pace=`. Still to do: tests +
+   sim/visual verification of defend mode, defense HUD polish.
 7. [ ] Phase 3 – full game: clock, quarters, possessions, kicks/FG meter, AI offense, ai_vs_ai sim.
 8. [ ] Phase 4 – roster import (GameData), cards affect play, team picker, lineup.
 9. [ ] Phase 5 – packs, coins, save system, collection.

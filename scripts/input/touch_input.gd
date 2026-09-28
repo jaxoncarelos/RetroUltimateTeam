@@ -10,6 +10,8 @@ signal released(start: Vector2, pos: Vector2, was_drag: bool)
 signal tapped(pos: Vector2)
 signal double_tapped(pos: Vector2)
 signal flicked(dir: Vector2)
+## Three fingers down at once (toggles the debug overlay).
+signal three_finger_tap
 
 const DRAG_THRESHOLD := 8.0
 const TAP_TIME := 0.25
@@ -30,6 +32,7 @@ var _dragging := false
 var _last_tap_t := -10.0
 var _last_tap_pos := Vector2.ZERO
 var _last_flick_t := -10.0
+var _fingers: Dictionary = {}
 
 
 static func _now() -> float:
@@ -43,6 +46,14 @@ func is_touching() -> bool:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		var e := event as InputEventScreenTouch
+		# Count every finger (not just the tracked one) for the three-finger debug gesture.
+		if e.pressed:
+			_fingers[e.index] = true
+			if _fingers.size() >= 3:
+				three_finger_tap.emit()
+				_fingers.clear()
+		else:
+			_fingers.erase(e.index)
 		if e.pressed:
 			if _index != -1:
 				return

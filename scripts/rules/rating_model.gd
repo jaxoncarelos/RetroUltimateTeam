@@ -103,6 +103,29 @@ static func tackle_prob(t: GameplayTuning, tak: float, elu: float, carrier_str: 
 	return clampf(p, t.tackle_min, t.tackle_max)
 
 
+## Fumble chance when a carrier with ball security `car` is tackled.
+static func fumble_prob(t: GameplayTuning, car: float, tak: float, hit_str: float) -> float:
+	var power := tak * 0.5 + hit_str * 0.5
+	return clampf(t.fumble_base + t.fumble_scale * (power - car) / 40.0, 0.002, 0.06)
+
+
+## A leaping defender's INT chance given his timing error (s from the ideal).
+static func jump_int_prob(t: GameplayTuning, timing_err: float, cov: float, cth: float) -> float:
+	if timing_err > t.jump_perfect:
+		return 0.0
+	var skill := _n(cov) * 0.5 + _n(cth) * 0.5
+	return clampf(t.jump_int_perfect * (0.6 + 0.6 * skill), 0.1, 0.85)
+
+
+## Chance the leap knocks the ball away (checked after the INT roll).
+static func jump_deflect_prob(t: GameplayTuning, timing_err: float) -> float:
+	if timing_err <= t.jump_perfect:
+		return 1.0
+	if timing_err <= t.jump_good:
+		return t.jump_deflect_good
+	return 0.0
+
+
 ## Seconds a pressed receiver is slowed at the line.
 static func press_jam(t: GameplayTuning, cov: float, rte: float) -> float:
 	return clampf(t.press_jam_base + (cov - rte) * t.press_jam_per_point, 0.1, t.press_jam_max)

@@ -70,6 +70,27 @@ extends Resource
 @export var shed_min := 0.5
 @export var shed_jitter := 0.35
 
+@export var fumble_base := 0.012      ## fumble chance per tackle at equal ratings
+@export var fumble_scale := 0.03       ## extra chance per 40 points of hit power over ball security
+@export var fumble_recover_radius := 4.0
+
+@export_group("Defense controls")
+@export var jump_time := 0.5           ## seconds a defender's leap lasts; ideal = ball arrives at the peak
+@export var jump_height := 0.9         ## yards
+@export var jump_reach := 0.9          ## extra yards of reach while leaping
+@export var jump_perfect := 0.09       ## s of timing error for a perfect jump
+@export var jump_good := 0.22          ## s of timing error that still gets a hand on it
+@export var jump_int_perfect := 0.55   ## base INT chance on a perfect jump (scaled by coverage/hands)
+@export var jump_deflect_good := 0.75  ## swat chance on a good (not perfect) jump
+@export var stick_deadzone := 6.0      ## px before the defense stick moves the player
+@export var stick_full := 26.0         ## px of drag for full speed
+@export var tap_carrier_radius := 3.5  ## yards: a tap this close to the ball carrier is a dive
+@export var human_dive_range := 2.8    ## yards: max distance for the human's dive tackle
+@export var tap_switch_radius := 2.2   ## yards: tapping this close to a defender switches to him
+@export var tap_ball_radius := 5.0     ## yards: a tap this close to the landing marker is a jump
+@export var switch_manual_hold := 1.5  ## s a manual switch holds before auto-switch may override
+@export var switch_margin := 0.35      ## s of intercept time a new auto pick must be better by
+
 @export_group("Runner controls")
 @export var steer_deadzone := 5.0      ## px
 @export var steer_full := 28.0         ## px of vertical drag for full lateral

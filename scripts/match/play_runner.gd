@@ -9,6 +9,8 @@ extends Node2D
 signal play_ended(result: Dictionary)
 signal carrier_changed(agent: PlayerAgent)
 signal ball_thrown(target: Vector2)
+## A tackle landed (for screen shake / sfx): where, and the carrier's speed.
+signal big_hit(at: Vector2, speed: float)
 
 enum Phase { IDLE, PRE_SNAP, LIVE, DEAD }
 
@@ -57,6 +59,9 @@ var pass_thrown := false
 var scrambling := false
 var play_time := 0.0
 var broken_tackles := 0
+var fumbled := false
+## Receiver the CPU QB is currently reading (DefenseSwitcher uses it pre-throw).
+var qb_target_hint: PlayerAgent = null
 
 var _pending_result: Dictionary = {}
 var _dead_timer := 0.0
@@ -95,6 +100,8 @@ func setup_play(p_off: PlayDef, p_def: PlayDef, p_los_x: float, p_ball_y: float,
 	key_level = 0.0
 	handoff_delay = 0.0
 	carrier_lane = PackedVector2Array()
+	fumbled = false
+	qb_target_hint = null
 	_pending_result = {}
 
 	var origin := Vector2(los_x, ball_y)
@@ -121,7 +128,13 @@ func setup_play(p_off: PlayDef, p_def: PlayDef, p_los_x: float, p_ball_y: float,
 
 	qb = off_slots.get("QB")
 	ball.place(origin)
-	_set_controlled(qb if human_team == PlayerAgent.Team.OFFENSE else null)
+	match human_team:
+		PlayerAgent.Team.OFFENSE:
+			_set_controlled(qb)
+		PlayerAgent.Team.DEFENSE:
+			_set_controlled(default_defender())
+		_:
+			_set_controlled(null)
 	phase = Phase.PRE_SNAP
 
 
@@ -325,7 +338,8 @@ func throw_ball(target: Vector2) -> void:
 	pass_thrown = true
 	qb.throw_anim = 0.3
 	carrier = null
-	_set_controlled(null)
+	if human_team == PlayerAgent.Team.OFFENSE:
+		_set_controlled(null)
 
 	# Best-placed receiver breaks on the ball; nearby defenders react after their delay.
 	var best: PlayerAgent = null
@@ -339,7 +353,8 @@ func throw_ball(target: Vector2) -> void:
 			best = o
 	if best != null:
 		best.brain = BallHawkBrain.new(best, self, landing, 0.0, null)
-		_set_controlled(best if human_team == PlayerAgent.Team.OFFENSE else null)
+		if human_team == PlayerAgent.Team.OFFENSE:
+			_set_controlled(best)
 	for d in defense:
 		if d.engaged_with != null or not d.can_act() or d.brain is RushBrain:
 			continue
@@ -366,6 +381,48 @@ func on_tackle(tackler: PlayerAgent, runner: PlayerAgent) -> void:
 	runner.knock_down()
 	tackler.knock_down(0.6)
 	tackler.velocity = runner.velocity * 0.5
+	big_hit.emit(runner.field_pos, runner.velocity.length())
+	# Simple fumbles: the ball pops out on the hit and whoever is closest recovers it.
+	if runner.team == PlayerAgent.Team.OFFENSE:
+		var p := RatingModel.fumble_prob(tuning, runner.attr("car"), tackler.attr("tak"), tackler.attr("str"))
+		if rng.randf() < p:
+			_fumble(runner)
+
+
+func _fumble(runner: PlayerAgent) -> void:
+	var spot := runner.field_pos
+	var best: PlayerAgent = null
+	var best_d := tuning.fumble_recover_radius
+	for a in agents:
+		if a == runner or a.is_down:
+			continue
+		var d := a.field_pos.distance_to(spot) + rng.randf_range(0.0, 1.0)
+		if d < best_d:
+			best_d = d
+			best = a
+	fumbled = true
+	if best != null and best.team != runner.team:
+		_end_play("fumble", spot, "FUMBLE! TURNOVER")
+
+
+## The human's defender at the snap: the middle linebacker-ish player (first LB, else nearest
+## defender to the ball).
+func default_defender() -> PlayerAgent:
+	var best: PlayerAgent = null
+	var best_d := INF
+	for d in defense:
+		var dist := d.field_pos.distance_to(Vector2(los_x + 5.0, ball_y)) - (4.0 if d.pos_code == "LB" else 0.0)
+		if dist < best_d:
+			best_d = dist
+			best = d
+	return best
+
+
+## Hands the human a different defender (DefenseSwitcher / tap-to-switch).
+func set_controlled_defender(d: PlayerAgent) -> void:
+	if human_team != PlayerAgent.Team.DEFENSE or d == controlled or d == null or d.team != PlayerAgent.Team.DEFENSE:
+		return
+	_set_controlled(d)
 
 
 func _set_controlled(a: PlayerAgent) -> void:
@@ -378,6 +435,10 @@ func _set_controlled(a: PlayerAgent) -> void:
 
 
 func _set_carrier(a: PlayerAgent, lane := PackedVector2Array()) -> void:
+	if a.team == PlayerAgent.Team.DEFENSE:
+		# Turnover: every block breaks up; the other side starts blocking.
+		for x in agents:
+			x.engaged_with = null
 	carrier_lane = lane
 	carrier = a
 	ball.give_to(a)
@@ -465,7 +526,7 @@ func _check_carrier() -> void:
 			and p.x > los_x + 0.5:
 		start_scramble()
 	if carrier.team == PlayerAgent.Team.DEFENSE:
-		_end_play("int", p, "INTERCEPTED!")
+		_check_return(p)
 		return
 	if p.x >= FieldGeo.OPP_GOAL:
 		carrier.celebrating = true
@@ -483,9 +544,51 @@ func _check_carrier() -> void:
 			_end_play("tackle", p + Vector2(fall_forward(carrier), 0.0), "")
 
 
+## Interception return (the defense runs toward -x): pick six, or down where tackled.
+## Downed in the end zone it came from = touchback (the match controller handles spots).
+func _check_return(p: Vector2) -> void:
+	if p.x <= FieldGeo.OWN_GOAL:
+		carrier.celebrating = true
+		_end_play("int_td", p, "PICK SIX!")
+	elif p.y < 0.0 or p.y > FieldGeo.WIDTH:
+		_end_play("int", p, "INTERCEPTED!")
+	elif carrier.is_down:
+		_end_play("int", p - Vector2(fall_forward(carrier) * -1.0, 0.0), "INTERCEPTED!")
+
+
+## Human defender's jump at the ball (swat / pick). Timing is judged at the catch point.
+func defender_jump(d: PlayerAgent) -> void:
+	if phase != Phase.LIVE or ball.state != Ball.State.AIR or d.jump_timer > 0.0 or not d.can_act():
+		return
+	d.start_jump(tuning)
+	d.jump_started_at = play_time
+
+
+## The defender whose jump can affect a ball arriving at `landing`, or null.
+func _jumper_near(landing: Vector2) -> PlayerAgent:
+	var t := tuning
+	for d in defense:
+		if d.jump_started_at < 0.0 or play_time - d.jump_started_at > t.jump_time + t.jump_good:
+			continue
+		if d.field_pos.distance_to(landing) <= t.contest_radius + t.jump_reach:
+			return d
+	return null
+
+
 func _resolve_arrival() -> void:
 	var landing := ball.to
 	var t := tuning
+	var j := _jumper_near(landing)
+	if j != null:
+		var err := absf((play_time - j.jump_started_at) - t.jump_time * 0.5)
+		var r := rng.randf()
+		var p_int := RatingModel.jump_int_prob(t, err, j.attr("cov"), j.attr("cth"))
+		if r < p_int:
+			_set_carrier(j)
+			return
+		if r < p_int + RatingModel.jump_deflect_prob(t, err):
+			_end_play("incomplete", Vector2(los_x, ball_y), "SWATTED!")
+			return
 	var o := _nearest_catcher(offense, landing, t.catch_radius, true)
 	var d := _nearest_catcher(defense, landing, t.contest_radius, false)
 	var od := o.field_pos.distance_to(landing) if o != null else INF
@@ -542,6 +645,7 @@ func _end_play(type: String, spot: Vector2, text: String) -> void:
 		"spot_y": clampf(spot.y, 0.0, FieldGeo.WIDTH),
 		"yards": int(round(spot_x) - round(los_x)),
 		"text": text,
-		"turnover": type == "int",
+		"turnover": type in ["int", "int_td", "fumble"],
 		"broken_tackles": broken_tackles,
+		"pass_thrown": pass_thrown,
 	}

@@ -43,6 +43,8 @@ var dive_recover := -1.0
 var throw_anim := 0.0
 var tackled_speed := 0.0   ## x speed at the moment of the tackle (fall-forward spot)
 var jam_timer := 0.0   ## seconds of slowed release (press coverage)
+var jump_timer := 0.0
+var jump_started_at := -1.0   ## play_time of the last jump at the ball (-1 = none)
 var celebrating := false
 
 var highlight := false:
@@ -120,6 +122,11 @@ func start_dive(t: GameplayTuning, dir: Vector2, recover := -1.0) -> void:
 	engaged_with = null
 
 
+## Defender leaps at a thrown ball (swat / pick attempt).
+func start_jump(t: GameplayTuning) -> void:
+	jump_timer = t.jump_time
+
+
 func start_juke(t: GameplayTuning, dir: float) -> bool:
 	if juke_cd > 0.0 or not can_act():
 		return false
@@ -154,6 +161,12 @@ func step(dt: float, t: GameplayTuning) -> void:
 	if engaged_with != null:
 		return
 	var target_v := desired_dir * max_speed * throttle * speed_mult
+	if jump_timer > 0.0:
+		jump_timer -= dt
+		z_height = t.jump_height * sin(clampf(1.0 - jump_timer / t.jump_time, 0.0, 1.0) * PI)
+		target_v *= 0.4
+		if jump_timer <= 0.0:
+			z_height = 0.0
 	if jam_timer > 0.0:
 		jam_timer -= dt
 		target_v *= t.press_jam_speed
@@ -176,6 +189,8 @@ func _process(_delta: float) -> void:
 		anim = "down"
 	elif dive_timer > 0.0:
 		anim = "dive"
+	elif jump_timer > 0.0:
+		anim = "celebrate"   # arms-up frames double as the leap
 	elif throw_anim > 0.0:
 		anim = "throw"
 	elif celebrating:

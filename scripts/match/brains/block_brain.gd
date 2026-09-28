@@ -25,7 +25,8 @@ func think() -> void:
 	if mode == "escort" and ctx.carrier != null:
 		focus = ctx.carrier.field_pos
 	var reach := 4.5 if mode == "pass" else (8.0 if mode == "escort" else 7.0)
-	for d in ctx.defense:
+	var opponents := ctx.defense if agent.team == PlayerAgent.Team.OFFENSE else ctx.offense
+	for d in opponents:
 		if d.is_down or d.engaged_with != null or d.block_cd > 0.0:
 			continue
 		var dist := d.field_pos.distance_to(agent.field_pos)
@@ -41,7 +42,8 @@ func act(_dt: float) -> void:
 	if target != null and not target.is_down and target.engaged_with == null:
 		agent.move_to(target.field_pos, 1.0, false)
 	elif mode == "escort" and ctx.carrier != null:
-		agent.move_to(ctx.carrier.field_pos + Vector2(3.0, 0.0), 0.9, true)
+		var fwd := 1.0 if ctx.carrier.team == PlayerAgent.Team.OFFENSE else -1.0
+		agent.move_to(ctx.carrier.field_pos + Vector2(3.0 * fwd, 0.0), 0.9, true)
 	else:
 		agent.move_to(anchor, 0.7, true)
 
