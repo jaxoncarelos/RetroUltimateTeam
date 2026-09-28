@@ -15,7 +15,8 @@ var cards: Array = []            ## [{uid, def, t, locked, boost}]
 var lineup: Dictionary = {}      ## slot -> uid
 var season: Dictionary = {}
 var challenges: Dictionary = {}
-var stats := {"games": 0, "wins": 0, "losses": 0, "ties": 0, "packs_opened": 0}
+var stats := {"games": 0, "wins": 0, "losses": 0, "ties": 0, "packs_opened": 0, "last_win_day": 0,
+		"coins_earned": 0}
 var sets_done: Dictionary = {}
 
 

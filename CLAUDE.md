@@ -62,5 +62,11 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    `Collection` (starters, lineup, chemistry), `SceneRouter`, team picker, minimal hub, HUD
    player tag. roster.csv now has 4–6 stars for every team (verify names/numbers!).
    A/B: `--ai-vs-ai=20 --home-ovr=88 --away-ovr=64` → home wins 100%.
-9. [ ] Phase 5 – packs, coins, save system, collection.
+9. [x] Phase 5 – `PackDef` (data/packs/*.tres) + `PackCatalog`, `EconomyRules` (odds, guarantees,
+   weak-position weighting, buy+open atomically, quick-sell, duplicate training, sets, match
+   rewards), screens: hub (rewards, difficulty), store, pack opening (flip/flash), collection
+   (filters, detail: sell/train/lock), lineup (slot picker, auto-best), sets. `CardView`
+   (48x64 code-drawn), `MetaUI` helpers, `Sfx` autoload (synthesized chiptune).
+   Debug: `-- --demo-profile --screen=store` (unsaved KC career). Progression sim in
+   test_economy: OVR 65 → 73 (20 games) → 80 (45) → 83 (100).
 10. [ ] Phase 6 – season, challenges, polish.

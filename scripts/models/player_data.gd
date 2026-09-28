@@ -26,6 +26,17 @@ static func create(p_id: String, p_name: String, p_team: String, p_pos: String, 
 	return p
 
 
+const SUFFIXES := ["JR.", "JR", "SR.", "II", "III", "IV"]
+
+
+## Surname without generational suffixes ("HARRISON" for "Marvin Harrison Jr.").
+func last_name() -> String:
+	var parts := name.to_upper().split(" ", false)
+	while parts.size() > 1 and parts[parts.size() - 1] in SUFFIXES:
+		parts.remove_at(parts.size() - 1)
+	return parts[parts.size() - 1] if parts.size() > 0 else name.to_upper()
+
+
 ## "P. MAHOMES" style label for the HUD.
 func short_name() -> String:
 	var parts := name.split(" ", false)

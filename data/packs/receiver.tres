@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PackDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/pack_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "receiver"
+display_name = "RECEIVER PACK"
+price = 0
+card_count = 3
+odds = PackedFloat32Array(0.2, 0.5, 0.25, 0.05)
+guarantee_tier = 1
+positions = PackedStringArray("WR", "TE")
+team = ""
+color = Color(0.0000, 0.8941, 0.2118, 1)

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PackDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/pack_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "elite"
+display_name = "ELITE PACK"
+price = 15000
+card_count = 5
+odds = PackedFloat32Array(0.0, 0.2, 0.55, 0.25)
+guarantee_tier = 3
+positions = PackedStringArray()
+team = ""
+color = Color(0.6941, 0.2353, 1.0000, 1)
