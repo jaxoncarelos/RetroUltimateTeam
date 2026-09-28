@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PackDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/pack_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "starter"
+display_name = "STARTER PACK"
+price = 0
+card_count = 5
+odds = PackedFloat32Array(0.3, 0.55, 0.15, 0.0)
+guarantee_tier = 2
+positions = PackedStringArray()
+team = ""
+color = Color(0.1608, 0.6784, 1.0000, 1)

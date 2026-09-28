@@ -11,6 +11,8 @@ var jersey := 0
 var ovr := 60
 var attrs: Dictionary = {}
 var generated := false   ## depth filler created by GameData (not in the CSV)
+var age := 0             ## 0 = unknown
+var pot := 60            ## potential (development ceiling); = ovr for veterans
 
 
 static func create(p_id: String, p_name: String, p_team: String, p_pos: String, p_jersey: int,
@@ -23,7 +25,19 @@ static func create(p_id: String, p_name: String, p_team: String, p_pos: String, 
 	p.jersey = p_jersey
 	p.ovr = p_ovr
 	p.attrs = RatingModel.fill_attrs(p_pos, p_ovr, explicit)
+	p.pot = p_ovr
 	return p
+
+
+## Sets age and potential (pot <= 0 = derived from age via CardRules.default_pot).
+func set_development(p_age: int, p_pot := 0) -> void:
+	age = p_age
+	pot = maxi(ovr, p_pot) if p_pot > 0 else CardRules.default_pot(ovr, p_age)
+
+
+## Young and not yet at his ceiling (UI "ROOKIE"/"PROSPECT" badge).
+func is_prospect() -> bool:
+	return pot > ovr
 
 
 const SUFFIXES := ["JR.", "JR", "SR.", "II", "III", "IV"]

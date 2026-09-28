@@ -3,7 +3,7 @@ extends Node
 ## Sfx.play("hit") anywhere. Volume from Settings.sfx_volume.
 
 const RATE := 22050
-const VOICES := 6
+const VOICES := 10
 
 var _streams: Dictionary = {}
 var _players: Array[AudioStreamPlayer] = []
@@ -30,6 +30,28 @@ func _ready() -> void:
 		"kick": [["noise", 0, 0, 0.05, 0.5], ["triangle", 200, 90, 0.1, 0.5]],
 		"bad": [["square", 300, 150, 0.25, 0.3]],
 		"coin": [["square", 988, 988, 0.05, 0.3], ["square", 1319, 1319, 0.15, 0.3]],
+		# Menu / reward juice.
+		"tick": [["square", 1568, 1568, 0.018, 0.12]],
+		"coin_tick": [["square", 1319, 1760, 0.04, 0.18]],
+		"claim": [["square", 784, 784, 0.05, 0.3], ["square", 988, 988, 0.05, 0.3], ["square", 1319, 1319, 0.05, 0.3],
+				["square", 1568, 1568, 0.18, 0.3]],
+		"levelup": [["square", 523, 523, 0.08, 0.3], ["square", 659, 659, 0.08, 0.3], ["square", 784, 784, 0.08, 0.3],
+				["square", 1047, 1047, 0.08, 0.3], ["square", 784, 784, 0.06, 0.3], ["square", 1047, 1047, 0.08, 0.3],
+				["square", 1319, 1319, 0.35, 0.32]],
+		"whoosh": [["noise", 0, 0, 0.22, 0.25]],
+		"swoosh": [["triangle", 200, 900, 0.14, 0.35]],
+		# Pack opening.
+		"rumble": [["square", 55, 50, 0.5, 0.35], ["noise", 0, 0, 0.1, 0.2]],
+		"tear": [["noise", 0, 0, 0.18, 0.55], ["square", 1200, 300, 0.12, 0.25]],
+		"slam": [["noise", 0, 0, 0.06, 0.6], ["square", 90, 40, 0.18, 0.5]],
+		"reveal": [["square", 392, 784, 0.12, 0.3]],
+		"sparkle": [["square", 2093, 2093, 0.03, 0.15], ["square", 2637, 2637, 0.03, 0.15], ["square", 3136, 3136, 0.06, 0.12]],
+		"firework": [["noise", 0, 0, 0.05, 0.5], ["triangle", 900, 200, 0.25, 0.3]],
+		"walkout": [["triangle", 110, 110, 0.25, 0.4], ["triangle", 147, 147, 0.25, 0.4], ["triangle", 165, 165, 0.25, 0.4],
+				["triangle", 220, 220, 0.5, 0.45]],
+		"elite": [["square", 523, 523, 0.09, 0.32], ["square", 659, 659, 0.09, 0.32], ["square", 784, 784, 0.09, 0.32],
+				["square", 1047, 1047, 0.09, 0.32], ["square", 1319, 1319, 0.09, 0.32], ["square", 1568, 1568, 0.09, 0.32],
+				["square", 2093, 2093, 0.4, 0.32]],
 	}
 	for n in defs:
 		_streams[n] = _build(defs[n])

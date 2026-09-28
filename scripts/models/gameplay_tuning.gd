@@ -19,25 +19,57 @@ extends Resource
 @export var throw_speed_range := 13.0
 @export var throw_dist_base := 38.0    ## max yards at 0 throw power
 @export var throw_dist_range := 30.0
-@export var aim_gain := 0.42           ## yards of throw per screen pixel of drag
+@export var aim_gain := 0.36           ## yards of throw per screen pixel of drag (short pulls)
+@export var aim_curve_px := 170.0      ## pull gets progressive: × (1 + px / this) (deep = shorter drag)
 @export var aim_min_drag := 10.0       ## px; shorter drags cancel the throw
 @export var aim_error_base := 0.07     ## yards of error per yard thrown at accuracy 0
-@export var lob_extra_time := 0.35     ## deep throws hang this fraction longer
+@export var aim_assist_radius := 4.0   ## yards: reticle this close to a receiver's lead point gets pulled
+@export var aim_assist_strength := 0.35 ## 0 = off; share of the way the reticle is pulled onto the lead
+@export var lob_lead_extra := 1.5      ## yards: CPU/assist leads lobs this much further in stride
+@export_subgroup("Trajectory")
+@export var lob_start := 13.0          ## yards: automatic loft starts rising here…
+@export var lob_full := 32.0           ## …and is a full lob from here
+@export var bullet_apex_base := 0.4    ## yards of apex on a flat bullet
+@export var bullet_apex_per_yd := 0.05
+@export var lob_apex_base := 3.0       ## yards of apex on a full lob
+@export var lob_apex_per_yd := 0.24    ## (45-yard bomb ≈ 14 yards high)
+@export var ball_gravity := 30.0       ## yd/s² (game gravity): sets how long a lob hangs
+@export var touch_threshold := 0.22    ## loft ≥ this shows TOUCH in the aim preview
+@export var lob_threshold := 0.6       ## loft ≥ this shows LOB
+@export_subgroup("Lane and contest")
+@export var lane_width := 1.6          ## yards off the throwing line a defender forces a lob over him
+@export var lane_skip_near := 4.0      ## yards from the QB where lane blockers are ignored (rushers)
+@export var lane_skip_far := 2.5       ## yards from the target where they are ignored (coverage)
+@export var lane_clear_height := 3.3   ## yards of ball height that clears a lane defender
+@export var reach_height := 2.7        ## defenders can play a ball below this height (standing)
+@export var lane_reach := 0.9          ## yards (ground) from the ball's path a defender can get a hand on it
+@export var lane_play_prob := 0.35     ## chance a defender in reach gets a hand on a passing ball
+@export var lane_int_share := 0.2      ## share of those that are picked (scaled by his hands)
+@export var trail_contest_mult := 0.65 ## contest kept by a defender trailing a receiver who has a step
+@export var lob_contest_extra := 0.9   ## extra contest radius (yards) on a full lob: defenders close while it hangs
+@export var lob_catch_penalty := 0.1   ## over-the-shoulder catches: catch chance × (1 - this × loft)
+@export var undercut_int_mult := 1.2   ## INT chance multiplier when a defender settles under a lob
+@export var man_look_back := 0.6       ## s before the ball lands that man defenders turn to find it
+@export var ball_react_radius := 11.0  ## yards: zone defenders this close to the landing spot break on it
 @export var catch_radius := 1.4        ## yards
+@export var human_catch_bonus := 0.35  ## extra catch radius when the human threw it (forgiving)
 @export var contest_radius := 1.6
 @export var catch_base_low := 0.72     ## uncontested catch % at catching 50
 @export var catch_base_high := 0.98    ## … at catching 99
 @export var contest_penalty := 0.7
 @export var int_base := 0.07
 @export var int_cov_scale := 0.26
-@export var tip_int_chance := 0.07     ## a contested ball the receiver fails to catch pops to the defender
+@export var tip_int_chance := 0.05     ## a contested ball the receiver fails to catch pops to the defender
 
 @export var press_jam_base := 0.45    ## seconds a pressed receiver is jammed at equal ratings
 @export var press_jam_per_point := 0.012 ## extra jam seconds per point of coverage over route running
 @export var press_jam_max := 0.9
 @export var press_jam_speed := 0.4     ## speed multiplier while jammed
 @export var press_depth := 1.3         ## yards off the ball a press corner lines up
-@export var man_hold_depth := 3.0      ## man defenders wait this deep while their man is in the backfield
+@export var backpedal_speed_mult := 0.75 ## man defenders backpedaling (facing the QB) move this fast
+@export var flip_distance := 1.0       ## yards of cushion left when a man defender flips to trail
+@export var flip_speed_keep := 0.5     ## share of his speed a man defender keeps through the hip flip
+@export var man_hold_depth := 3.0     ## man defenders wait this deep while their man is in the backfield
 @export var pa_bite_time := 0.75       ## seconds underneath zone defenders step up on a play fake (awareness 60)
 
 @export_group("CPU quarterback")
@@ -48,6 +80,8 @@ extends Resource
 @export var cpu_min_throw_time := 0.75 ## earliest throw (plus 0.12 s per yard of drop)
 @export var cpu_max_hold := 2.6        ## after this the QB takes the best option or throws it away
 @export var cpu_checkdown_open := 0.6
+@export var cpu_deep_caution := 0.06   ## yards of openness the CPU QB wants per air yard beyond 15
+@export var cpu_zone_closing := 0.55   ## share of a defender's closing speed during the flight the CPU QB respects
 
 @export_group("Contact")
 @export var tackle_range := 0.85
@@ -65,6 +99,7 @@ extends Resource
 @export var engage_range := 1.2
 @export var run_engage_range := 1.6    ## run blockers latch on from a bit farther
 @export var snap_engage_range := 2.8   ## on run plays linemen fire off and engage the man over them at the snap
+@export var run_seal_push := 0.15      ## yd/s run blockers drive their man sideways, away from the carrier's lane
 @export var fall_forward_time := 0.3  ## tackled carriers fall forward: spot += forward speed × this
 @export var fall_forward_max := 2.8
 @export var shed_base := 1.9           ## seconds a block holds at equal ratings
@@ -114,6 +149,21 @@ extends Resource
 @export var runoff_normal := 32.0         ## game seconds between plays when the clock runs
 @export var runoff_hurry := 9.0           ## offense trailing in the last 2:00 of a half
 @export var runoff_milk := 36.0           ## offense leading in the last 4:00 of the game
+
+@export_group("CPU ball carrier")
+@export var run_probe_near := 3.0      ## yards: the runner checks space this far along each candidate lane…
+@export var run_probe_far := 6.0       ## …and this far
+@export var run_engaged_slack := 0.5   ## yards of extra space an engaged (blocked) defender counts for
+@export var run_progress_weight := 0.38 ## preference for lanes that gain ground over lanes that just have space
+@export var run_lane_stick := 1.5      ## how strongly he sticks to the designed lane while it is open
+
+@export_group("Feel")
+@export var slowmo_scale := 0.35       ## Engine.time_scale during a highlight (deep catch, pick, TD, big hit)
+@export var slowmo_time := 0.45        ## real seconds of slow-mo (0 = off)
+@export var slowmo_deep_yards := 20.0  ## air yards for a catch to count as a highlight
+@export var slowmo_hit_speed := 8.5    ## carrier speed (yd/s) for a tackle to count as a big hit
+@export var camera_punch := 0.07       ## zoom kick on a highlight (0.07 = 7 %)
+@export var aim_camera_lead := 130.0   ## px: while aiming, the camera keeps the reticle this far right of center
 
 @export_group("Runner controls")
 @export var steer_deadzone := 5.0      ## px

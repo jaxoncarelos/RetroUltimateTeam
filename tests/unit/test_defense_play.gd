@@ -136,8 +136,10 @@ func test_jump_at_the_catch_point_resolves_the_pass() -> void:
 	var target := me.field_pos + Vector2(2.0, 0.0)
 	runner.throw_ball(target)
 	me.field_pos = runner.ball.to
-	# Leap so the ball arrives at the top of the jump.
+	# Leap so the ball arrives at the top of the jump. (No human input here, so his brain
+	# would wander off during a lofted ball's hang time: hold him on the spot.)
 	while runner.ball.time_left() > runner.tuning.jump_time * 0.5:
+		me.field_pos = runner.ball.to
 		_step(1)
 	runner.defender_jump(me)
 	_step(60)

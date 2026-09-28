@@ -1,23 +1,63 @@
 extends CanvasLayer
-## Scene transitions with a quick pixel fade, and a config hand-off (e.g. MatchConfig
+## Scene transitions with a diagonal pixel wipe, and a config hand-off (e.g. MatchConfig
 ## dictionary for the match scene: take_config() in the new scene's _ready).
 
+const TITLE := "res://scenes/meta/title.tscn"
 const HUB := "res://scenes/meta/hub.tscn"
 const MATCH := "res://scenes/match/match.tscn"
 const TEAM_PICK := "res://scenes/meta/team_picker.tscn"
+const MODE := "res://scenes/meta/mode_select.tscn"
+const PREMATCH := "res://scenes/meta/prematch.tscn"
+const RESULTS := "res://scenes/meta/results.tscn"
+const OBJECTIVES := "res://scenes/meta/objectives.tscn"
+const STORE := "res://scenes/meta/store.tscn"
+const SQUAD := "res://scenes/meta/collection.tscn"
+const LINEUP := "res://scenes/meta/lineup.tscn"
+const PACK_OPEN := "res://scenes/meta/pack_open.tscn"
+const SEASON := "res://scenes/meta/season.tscn"
+const CHALLENGES := "res://scenes/meta/challenges.tscn"
+const SETTINGS := "res://scenes/meta/settings.tscn"
+
+const WIPE_TIME := 0.22
 
 var pending_config: Dictionary = {}
-var _fade: ColorRect
+var _wipe: _Wipe
 var _busy := false
+
+
+## Full-screen grid of squares that grow in along a diagonal (cover) and shrink away.
+class _Wipe:
+	extends Control
+	var progress := 0.0:
+		set(v):
+			progress = v
+			queue_redraw()
+	const WCELL := 20.0
+	var color := Color("#0f165a")
+
+	func _draw() -> void:
+		if progress <= 0.0:
+			return
+		var cols := int(ceil(size.x / WCELL)) + 1
+		var rows := int(ceil(size.y / WCELL)) + 1
+		var span := float(cols + rows)
+		for y in rows:
+			for x in cols:
+				var d := float(x + y) / span
+				var k := clampf(progress * 2.0 - d, 0.0, 1.0)
+				if k <= 0.0:
+					continue
+				var s := WCELL * k
+				var c := Vector2(x, y) * WCELL + Vector2.ONE * WCELL * 0.5
+				draw_rect(Rect2(c - Vector2(s, s) * 0.5, Vector2(s, s)).grow(0.5), color)
 
 
 func _ready() -> void:
 	layer = 100
-	_fade = ColorRect.new()
-	_fade.color = Color(0.06, 0.08, 0.12, 0.0)
-	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_fade)
+	_wipe = _Wipe.new()
+	_wipe.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_wipe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_wipe)
 
 
 func goto(path: String, config: Dictionary = {}) -> void:
@@ -25,14 +65,23 @@ func goto(path: String, config: Dictionary = {}) -> void:
 		return
 	_busy = true
 	pending_config = config
+	_wipe.mouse_filter = Control.MOUSE_FILTER_STOP
+	Sfx.play("swoosh")
 	var tw := create_tween()
-	tw.tween_property(_fade, "color:a", 1.0, 0.18)
+	tw.tween_property(_wipe, "progress", 1.0, WIPE_TIME)
 	await tw.finished
 	get_tree().change_scene_to_file(path)
 	await get_tree().process_frame
+	await get_tree().process_frame
 	var back := create_tween()
-	back.tween_property(_fade, "color:a", 0.0, 0.18)
+	back.tween_property(_wipe, "progress", 0.0, WIPE_TIME)
+	await back.finished
+	_wipe.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_busy = false
+
+
+func is_busy() -> bool:
+	return _busy
 
 
 func take_config() -> Dictionary:

@@ -1,76 +1,174 @@
 extends Control
-## SEASON: an 8- or 17-game schedule vs real teams (other games simulated), standings,
-## then 7-team-per-conference playoffs to the Super Bowl (Elite pack for the champion).
+## SEASON (Retro Bowl "Schedule"): the week's matchups in a framed two-column list with
+## mini helmets and scores (your game in yellow), arrows to page weeks, a STANDINGS view,
+## playoffs, and CONTINUE into the pre-match screen for your next game.
 
 var _ui: Dictionary
-var _body: VBoxContainer
+var _panel: RetroPanel
+var _body: Control
+var _week := 0
+var _standings := false
+var _nav_extra: Array[Control] = []
 
 
 func _ready() -> void:
-	_ui = MetaUI.screen(self, "SEASON")
-	_body = VBoxContainer.new()
-	_body.add_theme_constant_override("separation", 4)
-	_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_ui["root"].add_child(_body)
+	_ui = MetaUI.screen(self, "SCHEDULE")
+	var root: VBoxContainer = _ui["root"]
+	var row := HBoxContainer.new()
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 6)
+	root.add_child(row)
+	var prev := IconButton.new("back", Vector2(24, 40))
+	prev.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	prev.pressed.connect(func() -> void: _page(-1))
+	row.add_child(prev)
+	_panel = RetroPanel.new("WEEK 1", UiSkin.PANEL, 5)
+	_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(_panel)
+	var next := IconButton.new("play", Vector2(24, 40))
+	next.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	next.pressed.connect(func() -> void: _page(1))
+	row.add_child(next)
+	var s := SaveManager.profile.season
+	_week = clampi(int(s.get("week", 0)), 0, maxi(0, (s.get("weeks", []) as Array).size() - 1))
 	_refresh()
 
 
+func _page(d: int) -> void:
+	var s := SaveManager.profile.season
+	var n := (s.get("weeks", []) as Array).size()
+	if n == 0 or _standings:
+		return
+	_week = (_week + d + n) % n
+	Sfx.play("swoosh")
+	_refresh()
+
+
+func _active() -> bool:
+	var prof := SaveManager.profile
+	return not prof.season.is_empty() and prof.season.get("team", "") == prof.franchise_team
+
+
 func _refresh() -> void:
-	for c in _body.get_children():
-		_body.remove_child(c)
-		c.queue_free()
 	var prof := SaveManager.profile
 	var s := prof.season
-	if s.is_empty() or s.get("team", "") != prof.franchise_team:
-		_body.add_child(MetaUI.label("PLAY A %d-GAME SEASON AGAINST REAL TEAMS, THEN THE PLAYOFFS." % Settings.season_games))
-		_body.add_child(MetaUI.label("SUPER BOWL CHAMPIONS GET AN ELITE PACK.", UiTheme.DIM))
-		_body.add_child(MetaUI.button("START SEASON", Vector2(160, 28), _new_season))
+	if _body != null:
+		_panel.remove_child(_body)
+		_body.queue_free()
+	for c in _nav_extra:
+		c.queue_free()
+	_nav_extra.clear()
+	var nav: HBoxContainer = _ui["nav"]
+	if not _active():
+		_panel.title = "NEW SEASON"
+		var col := VBoxContainer.new()
+		col.alignment = BoxContainer.ALIGNMENT_CENTER
+		col.add_theme_constant_override("separation", 6)
+		col.add_child(MetaUI.label("PLAY A %d-GAME SEASON AGAINST REAL TEAMS," % Settings.season_games, UiSkin.WHITE, 8,
+				HORIZONTAL_ALIGNMENT_CENTER))
+		col.add_child(MetaUI.label("THEN THE PLAYOFFS. MAKING THEM PAYS %d COINS," % ModeResults.PLAYOFF_BERTH_COINS,
+				UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_CENTER))
+		col.add_child(MetaUI.label("EVERY PLAYOFF WIN %d. CHAMPIONS GET AN ELITE PACK!" % ModeResults.PLAYOFF_WIN_COINS,
+				UiSkin.YELLOW, 8, HORIZONTAL_ALIGNMENT_CENTER))
+		_body = col
+		_panel.add_child(col)
+		_add_nav(MetaUI.spacer())
+		_add_nav(MetaUI.continue_button("START SEASON", _new_season, true, 150))
 		return
-	var table := SeasonRules.standings(s, GameData.teams.keys())
 	var you: String = s["team"]
-	var rec: Dictionary = table[you]
-	var head := "YEAR %d  ·  %s  ·  %d-%d-%d" % [int(s["year"]), you, rec["w"], rec["l"], rec["t"]]
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	_body.add_child(row)
-	var info := VBoxContainer.new()
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(info)
-	info.add_child(MetaUI.label(head, UiTheme.ACCENT))
+	var table := SeasonRules.standings(s, GameData.teams.keys())
+	_add_nav(MetaUI.nav_button("SCHEDULE" if _standings else "STANDINGS", func() -> void:
+		_standings = not _standings
+		_refresh(), 90))
+	_add_nav(MetaUI.spacer())
 	match str(s["phase"]):
-		"regular":
-			var w := int(s["week"])
-			var g := _find_game(s["weeks"][w], you)
-			var home: bool = g[0] == you
-			var opp: String = g[1] if home else g[0]
-			info.add_child(MetaUI.label("WEEK %d OF %d:  %s %s  (OVR %d)" % [w + 1, int(s["games"]),
-					"VS" if home else "AT", GameData.team(opp).team_name.to_upper(), int(s["ovr"].get(opp, 75))]))
-			row.add_child(MetaUI.button("PLAY WEEK %d" % (w + 1), Vector2(110, 28), func() -> void: _play(g, "WEEK %d" % (w + 1))))
-		"playoffs":
-			var po: Dictionary = s["playoffs"]
-			info.add_child(MetaUI.label("PLAYOFFS: %s ROUND" % SeasonRules.ROUND_NAMES[int(po["round"])]))
-			var mine := SeasonRules.my_playoff_game(s)
-			if not mine.is_empty():
-				row.add_child(MetaUI.button("PLAY %s" % SeasonRules.ROUND_NAMES[int(po["round"])], Vector2(130, 28),
-						func() -> void: _play(mine, SeasonRules.ROUND_NAMES[int(po["round"])])))
-			else:
-				info.add_child(MetaUI.label("YOU'RE OUT. WATCH THE REST:" if po["made_it"] else "YOU MISSED THE PLAYOFFS.",
-						UiTheme.DIM))
-				row.add_child(MetaUI.button("SIM ROUND", Vector2(110, 28), _sim_round))
+		"regular", "playoffs":
+			var cfg := GameFlow.season_game_config(prof)
+			if not cfg.is_empty():
+				var play := MetaUI.continue_button("PLAY " + str(cfg.get("label", "")), func() -> void:
+					SceneRouter.goto(SceneRouter.PREMATCH, cfg), true, 150)
+				_add_nav(play)
+				Fx.pulse.call_deferred(play, 1.05, 1.1)
+			elif s["phase"] == "playoffs":
+				_add_nav(MetaUI.continue_button("SIM ROUND", _sim_round, true, 130))
 		"done":
-			var champ: String = s["playoffs"]["champion"]
-			info.add_child(MetaUI.label("SUPER BOWL CHAMPIONS: %s %s" % [GameData.team(champ).city.to_upper(),
-					GameData.team(champ).team_name.to_upper()], UiTheme.ACCENT if champ == you else UiTheme.TEXT))
-			row.add_child(MetaUI.button("NEXT SEASON", Vector2(110, 28), _new_season))
-	var sc := MetaUI.scroll(_body)
+			_add_nav(MetaUI.continue_button("NEXT SEASON", _new_season, true, 130))
+	if _standings:
+		_panel.title = "STANDINGS  -  YEAR %d" % int(s["year"])
+		_body = _standings_view(table, you)
+	elif s["phase"] == "regular":
+		_panel.title = "WEEK %d" % (_week + 1)
+		_body = _week_view(s, _week, you)
+	else:
+		var po: Dictionary = s["playoffs"]
+		_panel.title = "PLAYOFFS" if s["phase"] == "playoffs" else "SEASON OVER"
+		var col2 := VBoxContainer.new()
+		col2.add_theme_constant_override("separation", 1)
+		if s["phase"] == "done":
+			var champ: String = po["champion"]
+			col2.add_child(MetaUI.label("SUPER BOWL CHAMPIONS: %s" % GameData.team(champ).team_name.to_upper(),
+					UiSkin.YELLOW, 16, HORIZONTAL_ALIGNMENT_CENTER))
+		else:
+			col2.add_child(MetaUI.label("%s ROUND" % SeasonRules.ROUND_NAMES[int(po["round"])], UiSkin.YELLOW, 8,
+					HORIZONTAL_ALIGNMENT_CENTER))
+			if SeasonRules.my_playoff_game(s).is_empty():
+				col2.add_child(MetaUI.label("YOU'RE OUT - SIM THE REST" if po.get("made_it", false) else
+						"YOU MISSED THE PLAYOFFS", UiSkin.MUTED, 8, HORIZONTAL_ALIGNMENT_CENTER))
+		for line in (po.get("log", []) as Array).slice(-12):
+			col2.add_child(MetaUI.label(str(line), UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_CENTER))
+		_body = col2
+	_panel.add_child(_body)
+
+
+func _add_nav(c: Control) -> void:
+	(_ui["nav"] as HBoxContainer).add_child(c)
+	_nav_extra.append(c)
+
+
+func _week_view(s: Dictionary, w: int, you: String) -> Control:
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 0)
+	for g in s["weeks"][w]:
+		var mine: bool = you in g
+		var h := PanelContainer.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = UiSkin.ROW if mine else (Color(1, 1, 1, 0.03) if grid.get_child_count() % 4 < 2 else Color(0, 0, 0, 0))
+		sb.content_margin_left = 3
+		sb.content_margin_right = 3
+		h.add_theme_stylebox_override("panel", sb)
+		h.custom_minimum_size = Vector2(196, 13)
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 3)
+		h.add_child(hb)
+		var col := UiSkin.YELLOW if mine else UiSkin.WHITE
+		var away: TeamData = GameData.team(g[1])
+		var home: TeamData = GameData.team(g[0])
+		hb.add_child(HelmetView.new(away, 0.5, false))
+		var t := MetaUI.label("%-3s AT %-3s" % [g[1], g[0]], col)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hb.add_child(t)
+		hb.add_child(HelmetView.new(home, 0.5, true))
+		var res := ""
+		for rr in s["results"]:
+			if rr[0] == g[0] and rr[1] == g[1]:
+				res = "%d-%d" % [int(rr[3]), int(rr[2])]
+		var rl := MetaUI.label(res, col, 8, HORIZONTAL_ALIGNMENT_RIGHT)
+		rl.custom_minimum_size = Vector2(38, 0)
+		hb.add_child(rl)
+		grid.add_child(h)
+	return grid
+
+
+func _standings_view(table: Dictionary, you: String) -> Control:
 	var cols := HBoxContainer.new()
-	cols.add_theme_constant_override("separation", 12)
-	sc.add_child(cols)
+	cols.add_theme_constant_override("separation", 16)
 	for conf in ["AFC", "NFC"]:
 		var col := VBoxContainer.new()
-		col.add_theme_constant_override("separation", 1)
+		col.add_theme_constant_override("separation", 0)
 		cols.add_child(col)
-		col.add_child(MetaUI.label("%s STANDINGS" % conf, UiTheme.ACCENT))
+		col.add_child(MetaUI.label(conf, UiSkin.YELLOW))
 		var abbrs: Array = []
 		for a in GameData.teams:
 			if GameData.team(a).conf == conf:
@@ -78,22 +176,12 @@ func _refresh() -> void:
 		var ranked := SeasonRules.rank(abbrs, table)
 		for i in ranked.size():
 			var r: Dictionary = table[ranked[i]]
-			var l := MetaUI.label("%2d %-4s %d-%d-%d  %+d" % [i + 1, ranked[i], r["w"], r["l"], r["t"], int(r["pf"]) - int(r["pa"])],
-					UiTheme.ACCENT if ranked[i] == you else UiTheme.TEXT)
-			col.add_child(l)
-	if s["phase"] != "regular":
-		var logc := VBoxContainer.new()
-		cols.add_child(logc)
-		logc.add_child(MetaUI.label("PLAYOFFS", UiTheme.ACCENT))
-		for line in s["playoffs"].get("log", []):
-			logc.add_child(MetaUI.label(line))
-
-
-func _find_game(week: Array, you: String) -> Array:
-	for g in week:
-		if you in g:
-			return g
-	return [you, you]
+			col.add_child(MetaUI.label("%2d %-4s %2d-%-2d  %+d" % [i + 1, ranked[i], r["w"], r["l"], int(r["pf"]) - int(r["pa"])],
+					UiSkin.YELLOW if ranked[i] == you else (UiSkin.WHITE if i < 7 else UiSkin.MUTED)))
+	var sc := ScrollContainer.new()
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sc.add_child(cols)
+	return sc
 
 
 func _new_season() -> void:
@@ -107,15 +195,9 @@ func _new_season() -> void:
 	var year := int(prof.season.get("year", 0)) + 1
 	prof.season = SeasonRules.new_season(GameData.teams, prof.franchise_team, Settings.season_games, strengths, rng, year)
 	SaveManager.save()
+	_week = 0
+	Sfx.play("claim")
 	_refresh()
-
-
-func _play(g: Array, label: String) -> void:
-	var prof := SaveManager.profile
-	var you := prof.franchise_team
-	var opp: String = g[1] if g[0] == you else g[0]
-	SceneRouter.goto(SceneRouter.MATCH, {"home": you, "away": opp, "from_hub": true, "difficulty": Settings.difficulty,
-			"mode": "season", "extra": {"home": g[0], "away": g[1], "label": label}})
 
 
 func _sim_round() -> void:

@@ -1,6 +1,10 @@
 class_name PlayOverlay
 extends Node2D
 ## Pre-snap route preview (under players) or live aim arc + landing reticle (above players).
+## Aim preview: the real flight arc (dots, colored by throw type), its ground shadow and an
+## apex stem so the height reads at a glance, the landing reticle with BULLET / TOUCH / LOB,
+## and a ghost marker where each receiver will be when the ball lands (the assisted one is
+## highlighted). In flight: the landing reticle plus the ball's shadow track.
 
 enum Kind { ROUTES, AIM }
 
@@ -8,6 +12,9 @@ const ROUTE_COLOR := Color(1, 1, 1, 0.75)
 const RUN_COLOR := Color("#ffa300")
 const AIM_COLOR := Color("#fff1e8")
 const RETICLE_COLOR := Color("#ffec27")
+const KIND_COLORS: Array[Color] = [Color("#fff1e8"), Color("#ffa300"), Color("#29adff")]
+const SHADOW_COLOR := Color(0, 0, 0, 0.35)
+const GHOST_COLOR := Color("#fff1e8")
 
 var kind := Kind.ROUTES
 var runner: PlayRunner
@@ -34,7 +41,7 @@ func _draw() -> void:
 		if aim_active and runner.qb_is_passer():
 			_draw_aim()
 		if show_landing and runner.ball.state == Ball.State.AIR:
-			_draw_reticle(FieldProjection.to_screen(runner.ball.to), RETICLE_COLOR, 0.5 + 0.5 * sin(Time.get_ticks_msec() / 90.0))
+			_draw_flight()
 
 
 ## Pre-snap: a pulsing grab ring on the QB with a "pull back" chevron trail behind him.
@@ -73,15 +80,63 @@ func _draw_routes() -> void:
 
 func _draw_aim() -> void:
 	var from := runner.qb.field_pos
-	var dist := from.distance_to(aim_target)
-	var arc := RatingModel.throw_arc(runner.tuning, runner.qb.attr("thp"), dist)
-	var steps := 14
+	var plan := runner.plan_throw(aim_target)
+	var apex := float(plan["apex"])
+	var kind := int(plan["kind"])
+	var col: Color = KIND_COLORS[kind]
+	var land_s := FieldProjection.to_screen(aim_target)
+	# Ground shadow of the flight path.
+	_dotted(FieldProjection.to_screen(from), land_s, SHADOW_COLOR)
+	# The arc itself.
+	var steps := clampi(int(from.distance_to(aim_target) * 1.3), 10, 70)
+	var top := Vector2.ZERO
+	var top_z := -1.0
 	for i in range(1, steps + 1):
 		var u := float(i) / steps
-		var p := Ball.arc_point(from, aim_target, arc.y, u)
+		var p := Ball.arc_point(from, aim_target, apex, u)
 		var s := FieldProjection.to_screen(Vector2(p.x, p.y)) + FieldProjection.lift(p.z)
-		draw_rect(Rect2(s.round(), Vector2(2, 2)), AIM_COLOR)
-	_draw_reticle(FieldProjection.to_screen(aim_target), RETICLE_COLOR, 1.0)
+		draw_rect(Rect2(s.round() - Vector2(0, 1), Vector2(2, 1)), Color(0, 0, 0, 0.35))
+		draw_rect(Rect2(s.round(), Vector2(2, 2)), col)
+		if p.z > top_z:
+			top_z = p.z
+			top = Vector2(p.x, p.y)
+	# Apex stem: a faint vertical line from the top of the arc down to its shadow.
+	if kind != PassModel.Kind.BULLET:
+		var g := FieldProjection.to_screen(top).round()
+		var h := FieldProjection.lift(top_z).round()
+		for y in range(int(h.y), 0, 3):
+			draw_rect(Rect2(g + Vector2(0, y), Vector2(1, 1)), Color(col, 0.45))
+	_draw_ghosts(float(plan["dur"]))
+	_draw_reticle(land_s, RETICLE_COLOR, 1.0)
+	var font := ThemeDB.fallback_font
+	if font != null:
+		var label: String = PassModel.KIND_NAMES[kind]
+		var size := ThemeDB.fallback_font_size
+		var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		var at := (land_s + Vector2(-w * 0.5, -9)).round()
+		draw_string(font, at + Vector2(1, 1), label, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(0, 0, 0, 0.7))
+		draw_string(font, at, label, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
+
+
+## Where each eligible receiver will be when a ball thrown now comes down.
+func _draw_ghosts(dur: float) -> void:
+	for o in runner.offense:
+		if not o.is_eligible() or o.is_down:
+			continue
+		var g := FieldProjection.to_screen(runner.predict(o, dur)).round()
+		var hot := o == runner.aim_assist_target
+		var c := Color(RETICLE_COLOR if hot else GHOST_COLOR, 0.95 if hot else 0.55)
+		if hot:
+			_dotted(FieldProjection.to_screen(o.field_pos), g, Color(c, 0.5))
+		draw_rect(Rect2(g - Vector2(2, 2), Vector2(5, 5)), c, false, 1.0)
+
+
+## Ball in the air: pulsing landing reticle and the ball's remaining shadow track.
+func _draw_flight() -> void:
+	var b := runner.ball
+	var land := FieldProjection.to_screen(b.to)
+	_dotted(FieldProjection.to_screen(b.field_pos), land, SHADOW_COLOR)
+	_draw_reticle(land, RETICLE_COLOR, 0.5 + 0.5 * sin(Time.get_ticks_msec() / 90.0))
 
 
 func _draw_reticle(center: Vector2, color: Color, alpha: float) -> void:

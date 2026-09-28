@@ -61,20 +61,22 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var vp := get_viewport_rect().size
-	var origin := Vector2((vp.x - W) * 0.5, vp.y * 0.30)
-	var font := PixelFont.get_font()
-	draw_rect(Rect2(origin - Vector2(6, 22), Vector2(W + 12, H + 40)), Color(UiTheme.INK, 0.88))
-	draw_rect(Rect2(origin - Vector2(6, 22), Vector2(W + 12, H + 40)), UiTheme.TEXT, false, 1.0)
-	draw_string(font, origin + Vector2(0, -10), title, HORIZONTAL_ALIGNMENT_CENTER, W, 8, UiTheme.ACCENT)
+	var origin := Vector2(roundf((vp.x - W) * 0.5), roundf(vp.y * 0.30))
+	var frame := Rect2(origin - Vector2(10, 24), Vector2(W + 20, H + 46))
+	UiSkin.draw_frame(self, frame, Color(UiSkin.PANEL, 0.94), UiSkin.BORDER)
+	UiSkin.draw_text_c(self, origin.x + W * 0.5, origin.y - 9, title, 8, UiSkin.YELLOW, Color(0, 0, 0, 0), UiSkin.SHADOW)
+	draw_rect(Rect2(origin - Vector2(1, 1), Vector2(W + 2, H + 2)), UiSkin.BORDER)
 	draw_rect(Rect2(origin, Vector2(W, H)), Color("#7e2553"))
 	var cx := origin.x + W * 0.5
 	var half := W * 0.5
 	var dz := (zone + doink) * half
 	draw_rect(Rect2(cx - dz, origin.y, dz * 2.0, H), Color("#ffa300"))
 	var gz := zone * half
-	draw_rect(Rect2(cx - gz, origin.y, gz * 2.0, H), Color("#00e436"))
+	draw_rect(Rect2(cx - gz, origin.y, gz * 2.0, H), UiSkin.GREEN)
+	draw_rect(Rect2(cx - gz, origin.y, gz * 2.0, 2), UiSkin.GREEN.lightened(0.4))
 	draw_rect(Rect2(cx - 1, origin.y - 2, 2, H + 4), Color(1, 1, 1, 0.6))
-	var nx := cx + _needle * half
-	draw_rect(Rect2(nx - 1, origin.y - 4, 3, H + 8), UiTheme.TEXT)
-	if _active:
-		draw_string(font, origin + Vector2(0, H + 12), "TAP TO KICK", HORIZONTAL_ALIGNMENT_CENTER, W, 8, UiTheme.TEXT)
+	var nx := roundf(cx + _needle * half)
+	draw_rect(Rect2(nx - 2, origin.y - 5, 5, H + 10), UiSkin.SHADOW)
+	draw_rect(Rect2(nx - 1, origin.y - 4, 3, H + 8), UiSkin.WHITE)
+	if _active and fmod(_t, 0.6) < 0.45:
+		UiSkin.draw_text_c(self, cx, origin.y + H + 13, "TAP TO KICK!", 8, UiSkin.WHITE)

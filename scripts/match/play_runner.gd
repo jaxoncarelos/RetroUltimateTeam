@@ -11,6 +11,8 @@ signal carrier_changed(agent: PlayerAgent)
 signal ball_thrown(target: Vector2)
 ## A tackle landed (for screen shake / sfx): where, and the carrier's speed.
 signal big_hit(at: Vector2, speed: float)
+## A highlight moment for juice (slow-mo, camera punch): "deep_catch", "pick" or "td".
+signal big_moment(kind: String, at: Vector2)
 
 enum Phase { IDLE, PRE_SNAP, LIVE, DEAD }
 
@@ -62,6 +64,21 @@ var broken_tackles := 0
 var fumbled := false
 ## Receiver the CPU QB is currently reading (DefenseSwitcher uses it pre-throw).
 var qb_target_hint: PlayerAgent = null
+## Live aim reticle while the human is aiming (Vector2.INF otherwise); the camera leads to it.
+var aim_preview := Vector2.INF
+## Receiver the aim assist is pulling the reticle toward (or null).
+var aim_assist_target: PlayerAgent = null
+## PassModel plan of the ball in the air ({} before a throw).
+var throw_plan: Dictionary = {}
+## The receiver the ball is thrown to (tracks the landing spot).
+var intended: PlayerAgent = null
+var _human_throw := false
+var _lane_checked: Dictionary = {}
+var _ball_prev := Vector2.ZERO
+
+## Headless pass log across plays (sandbox sim / --pass-log): attempts/completions by depth.
+static var pass_log := {"att": 0, "comp": 0, "int": 0, "deep_att": 0, "deep_comp": 0, "deep_int": 0,
+		"lane_tips": 0, "lane_ints": 0, "lob": 0, "touch": 0, "bullet": 0}
 
 var _pending_result: Dictionary = {}
 var _dead_timer := 0.0
@@ -69,6 +86,20 @@ var _dead_timer := 0.0
 
 func _init() -> void:
 	contact = ContactResolver.new(self)
+
+
+## One line summary of pass_log (sandbox sim prints it; --pass-log prints it on exit).
+static func pass_log_text() -> String:
+	var l := pass_log
+	return "PASSLOG %d att, %.0f%% comp, %.1f%% INT | deep (20+ air yds) %d att, %.0f%% comp, %.1f%% INT | lane tips %d (%d INT) | bullet %d, touch %d, lob %d" % [
+		l["att"], 100.0 * l["comp"] / maxf(l["att"], 1), 100.0 * l["int"] / maxf(l["att"], 1),
+		l["deep_att"], 100.0 * l["deep_comp"] / maxf(l["deep_att"], 1), 100.0 * l["deep_int"] / maxf(l["deep_att"], 1),
+		l["lane_tips"], l["lane_ints"], l["bullet"], l["touch"], l["lob"]]
+
+
+func _exit_tree() -> void:
+	if OS.get_cmdline_user_args().has("--pass-log"):
+		print(pass_log_text())
 
 
 func _ready() -> void:
@@ -102,6 +133,12 @@ func setup_play(p_off: PlayDef, p_def: PlayDef, p_los_x: float, p_ball_y: float,
 	carrier_lane = PackedVector2Array()
 	fumbled = false
 	qb_target_hint = null
+	aim_preview = Vector2.INF
+	aim_assist_target = null
+	throw_plan = {}
+	intended = null
+	_human_throw = false
+	_lane_checked = {}
 	_pending_result = {}
 
 	var origin := Vector2(los_x, ball_y)
@@ -144,6 +181,7 @@ func _spawn(team: int, slot: String, pos: String, at: Vector2, info: Dictionary,
 	a.setup(team, slot, pos, attrs, tuning, colors, info.get("name", slot), info.get("jersey", 0))
 	a.field_pos = at
 	a.start_pos = at
+	a.in_stance = pos in ["OL", "DL", "TE"]
 	a.name = "%s_%s" % ["O" if team == PlayerAgent.Team.OFFENSE else "D", slot]
 	actors.add_child(a)
 	agents.append(a)
@@ -169,6 +207,7 @@ func snap() -> void:
 	ball.give_to(qb)
 	carrier = qb
 	for a in agents:
+		a.in_stance = false
 		a.brain = _brain_for(a)
 	_apply_presnap_reads()
 	if is_run_play():
@@ -179,6 +218,8 @@ func snap() -> void:
 		for p in qb.assignment.get("path", PackedVector2Array()):
 			lane.append(qb.start_pos + p)
 		_set_carrier(qb, lane)
+	if human_team == PlayerAgent.Team.OFFENSE:
+		key_level = clampf(key_level * _key_scale(), 0.0, 1.0)
 	if key_level > 0.0:
 		_cheat_zones_to_routes()
 		for d in defense:
@@ -186,6 +227,15 @@ func snap() -> void:
 			if is_run_play() and d.brain is RushBrain:
 				d.speed_mult = 1.0 + def_ai.rush_speed_bonus * key_level
 	Events.play_started.emit(off_play.display_name)
+
+
+## Keying strength vs the human for the current difficulty (Settings autoload if present).
+func _key_scale() -> float:
+	var scales := def_ai.key_scale_by_difficulty
+	var settings: Node = get_tree().root.get_node_or_null("Settings") if is_inside_tree() else null
+	if settings == null or scales.is_empty():
+		return 1.0
+	return scales[clampi(int(settings.get("difficulty")), 0, scales.size() - 1)]
 
 
 func _brain_for(a: PlayerAgent) -> Brain:
@@ -313,16 +363,91 @@ func focus_point() -> Vector2:
 	return ball.field_pos
 
 
-## Converts a slingshot drag (screen px) into a clamped throw target.
+## Converts a slingshot drag (screen px) into a clamped throw target (landing point).
+## Pull direction = throw direction, pull length = distance (progressive), then a light aim
+## assist toward a receiver's lead point (aim_assist_target is set for the preview).
 func aim_point(drag_start: Vector2, drag_now: Vector2) -> Vector2:
 	var pull := drag_now - drag_start
-	var target := qb.field_pos - pull * tuning.aim_gain
 	var max_d := RatingModel.max_throw_distance(tuning, qb.attr("thp"))
+	var raw := qb.field_pos - pull * tuning.aim_gain
+	var dir := (raw - qb.field_pos).normalized() if pull.length() > 0.01 else Vector2.RIGHT
+	var yards := minf(PassModel.pull_to_yards(tuning, pull.length()), max_d)
+	var target := qb.field_pos + dir * yards
+	aim_assist_target = null
+	var leads := PackedVector2Array()
+	var recs: Array[PlayerAgent] = []
+	for o in offense:
+		if o.is_eligible() and o.can_act() and o.engaged_with == null and o != qb:
+			leads.append(lead_point(o))
+			recs.append(o)
+	var a := PassModel.assist(tuning, target, leads)
+	if int(a["index"]) >= 0:
+		target = a["point"]
+		aim_assist_target = recs[int(a["index"])]
 	var v := target - qb.field_pos
 	if v.length() > max_d:
 		target = qb.field_pos + v.normalized() * max_d
 	target.y = clampf(target.y, -1.0, FieldGeo.WIDTH + 1.0)
 	return target
+
+
+## Defenders' ground positions a throw to `target` must pass over (projected a little ahead).
+func lane_blockers(target: Vector2) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	var look := minf(0.45, qb.field_pos.distance_to(target) / 60.0)
+	for d in defense:
+		if d.is_down or d.engaged_with != null:
+			continue
+		out.append(d.field_pos + d.velocity * look)
+	return out
+
+
+## PassModel plan for a throw from the QB to `target` (what the aim preview shows).
+func plan_throw(target: Vector2) -> Dictionary:
+	return PassModel.plan(tuning, qb.attr("thp"), qb.field_pos, target, lane_blockers(target))
+
+
+## Where a receiver will be `secs` from now if he keeps running his route at full speed.
+func predict(o: PlayerAgent, secs: float) -> Vector2:
+	if not (o.brain is RouteBrain):
+		return _on_field(o.field_pos + o.velocity * secs)
+	var rb := o.brain as RouteBrain
+	var spd := o.max_speed * o.speed_mult
+	var cur := o.velocity.length()
+	var budget := spd * maxf(secs - rb.delay - o.jam_timer * (1.0 - tuning.press_jam_speed), 0.0)
+	budget = maxf(budget - (spd - cur) * (spd - cur) / (2.0 * o.accel), 0.0)
+	var p := o.field_pos
+	var dir := rb.last_dir
+	for i in range(rb.idx, rb.points.size()):
+		var seg := rb.points[i] - p
+		if seg.length() >= budget:
+			return _on_field(p + seg.normalized() * budget)
+		budget -= seg.length()
+		if seg.length() > 0.01:
+			dir = seg.normalized()
+		p = rb.points[i]
+	if rb.end_mode == "sit":
+		return _on_field(p)
+	return _on_field(p + dir * budget)
+
+
+func _on_field(p: Vector2) -> Vector2:
+	return Vector2(minf(p.x, FieldGeo.LENGTH - 1.0), clampf(p.y, 1.0, FieldGeo.WIDTH - 1.0))
+
+
+## The landing spot that hits a receiver in stride (flight time from the plan, iterated),
+## pushed a little further ahead on lofted balls so he runs under it, away from a trailer.
+func lead_point(o: PlayerAgent) -> Vector2:
+	var p := o.field_pos
+	var plan := {}
+	for i in 3:
+		plan = plan_throw(p)
+		p = predict(o, float(plan["dur"]))
+	var ahead := predict(o, float(plan["dur"]) + 0.3) - p
+	if ahead.length() > 0.05:
+		p += ahead.normalized() * tuning.lob_lead_extra * float(plan["loft"])
+	p.y = clampf(p.y, 1.5, FieldGeo.WIDTH - 1.5)
+	return p
 
 
 # ---------------------------------------------------------------- actions
@@ -333,33 +458,48 @@ func throw_ball(target: Vector2) -> void:
 	var dist := qb.field_pos.distance_to(target)
 	var err := RatingModel.aim_error(tuning, qb.attr("tha"), qb.attr("awr"), dist, pressure_on_qb())
 	var landing := target + Vector2.from_angle(rng.randf() * TAU) * err * sqrt(rng.randf())
-	var arc := RatingModel.throw_arc(tuning, qb.attr("thp"), qb.field_pos.distance_to(landing))
-	ball.throw_to(qb.field_pos, landing, arc.x, arc.y)
+	throw_plan = plan_throw(landing)
+	var dur := float(throw_plan["dur"])
+	ball.throw_to(qb.field_pos, landing, dur, float(throw_plan["apex"]))
+	_ball_prev = qb.field_pos
+	_lane_checked = {}
+	_human_throw = human_team == PlayerAgent.Team.OFFENSE
 	pass_thrown = true
+	aim_preview = Vector2.INF
 	qb.throw_anim = 0.3
 	carrier = null
 	if human_team == PlayerAgent.Team.OFFENSE:
 		_set_controlled(null)
+	pass_log[["bullet", "touch", "lob"][int(throw_plan["kind"])]] += 1
 
-	# Best-placed receiver breaks on the ball; nearby defenders react after their delay.
+	# The receiver who can get there with the least to spare tracks the ball to its landing.
 	var best: PlayerAgent = null
 	var best_d := INF
 	for o in offense:
 		if not o.is_eligible() or not o.can_act():
 			continue
 		var d := o.field_pos.distance_to(landing)
-		if d < best_d and d / o.max_speed <= arc.x + 0.6:
+		if d < best_d and d / o.max_speed <= dur + 0.6:
 			best_d = d
 			best = o
+	intended = best
 	if best != null:
-		best.brain = BallHawkBrain.new(best, self, landing, 0.0, null)
+		best.brain = BallHawkBrain.new(best, self, landing, 0.0, null, true)
 		if human_team == PlayerAgent.Team.OFFENSE:
 			_set_controlled(best)
+	# Defenders: zone defenders read the QB and break on the ball after their reaction;
+	# man defenders run with their man (backs to the ball) and only turn late to find it.
 	for d in defense:
-		if d.engaged_with != null or not d.can_act() or d.brain is RushBrain:
+		if d.engaged_with != null or not d.can_act() or d.brain is RushBrain or d.human:
 			continue
-		if d.field_pos.distance_to(landing) < 11.0 + def_ai.ball_react_extra * key_level:
-			d.brain = BallHawkBrain.new(d, self, landing, d.reaction + 0.1, d.brain)
+		var dd := d.field_pos.distance_to(landing)
+		var react := d.reaction + 0.1
+		if d.brain is ManCoverBrain and (d.brain as ManCoverBrain).mark != null:
+			var mark := (d.brain as ManCoverBrain).mark
+			if mark == best or dd < tuning.ball_react_radius:
+				d.brain = BallHawkBrain.new(d, self, landing, maxf(react, dur - tuning.man_look_back), d.brain)
+		elif dd < tuning.ball_react_radius + def_ai.ball_react_extra * key_level:
+			d.brain = BallHawkBrain.new(d, self, landing, react, d.brain)
 	ball_thrown.emit(landing)
 
 
@@ -466,6 +606,23 @@ func _set_carrier(a: PlayerAgent, lane := PackedVector2Array()) -> void:
 
 # ---------------------------------------------------------------- simulation
 
+func _process(_delta: float) -> void:
+	_update_markers()
+
+
+## Who is who at a glance: stars under your receivers until the ball is thrown, and an arrow
+## over the ball carrier (yellow = yours, red = theirs).
+func _update_markers() -> void:
+	var human_off := human_team == PlayerAgent.Team.OFFENSE
+	var show_stars := human_off and (phase == Phase.PRE_SNAP or qb_is_passer())
+	for a in agents:
+		a.star = show_stars and a.is_eligible() and a != carrier
+		var mark := Color(0, 0, 0, 0)
+		if phase == Phase.LIVE and a == carrier and not qb_is_passer():
+			mark = Color("#ffec27") if a.team == human_team else Color("#ff4b4b")
+		a.arrow = mark
+
+
 func _physics_process(dt: float) -> void:
 	if phase == Phase.DEAD:
 		for a in agents:
@@ -495,6 +652,8 @@ func _physics_process(dt: float) -> void:
 	_check_handoff()
 	if ball.step(dt):
 		_resolve_arrival()
+	elif ball.state == Ball.State.AIR:
+		_check_lane()
 	_check_carrier()
 	if phase == Phase.LIVE and play_time > WATCHDOG_SECONDS:
 		var spot := carrier.field_pos if carrier != null else Vector2(los_x, ball_y)
@@ -530,6 +689,7 @@ func _check_carrier() -> void:
 		return
 	if p.x >= FieldGeo.OPP_GOAL:
 		carrier.celebrating = true
+		big_moment.emit("td", p)
 		_end_play("td", p, "TOUCHDOWN!")
 		return
 	if p.y < 0.0 or p.y > FieldGeo.WIDTH:
@@ -541,7 +701,10 @@ func _check_carrier() -> void:
 		elif carrier == qb and not pass_thrown and not is_run_play() and p.x < los_x:
 			_end_play("sack", p, "SACKED!")
 		else:
-			_end_play("tackle", p + Vector2(fall_forward(carrier), 0.0), "")
+			# Falling forward gains yards but can't carry a downed runner into the end zone.
+			var spot := p + Vector2(fall_forward(carrier), 0.0)
+			spot.x = minf(spot.x, FieldGeo.OPP_GOAL - 0.5)
+			_end_play("tackle", spot, "")
 
 
 ## Interception return (the defense runs toward -x): pick six, or down where tackled.
@@ -549,6 +712,7 @@ func _check_carrier() -> void:
 func _check_return(p: Vector2) -> void:
 	if p.x <= FieldGeo.OWN_GOAL:
 		carrier.celebrating = true
+		big_moment.emit("td", p)
 		_end_play("int_td", p, "PICK SIX!")
 	elif p.y < 0.0 or p.y > FieldGeo.WIDTH:
 		_end_play("int", p, "INTERCEPTED!")
@@ -575,6 +739,49 @@ func _jumper_near(landing: Vector2) -> PlayerAgent:
 	return null
 
 
+## A defender whose hands the low part of the ball's flight passes within reach of gets a
+## chance to tip or pick it (bullets thrown through a defender; lobs sail over them).
+## The last contest_radius yards belong to the catch-point contest instead.
+func _check_lane() -> void:
+	var t := tuning
+	var p := ball.field_pos
+	var prev := _ball_prev
+	_ball_prev = p
+	if ball.from.distance_to(p) < t.lane_skip_near or ball.to.distance_to(p) < t.contest_radius:
+		return
+	if ball.z > t.reach_height + t.jump_height:
+		return
+	for d in defense:
+		if _lane_checked.has(d) or d.engaged_with != null or (not d.can_act() and d.jump_timer <= 0.0):
+			continue
+		var gd := PassModel.seg_dist(d.field_pos, prev, p)
+		if not PassModel.can_reach(t, gd, ball.z, d.z_height):
+			continue
+		_lane_checked[d] = true
+		if rng.randf() >= RatingModel.lane_play_prob(t, d.attr("cov"), d.attr("awr")):
+			continue
+		pass_log["lane_tips"] += 1
+		if rng.randf() < RatingModel.lane_int_prob(t, d.attr("cth")) * (1.0 + def_ai.int_bonus * key_level):
+			pass_log["lane_ints"] += 1
+			_log_pass(false, true)
+			_set_carrier(d)
+		else:
+			_log_pass(false, false)
+			_end_play("incomplete", Vector2(los_x, ball_y), "TIPPED!")
+		return
+
+
+func _log_pass(caught: bool, picked: bool) -> void:
+	var deep := ball.to.x - los_x >= 20.0
+	pass_log["att"] += 1
+	pass_log["comp"] += 1 if caught else 0
+	pass_log["int"] += 1 if picked else 0
+	if deep:
+		pass_log["deep_att"] += 1
+		pass_log["deep_comp"] += 1 if caught else 0
+		pass_log["deep_int"] += 1 if picked else 0
+
+
 func _resolve_arrival() -> void:
 	var landing := ball.to
 	var t := tuning
@@ -584,32 +791,54 @@ func _resolve_arrival() -> void:
 		var r := rng.randf()
 		var p_int := RatingModel.jump_int_prob(t, err, j.attr("cov"), j.attr("cth"))
 		if r < p_int:
+			_log_pass(false, true)
 			_set_carrier(j)
+			big_moment.emit("pick", landing)
 			return
 		if r < p_int + RatingModel.jump_deflect_prob(t, err):
+			_log_pass(false, false)
 			_end_play("incomplete", Vector2(los_x, ball_y), "SWATTED!")
 			return
-	var o := _nearest_catcher(offense, landing, t.catch_radius, true)
-	var d := _nearest_catcher(defense, landing, t.contest_radius, false)
+	var reach := t.catch_radius + (t.human_catch_bonus if _human_throw else 0.0)
+	var o := _nearest_catcher(offense, landing, reach, true)
+	var d := _nearest_catcher(defense, landing, t.contest_radius + t.lob_contest_extra * float(throw_plan.get("loft", 0.0)), false)
 	var od := o.field_pos.distance_to(landing) if o != null else INF
 	var dd := d.field_pos.distance_to(landing) if d != null else INF
 	if o == null and d == null:
+		_log_pass(false, false)
 		_end_play("incomplete", Vector2(los_x, ball_y), "INCOMPLETE")
 		return
+	var loft := float(throw_plan.get("loft", 0.0))
 	if d != null and (o == null or dd + 0.3 + def_ai.contest_bonus * key_level < od):
+		# The defender beat the receiver to the spot. Under a hanging ball he has time to
+		# settle under it (undercut); a bullet he can only get a hand on.
 		var p_int := RatingModel.int_prob(t, d.attr("cov"), d.attr("cth")) * (1.0 + def_ai.int_bonus * key_level)
+		if loft >= t.lob_threshold and dd < 0.9:
+			p_int = minf(p_int * t.undercut_int_mult, 0.75)
 		if rng.randf() < p_int:
+			_log_pass(false, true)
 			_set_carrier(d)
+			big_moment.emit("pick", landing)
 		else:
+			_log_pass(false, false)
 			_end_play("incomplete", Vector2(los_x, ball_y), "BROKEN UP!")
 		return
-	var contest := 0.0 if d == null else clampf(1.0 - dd / t.contest_radius + def_ai.catch_contest_bonus * key_level, 0.0, 1.0)
+	var contest := 0.0
+	if d != null:
+		contest = clampf(PassModel.contest(t, landing, o.field_pos, d.field_pos, loft)
+				+ def_ai.catch_contest_bonus * key_level, 0.0, 1.0)
 	var def_cov := d.attr("cov") if d != null else 50.0
-	if rng.randf() < RatingModel.catch_prob(t, o.attr("cth"), contest, def_cov):
+	var p_catch := RatingModel.catch_prob(t, o.attr("cth"), contest, def_cov) * (1.0 - t.lob_catch_penalty * loft)
+	if rng.randf() < p_catch:
+		_log_pass(true, false)
 		_set_carrier(o)
-	elif d != null and rng.randf() < t.tip_int_chance:
+		if landing.x - los_x >= tuning.slowmo_deep_yards:
+			big_moment.emit("deep_catch", landing)
+	elif d != null and contest > 0.3 and rng.randf() < t.tip_int_chance:
+		_log_pass(false, true)
 		_set_carrier(d)
 	else:
+		_log_pass(false, false)
 		_end_play("incomplete", Vector2(los_x, ball_y), "DROPPED!" if contest < 0.3 else "BROKEN UP!")
 
 
@@ -648,4 +877,6 @@ func _end_play(type: String, spot: Vector2, text: String) -> void:
 		"turnover": type in ["int", "int_td", "fumble"],
 		"broken_tackles": broken_tackles,
 		"pass_thrown": pass_thrown,
+		"air_yards": ball.to.x - los_x if pass_thrown else 0.0,
+		"throw_kind": int(throw_plan.get("kind", -1)),
 	}

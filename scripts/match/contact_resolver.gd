@@ -71,6 +71,7 @@ func _blocks(dt: float) -> void:
 
 
 func _hold(b: PlayerAgent, d: PlayerAgent, dt: float) -> void:
+	var t := ctx.tuning
 	d.shed_timer -= dt
 	if d.shed_timer <= 0.0 or d.is_down or b.is_down or d == ctx.carrier:
 		b.engaged_with = null
@@ -81,7 +82,15 @@ func _hold(b: PlayerAgent, d: PlayerAgent, dt: float) -> void:
 	var edge := rush_rating(d) - b.attr("blk")
 	var drift: Vector2
 	if ctx.is_run_play() or ctx.carrier != null and ctx.carrier != ctx.qb:
-		drift = Vector2(1.0, 0.0) * clampf(0.5 - edge * 0.03, 0.1, 1.4)
+		# Drive him back and wall him off to the side away from the ball carrier.
+		var fwd := 1.0 if b.team == PlayerAgent.Team.OFFENSE else -1.0
+		drift = Vector2(fwd, 0.0) * clampf(0.5 - edge * 0.03, 0.1, 1.4)
+		var c := ctx.carrier
+		if c != null and c != b and c.team == b.team:
+			var side := signf(d.field_pos.y - c.field_pos.y)
+			if side == 0.0:
+				side = 1.0
+			drift.y = side * t.run_seal_push * clampf(1.0 - edge * 0.03, 0.2, 1.5)
 	else:
 		drift = d.desired_dir * clampf(0.6 + edge * 0.03, 0.2, 1.6)
 	d.field_pos += drift * dt

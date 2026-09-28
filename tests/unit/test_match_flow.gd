@@ -20,10 +20,11 @@ func test_human_match_runs_through_many_plays() -> void:
 	assert_eq(m.human, "KC")
 	var snaps := 0
 	var possessions := {}
-	var t := 0.0
-	while snaps < 14 and t < 120.0:
+	# Budget in frames, not wall time: one-time art baking at kickoff causes long first frames.
+	var frames := 0
+	while snaps < 14 and frames < 5000:
 		await wait_frames(1)
-		t += get_process_delta_time() * Engine.time_scale
+		frames += 1
 		if m.phase == MatchController.Phase.PLAY_CALL and not m.hud.tip_open():
 			possessions[m.gs.possession] = true
 			m._snap()

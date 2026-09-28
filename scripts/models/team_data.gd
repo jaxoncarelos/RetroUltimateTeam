@@ -39,3 +39,10 @@ static func load_all() -> Dictionary:
 
 func uniform_colors() -> Dictionary:
 	return {"primary": primary, "secondary": secondary, "helmet": helmet, "pants": pants}
+
+
+## Road whites: white jersey trimmed in the team color, same helmet. The away team wears these
+## on the field so both sides always read apart (KC red vs TB red, etc.).
+func away_colors() -> Dictionary:
+	var trim := primary if primary.get_luminance() < 0.8 else secondary
+	return {"primary": Color("#f2f2f2"), "secondary": trim, "helmet": helmet, "pants": pants}

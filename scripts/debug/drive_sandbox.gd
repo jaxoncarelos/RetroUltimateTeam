@@ -12,6 +12,8 @@ extends Node2D
 ##   --nokey      disable the CPU defense's memory (baseline for --spam comparisons)
 ##   --smart      autoplay calls plays with PlayAdvisor (situational) instead of at random
 ##   --look=X,Y   pin the camera on a field point (screenshots)   --grid  open the playbook grid
+##   --aim-demo   (with --autoplay) the CPU QB shows the human aim preview for ~0.6 s before
+##                it throws (screenshots of the arc / reticle / ghost markers)
 ##   --autosnap   (with --defend) snap automatically so the human-defense view can be recorded
 
 enum State { PLAY_CALL, LIVE, RESULT, DRIVE_OVER }
@@ -57,6 +59,8 @@ var spam_id := ""
 var use_memory := true
 var smart_calls := false
 var autosnap := false
+var aim_demo := false
+var _aim_demo_t := -1.0
 var stats := {"plays": 0, "yards": 0, "att": 0, "comp": 0, "int": 0, "sack": 0, "td": 0,
 		"runs": 0, "run_yds": 0, "pass_yds": 0, "broken": 0, "keyed": 0, "drives": 0, "fumble": 0}
 var by_play: Dictionary = {}   ## play id -> [calls, yards, tds]
@@ -82,6 +86,8 @@ func _ready() -> void:
 			smart_calls = true
 		elif arg == "--autosnap":
 			autosnap = true
+		elif arg == "--aim-demo":
+			aim_demo = true
 		elif arg.begins_with("--look="):
 			var xy := arg.get_slice("=", 1).split(",")
 			(func() -> void: camera.pinned = Vector2(float(xy[0]), float(xy[1]))).call_deferred()
@@ -367,8 +373,30 @@ func _physics_process(dt: float) -> void:
 
 
 func _cpu_offense_step(dt: float) -> void:
+	if state == State.LIVE and passer != null and aim_demo and runner.qb_is_passer():
+		_aim_demo_step(dt)
+		return
 	if state == State.LIVE and passer != null:
 		passer.update(dt)
+
+
+## --aim-demo: at 1.0 s show the aim preview on WR1's in-stride spot, throw 0.6 s later.
+func _aim_demo_step(dt: float) -> void:
+	if runner.play_time < 1.0:
+		return
+	var wr: PlayerAgent = runner.off_slots.get("WR1")
+	if wr == null:
+		passer.update(dt)
+		return
+	var target := runner.lead_point(wr)
+	runner.aim_preview = target
+	runner.aim_assist_target = wr
+	aim.aim_active = true
+	aim.aim_target = target
+	if runner.play_time >= 1.6:
+		aim.aim_active = false
+		runner.aim_preview = Vector2.INF
+		runner.throw_ball(target)
 
 
 func _record(result: Dictionary) -> void:
@@ -398,8 +426,9 @@ func _record(result: Dictionary) -> void:
 	elif type in stats:
 		stats[type] += 1
 	if sim_target > 0 and OS.get_cmdline_user_args().has("--verbose"):
-		print("  %-10s vs %-9s key=%.2f %-10s %+3d  bt=%d" % [selected_play.id, def_play.id, runner.key_level,
-				type, result["yards"], result.get("broken_tackles", 0)])
+		print("  %-10s vs %-9s key=%.2f %-10s %+3d  bt=%d  air=%d kind=%d" % [selected_play.id, def_play.id,
+				runner.key_level, type, result["yards"], result.get("broken_tackles", 0),
+				int(result.get("air_yards", 0)), int(result.get("throw_kind", -1))])
 
 
 func _print_stats() -> void:
@@ -415,6 +444,7 @@ func _print_stats() -> void:
 		100.0 * s["comp"] / maxf(s["att"], 1), s["pass_yds"], s["int"], s["sack"],
 		s["runs"], s["run_yds"], float(s["run_yds"]) / maxf(s["runs"], 1), s["td"], s["fumble"],
 		s["broken"], s["keyed"], 7.0 * s["td"] / maxf(s["drives"], 1), s["drives"]])
+	print(PlayRunner.pass_log_text())
 
 
 func _on_play_ended(result: Dictionary) -> void:

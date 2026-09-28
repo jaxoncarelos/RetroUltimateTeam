@@ -38,7 +38,8 @@ func _init(p_home := "HOME", p_away := "AWAY", real_quarter_seconds := 150.0) ->
 	for t in [home, away]:
 		stats[t] = {"pass_att": 0, "pass_comp": 0, "pass_yds": 0, "pass_td": 0, "int": 0,
 				"rush_att": 0, "rush_yds": 0, "rush_td": 0, "sacks": 0, "fumbles_lost": 0,
-				"fg_made": 0, "fg_att": 0, "punts": 0, "plays": 0, "yards": 0, "watchdog": 0}
+				"fg_made": 0, "fg_att": 0, "punts": 0, "plays": 0, "yards": 0, "watchdog": 0,
+				"long_pass": 0, "long_run": 0, "fg_long": 0, "pick6": 0}
 
 
 func other(team: String) -> String:
@@ -118,6 +119,7 @@ func apply_result(r: Dictionary, run_play: bool, seconds_before_play: float) -> 
 			s["rush_att"] += 1
 			s["rush_yds"] += yards
 			s["yards"] += yards
+			s["long_run"] = maxi(int(s["long_run"]), yards)
 	elif type == "sack":
 		s["sacks"] += 1
 		s["yards"] += yards
@@ -127,6 +129,7 @@ func apply_result(r: Dictionary, run_play: bool, seconds_before_play: float) -> 
 			s["pass_comp"] += 1
 			s["pass_yds"] += yards
 			s["yards"] += yards
+			s["long_pass"] = maxi(int(s["long_pass"]), yards)
 	match type:
 		"incomplete":
 			stop = true
@@ -146,6 +149,7 @@ func apply_result(r: Dictionary, run_play: bool, seconds_before_play: float) -> 
 			return _period_check()
 		"int_td":
 			s["int"] += 1
+			stats[def]["pick6"] += 1
 			add_points(def, 6)
 			last_event = "PICK SIX"
 			finish_drive(true, seconds_before_play)
@@ -195,6 +199,33 @@ func _after_downs(o: DownTracker.Outcome, off: String, stop: bool, before: float
 	if clock.end_play(stop, before):
 		last_event = "TWO-MINUTE WARNING"
 	return _period_check()
+
+
+## Field goal attempt box score (made/attempted/long). Call once per attempt.
+func record_field_goal(team: String, made: bool, dist: float) -> void:
+	var s: Dictionary = stats[team]
+	s["fg_att"] += 1
+	if made:
+		s["fg_made"] += 1
+		s["fg_long"] = maxi(int(s["fg_long"]), int(round(dist)))
+
+
+## One team's game box score for postgame rewards/objectives (ObjectiveRules.match_values):
+## its own stats plus pf, pa, won, tds, def_sacks, def_ints, def_pick6 and the
+## longest_pass / longest_run aliases.
+func box_score(team: String) -> Dictionary:
+	var opp := other(team)
+	var b: Dictionary = stats[team].duplicate()
+	b["pf"] = int(score[team])
+	b["pa"] = int(score[opp])
+	b["won"] = int(score[team]) > int(score[opp])
+	b["tds"] = int(b["pass_td"]) + int(b["rush_td"])
+	b["def_sacks"] = int(stats[opp]["sacks"])
+	b["def_ints"] = int(stats[opp]["int"])
+	b["def_pick6"] = int(b["pick6"])
+	b["longest_pass"] = int(b["long_pass"])
+	b["longest_run"] = int(b["long_run"])
+	return b
 
 
 func finish_drive(stop_clock: bool, before: float) -> void:

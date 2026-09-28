@@ -23,6 +23,9 @@ extends Resource
 @export var situation_weight := 1.2    ## how strongly down & distance shifts expectations
 
 @export_group("Keyed defenders")
+## Keying strength vs the human by difficulty (Rookie, Pro, All-Pro, Legend): beginners get a
+## gentler adaptive defense. CPU-vs-CPU is unaffected.
+@export var key_scale_by_difficulty := PackedFloat32Array([0.35, 0.7, 1.0, 1.15])
 @export var reaction_cut := 0.35       ## keyed defenders react this much faster at level 1
 @export var jump_blend := 0.65         ## how far coverage aims shift toward the next route point
 @export var zone_shift := 0.8         ## zones slide this share of the way onto the repeated play's route points

@@ -76,7 +76,7 @@ func set_possession(off_team: TeamData, def_team: TeamData) -> void:
 
 
 func _rebuild_turf() -> void:
-	_turf = StadiumArt.build_turf(left_endzone, right_endzone)
+	_turf = StadiumArt.build_turf(left_endzone, right_endzone, emblem_primary, emblem_secondary)
 	queue_redraw()
 
 
@@ -90,26 +90,9 @@ func _draw() -> void:
 	# Border, stands and sideline track are drawn behind this layer by CrowdView.
 	if _turf != null:
 		draw_texture(_turf, Vector2.ZERO)
-	_draw_emblem()
+	# Yard lines, hashes, numbers and the emblem are baked into the turf (StadiumArt).
 	_draw_endzone_text(font, 5.0, left_label)
 	_draw_endzone_text(font, 115.0, right_label)
-	# Yard lines every 5, hashes every yard
-	for yd in range(int(FieldGeo.OWN_GOAL), int(FieldGeo.OPP_GOAL) + 1):
-		var sx := int(_px(yd, 0).x)
-		if yd % 5 == 0:
-			var w := 2 if yd == int(FieldGeo.OWN_GOAL) or yd == int(FieldGeo.OPP_GOAL) else 1
-			draw_rect(Rect2(sx, 0, w, field_h), LINE)
-		else:
-			for hy in [0.6, FieldGeo.HASH_TOP, FieldGeo.HASH_BOTTOM, FieldGeo.WIDTH - 0.6]:
-				draw_rect(Rect2(sx, int(_px(0, hy).y) - 1, 1, 2), Color(LINE, 0.8))
-	# Numbers with arrows pointing at the nearer goal line.
-	for yd in range(20, 110, 10):
-		var n := FieldGeo.yard_line_number(yd)
-		for ny in [9.0, FieldGeo.WIDTH - 7.0]:
-			var p := _px(yd, ny)
-			draw_string(font, Vector2(p.x - 6, p.y), str(n), HORIZONTAL_ALIGNMENT_CENTER, 12, 8, Color(LINE, 0.9))
-			if n != 50:
-				_draw_arrow(Vector2(p.x + (-10.0 if yd < 60 else 10.0), p.y - 4.0), -1.0 if yd < 60 else 1.0)
 	# Sidelines and end lines
 	draw_rect(Rect2(_px(0, 0) - Vector2(0, 2), Vector2(FieldGeo.LENGTH * FieldProjection.PX_X, 2)), LINE)
 	draw_rect(Rect2(_px(0, FieldGeo.WIDTH), Vector2(FieldGeo.LENGTH * FieldProjection.PX_X, 2)), LINE)
@@ -131,34 +114,6 @@ func _draw_endzone_text(font: Font, center_x: float, text: String) -> void:
 	for i in text.length():
 		var p := _px(center_x, step * (i + 1))
 		draw_string(font, Vector2(p.x - 8, p.y + 4), text[i], HORIZONTAL_ALIGNMENT_CENTER, 16, 16, Color(LINE, 0.85))
-
-
-## Small solid triangle; dir -1 points left (toward the left goal), +1 right.
-func _draw_arrow(tip_side: Vector2, dir: float) -> void:
-	var tip := tip_side + Vector2(dir * 3.0, 0.0)
-	var base_x := tip_side.x - dir * 1.0
-	draw_colored_polygon(PackedVector2Array([tip, Vector2(base_x, tip.y - 3.0), Vector2(base_x, tip.y + 3.0)]),
-			Color(LINE, 0.9))
-
-
-## Original midfield emblem: a shield with a four-point star, in the home colors.
-func _draw_emblem() -> void:
-	var c := _px(FieldGeo.LENGTH * 0.5, FieldGeo.CENTER_Y)
-	var w := 34.0
-	var h := 26.0
-	var shield := PackedVector2Array([
-		c + Vector2(-w * 0.5, -h * 0.5), c + Vector2(w * 0.5, -h * 0.5),
-		c + Vector2(w * 0.5, h * 0.05), c + Vector2(0.0, h * 0.5), c + Vector2(-w * 0.5, h * 0.05)])
-	var outline := PackedVector2Array()
-	for p in shield:
-		outline.append(c + (p - c) * 1.12)
-	draw_colored_polygon(outline, Color(emblem_secondary, 0.55))
-	draw_colored_polygon(shield, Color(emblem_primary, 0.6))
-	var s := 9.0
-	var star := PackedVector2Array([
-		c + Vector2(0, -s), c + Vector2(2, -2), c + Vector2(s, 0), c + Vector2(2, 2),
-		c + Vector2(0, s * 0.8), c + Vector2(-2, 2), c + Vector2(-s, 0), c + Vector2(-2, -2)])
-	draw_colored_polygon(star, Color(emblem_secondary, 0.75))
 
 
 func _draw_pylons() -> void:

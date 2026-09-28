@@ -1,8 +1,10 @@
 class_name RosterDB
 extends RefCounted
 ## Parses data/roster.csv (skipping '#' comments and blank lines; blank cells = position
-## defaults), reports bad rows instead of crashing, fills every team's thin spots with
-## generated depth players, and builds the card catalog. Node-free (unit-tested).
+## defaults; optional `age`/`pot` columns drive development), reports bad rows instead of
+## crashing, fills a team's thin spots with generated depth players only as a last resort,
+## and builds the card catalog (one base card per player + Prime cards for stars).
+## Node-free (unit-tested).
 
 const ROSTER_PATH := "res://data/roster.csv"
 const POSITIONS := ["QB", "RB", "WR", "TE", "OL", "DL", "LB", "CB", "S", "K"]
@@ -58,6 +60,9 @@ func parse(text: String, team_abbrs: Array = []) -> void:
 				explicit[a] = int(v)
 		var p := PlayerData.create(id, row.get("name", id), team, pos, int(row.get("jersey", "0")),
 				clampi(int(row["ovr"]), 40, 99), explicit)
+		var age_s: String = row.get("age", "")
+		var pot_s: String = row.get("pot", "")
+		p.set_development(int(age_s) if age_s.is_valid_int() else 0, int(pot_s) if pot_s.is_valid_int() else 0)
 		_add(p)
 
 
@@ -87,7 +92,8 @@ func real_core_ovr(abbr: String, fallback := 74) -> int:
 	return fallback if n == 0 else int(round(float(sum) / n))
 
 
-## Generated depth players so every team can field a full lineup.
+## Last-resort generated depth players ("KC OL1") for positions where the CSV is too thin
+## to field a lineup. Never granted as starters, never in packs.
 func fill_depth(team_abbrs: Array) -> void:
 	for abbr in team_abbrs:
 		var have := {}
@@ -115,20 +121,39 @@ func fill_depth(team_abbrs: Array) -> void:
 				_add(p)
 
 
-## Every eligible tier version of every real player. Generated depth players only exist as
-## Bronze (so a thin franchise can still field a lineup); packs never pull them.
+## Base card of every player (generated depth included, so a thin team can still field a
+## lineup; packs never pull them) plus a Prime card for real stars (CardRules.has_prime).
 func build_catalog() -> void:
 	cards.clear()
 	for id in players:
 		var p: PlayerData = players[id]
+		var b := CardDef.build_program(p, CardRules.PROGRAM_BASE)
+		cards[b.id] = b
+		if not p.generated and CardRules.has_prime(p.ovr):
+			var pr := CardDef.build_program(p, CardRules.PROGRAM_PRIME)
+			cards[pr.id] = pr
+
+
+## Card ids at `tier` (derived from card OVR), real players only.
+func card_ids_of_tier(tier: int) -> Array[String]:
+	var out: Array[String] = []
+	for cid in cards:
+		var c: CardDef = cards[cid]
+		if c.tier == tier and not players[c.player_id].generated:
+			out.append(cid)
+	return out
+
+
+## A team's best real player (highest OVR; ties go to the higher-value position).
+func franchise_star(abbr: String) -> PlayerData:
+	var best: PlayerData = null
+	for p: PlayerData in by_team.get(abbr, []):
 		if p.generated:
-			var b := CardDef.build(p, CardRules.Tier.BRONZE)
-			cards[b.id] = b
 			continue
-		for tier in CardRules.TABLE.size():
-			if CardRules.eligible(tier, p.ovr):
-				var c := CardDef.build(p, tier)
-				cards[c.id] = c
+		if best == null or p.ovr > best.ovr or (p.ovr == best.ovr and
+				POSITIONS.find(p.pos) < POSITIONS.find(best.pos)):
+			best = p
+	return best
 
 
 ## A team's real lineup (auto-best by real OVR): slot -> {id, name, jersey, attrs, ovr}.

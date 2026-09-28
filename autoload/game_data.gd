@@ -32,6 +32,13 @@ func team_players(abbr: String) -> Array:
 	return db.by_team.get(abbr, [])
 
 
+## What picking `abbr` gives you (team picker): {"star": PlayerData (franchise star card),
+## "ovr": starting team OVR, "count": number of starter cards}.
+func starter_preview(abbr: String) -> Dictionary:
+	var ids := Collection.starter_card_ids(db, abbr)
+	return {"star": db.franchise_star(abbr), "ovr": Collection.squad_ovr(db, ids), "count": ids.size()}
+
+
 func league_avg_ovr() -> int:
 	if _league_avg < 0:
 		_league_avg = db.league_avg_ovr()

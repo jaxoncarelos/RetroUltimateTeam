@@ -16,7 +16,7 @@ func _ready() -> void:
 	_ovr = MetaUI.label("", UiTheme.ACCENT)
 	_ovr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(_ovr)
-	bar.add_child(MetaUI.button("AUTO-BEST", Vector2(90, 22), func() -> void:
+	bar.add_child(MetaUI.button("AUTO-BEST", Vector2(90, 24), func() -> void:
 		Collection.auto_lineup(SaveManager.profile, GameData.db)
 		SaveManager.save()
 		_refresh()))
@@ -43,7 +43,7 @@ func _refresh() -> void:
 	for slot in TeamRating.ALL_SLOTS:
 		var e: Dictionary = entries.get(slot, {})
 		var text := "%-4s %s" % [slot, "- EMPTY -" if e.is_empty() else "%d  %s" % [e["ovr"], e["name"]]]
-		var b := MetaUI.button(text, Vector2(224, 20), func() -> void: _open_picker(slot))
+		var b := MetaUI.button(text, Vector2(224, 24), func() -> void: _open_picker(slot))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		_slots.add_child(b)
 
@@ -79,10 +79,10 @@ func _open_picker(slot: String) -> void:
 			if int(prof.lineup[s]) == uid:
 				where = "  (%s)" % s
 		var b := MetaUI.button("%d  %s  %s%s" % [item[0], p.short_name(), CardRules.NAMES[c.tier], where],
-				Vector2(250, 20), func() -> void: _assign(slot, uid))
+				Vector2(250, 24), func() -> void: _assign(slot, uid))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		list.add_child(b)
-	col.add_child(MetaUI.button("CANCEL", Vector2(250, 20), func() -> void: _picker.visible = false))
+	col.add_child(MetaUI.button("CANCEL", Vector2(250, 24), func() -> void: _picker.visible = false))
 	_picker.visible = true
 	_picker.reset_size()
 	_picker.position = (get_viewport_rect().size - _picker.get_combined_minimum_size()) * 0.5

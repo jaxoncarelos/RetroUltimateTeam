@@ -1,6 +1,7 @@
 class_name PackDef
 extends Resource
-## A card pack (PLAN.md §5). odds = chance per card of Bronze/Silver/Gold/Elite (sum 1).
+## A card pack (PLAN.md §5). odds = chance per card of Bronze/Silver/Gold/Elite (sum 1);
+## tiers come from card OVR (Bronze < 70, Silver 70-79, Gold 80-89, Elite 90+).
 ## guarantee_tier: at least one card of that tier or better (-1 = none).
 ## positions: only players at these positions (empty = any). team: only this team ("" = any;
 ## "FRANCHISE" = the player's franchise).

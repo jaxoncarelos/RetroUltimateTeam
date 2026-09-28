@@ -126,6 +126,7 @@ func _build_scene(home_team: TeamData, away_team: TeamData) -> void:
 	add_child(camera)
 	camera.make_current()
 	hud = MatchHUD.new()
+	hud.runner = runner
 	add_child(hud)
 	hud.play_selected.connect(_on_play_selected)
 	hud.special_pressed.connect(_on_special)
@@ -289,8 +290,8 @@ func _start_play_call() -> void:
 	var off_team: TeamData = teams[gs.possession]
 	var def_team: TeamData = teams[gs.defense()]
 	field.set_possession(off_team, def_team)
-	runner.off_colors = off_team.uniform_colors()
-	runner.def_colors = def_team.uniform_colors()
+	runner.off_colors = _jersey(off_team)
+	runner.def_colors = _jersey(def_team)
 	runner.human_team = PlayerAgent.Team.OFFENSE if _human_offense() else (
 			PlayerAgent.Team.DEFENSE if _human_defense() else -1)
 	runner.human_input = ocontrol if _human_offense() else (dcontrol if _human_defense() else null)
@@ -409,15 +410,11 @@ func _ball_y() -> float:
 func _update_scorebug() -> void:
 	if human != "" and gs.score_diff(human) <= -10:
 		_comeback = true
-	var h: String = gs.home
-	var a: String = gs.away
-	# "*" marks the team with the ball.
-	var line1 := "%s%s %d  %s%s %d  ·  %s" % ["*" if gs.possession == h else "", h, gs.score[h],
-			"*" if gs.possession == a else "", a, gs.score[a], gs.clock.label()]
-	var spot := FieldGeo.spot_text(gs.downs.los_x)
-	var to := "TO %d-%d" % [gs.timeouts[h], gs.timeouts[a]]
-	var line2 := "%s  ·  %s  ·  %s" % [gs.downs.down_text() if not _two_point else "2-PT TRY", spot, to]
-	hud.set_scorebug(line1, line2)
+	var q: String = "OT" if gs.clock.is_overtime() else ["1ST", "2ND", "3RD", "4TH"][clampi(gs.clock.quarter - 1, 0, 3)] + " QTR"
+	hud.set_score_bar({"home": gs.home, "away": gs.away, "home_score": int(gs.score[gs.home]),
+			"away_score": int(gs.score[gs.away]), "possession": gs.possession, "quarter": q,
+			"clock": GameClock.format_time(gs.clock.seconds_left),
+			"down": "2-PT TRY" if _two_point else gs.downs.down_text()})
 
 
 func _update_snap_hint() -> void:
@@ -473,7 +470,8 @@ func _process(delta: float) -> void:
 	var ctrl := runner.controlled if human != "" else null
 	if ctrl != _tagged:
 		_tagged = ctrl
-		hud.set_player_tag("" if ctrl == null else "#%d %s  %s" % [ctrl.jersey, ctrl.display_name, ctrl.pos_code])
+		hud.set_player_tag("" if ctrl == null else "%s [%s]  #%d" % [ctrl.display_name.to_upper().replace(". ", "."),
+				ctrl.pos_code, ctrl.jersey])
 	# The play clock "runs" while the play is called: tick the runoff down in real time.
 	if phase == Phase.PLAY_CALL and _pending_runoff > 0.0 and not _sim():
 		var step := minf(_pending_runoff, delta * gs.clock.speed * 0.5)
@@ -689,13 +687,12 @@ func _resolve_field_goal(good: bool, dist: float, text: String) -> void:
 	if not _sim():
 		Sfx.play("kick")
 	var kicker := gs.possession
-	gs.stats[kicker]["fg_att"] += 1
+	gs.record_field_goal(kicker, good, dist)
 	gs.clock.tick_live(5.0 / gs.clock.speed)
 	gs.finish_drive(true, gs.clock.seconds_left)
 	if not _sim():
 		hud.show_banner("%d-YARD FIELD GOAL" % int(dist), text, 1.6)
 	if good:
-		gs.stats[kicker]["fg_made"] += 1
 		gs.add_points(kicker, 3)
 		_update_scorebug()
 		if _ot_over():
@@ -750,7 +747,7 @@ func _on_choice(index: int) -> void:
 			_on_pause_choice(index)
 		Phase.FINAL:
 			if config.get("from_hub", false):
-				SceneRouter.goto(SceneRouter.HUB, {"last_result": match_result()})
+				SceneRouter.goto(SceneRouter.RESULTS, {"last_result": match_result()})
 			else:
 				get_tree().reload_current_scene()
 
@@ -903,7 +900,7 @@ func match_result(forfeit := false) -> Dictionary:
 			"def_ints": int(gs.stats[opp]["int"]), "def_sacks": int(gs.stats[opp]["sacks"]),
 			"difficulty": int(config.get("difficulty", Settings.difficulty)),
 			"mode": str(config.get("mode", "quick")), "extra": config.get("extra", {}),
-			"came_back": _comeback, "challenge_won": _chal_won}
+			"came_back": _comeback, "challenge_won": _chal_won, "box": gs.box_score(mine)}
 
 
 # ---------------------------------------------------------------- challenges
@@ -1016,7 +1013,7 @@ func _on_pause_choice(index: int) -> void:
 			return
 		3:
 			if config.get("from_hub", false):
-				SceneRouter.goto(SceneRouter.HUB, {"last_result": match_result(true)})
+				SceneRouter.goto(SceneRouter.RESULTS, {"last_result": match_result(true)})
 			else:
 				get_tree().reload_current_scene()
 			return
@@ -1101,3 +1098,8 @@ func _print_sim_totals() -> void:
 		float(t["rush_yds"]) / maxf(t["rush_att"], 1), t["rush_att"] / teams_n, t["plays"] / teams_n,
 		t["fg_made"], t["fg_att"], t["punts"] / teams_n, t["ot"], t["ties"],
 		100.0 * t["home_wins"] / maxf(t["games"], 1), t["watchdog"]])
+
+
+## Home team in its colors, visitors in road whites, so the two sides never blend together.
+func _jersey(team: TeamData) -> Dictionary:
+	return team.uniform_colors() if team.abbr == gs.home else team.away_colors()

@@ -1,82 +1,73 @@
 extends Control
-## First run: "PICK YOUR NFL TEAM". 32 badges; tapping one shows its stars and team OVR;
-## confirming grants the starter cards (top 5 Silver, the rest Bronze) and opens the hub.
+## First run: "CHOOSE YOUR TEAM". 32 helmet buttons; tapping one previews its franchise
+## star and starting-squad OVR; START grants the starting squad and goes straight into
+## the free Starter pack opening (walkout), then the hub.
 
 var _grid: GridContainer
 var _info: Label
 var _confirm: Button
 var _picked := ""
+var _ui: Dictionary
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
-	var bg := ColorRect.new()
-	bg.color = UiTheme.INK
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
-	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_FULL_RECT)
-	box.offset_left = 8
-	box.offset_right = -8
-	box.offset_top = 6
-	box.offset_bottom = -6
-	box.add_theme_constant_override("separation", 4)
-	add_child(box)
-	var title := Label.new()
-	title.text = "PICK YOUR NFL TEAM"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 16)
-	title.add_theme_color_override("font_color", UiTheme.ACCENT)
-	box.add_child(title)
+	_ui = MetaUI.screen(self, "CHOOSE YOUR TEAM", "", {"coins": false})
+	var root: VBoxContainer = _ui["root"]
+	var center := CenterContainer.new()
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(center)
 	_grid = GridContainer.new()
-	_grid.columns = 11
-	_grid.add_theme_constant_override("h_separation", 3)
-	_grid.add_theme_constant_override("v_separation", 3)
-	box.add_child(_grid)
+	_grid.columns = 8
+	_grid.add_theme_constant_override("h_separation", 4)
+	_grid.add_theme_constant_override("v_separation", 4)
+	center.add_child(_grid)
 	var abbrs: Array = GameData.teams.keys()
 	abbrs.sort()
 	for abbr in abbrs:
 		var t: TeamData = GameData.teams[abbr]
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(38, 44)
+		b.custom_minimum_size = Vector2(50, 40)
 		b.toggle_mode = true
-		b.tooltip_text = "%s %s" % [t.city, t.team_name]
-		var badge := TeamBadge.new(t, 2)
-		badge.position = Vector2(3, 3)
-		b.add_child(badge)
-		b.pressed.connect(func() -> void: _select(abbr))
+		b.focus_mode = Control.FOCUS_NONE
+		var h := TextureRect.new()
+		h.texture = ArtGen.helmet(abbr, t.uniform_colors(), false)
+		h.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		h.size = Vector2(32, 24)
+		h.position = Vector2(9, 3)
+		h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(h)
+		var l := MetaUI.label(abbr, UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_CENTER)
+		l.position = Vector2(0, 27)
+		l.size = Vector2(50, 9)
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(l)
+		b.pressed.connect(_select.bind(abbr))
 		b.set_meta("abbr", abbr)
 		_grid.add_child(b)
-	var bottom := HBoxContainer.new()
-	bottom.add_theme_constant_override("separation", 8)
-	box.add_child(bottom)
-	_info = Label.new()
+	var nav: HBoxContainer = _ui["nav"]
+	_info = MetaUI.label("PICK A TEAM: YOU START WITH ITS REAL PLAYERS AS CARDS", UiSkin.WHITE)
 	_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_info.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_info.text = "YOU START WITH YOUR TEAM'S REAL PLAYERS AS CARDS.\nTHE TOP 5 ARE SILVER, THE REST BRONZE."
-	bottom.add_child(_info)
-	_confirm = Button.new()
-	_confirm.text = "START\nCAREER"
-	_confirm.custom_minimum_size = Vector2(72, 40)
+	nav.add_child(_info)
+	_confirm = MetaUI.continue_button("START", _start, true, 100)
 	_confirm.disabled = true
-	_confirm.pressed.connect(_start)
-	bottom.add_child(_confirm)
+	nav.add_child(_confirm)
 
 
 func _select(abbr: String) -> void:
 	_picked = abbr
 	for b in _grid.get_children():
-		b.button_pressed = b.get_meta("abbr") == abbr
+		(b as Button).set_pressed_no_signal(b.get_meta("abbr") == abbr)
+		if b.get_meta("abbr") == abbr:
+			Fx.pop(b, 1.15, 0.2)
 	var t: TeamData = GameData.teams[abbr]
-	var roster: Array = GameData.team_players(abbr).duplicate()
-	roster.sort_custom(func(a: PlayerData, b: PlayerData) -> bool: return a.ovr > b.ovr)
-	var stars: Array[String] = []
-	for p: PlayerData in roster:
-		if not p.generated and stars.size() < 3:
-			stars.append("%s %s" % [p.pos, p.short_name()])
-	_info.text = "%s %s  ·  TEAM OVR %d\nSTARS: %s" % [t.city.to_upper(), t.team_name.to_upper(),
-			GameData.db.team_ovr(abbr), ", ".join(stars) if not stars.is_empty() else "-"]
+	var pv: Dictionary = GameData.starter_preview(abbr)
+	var star: PlayerData = pv.get("star")
+	_info.text = "%s %s  -  SQUAD OVR %d\nSTAR: %s" % [t.city.to_upper(), t.team_name.to_upper(), int(pv.get("ovr", 0)),
+			"%s %s (%d)" % [star.pos, star.short_name().to_upper(), star.ovr] if star != null else "-"]
 	_confirm.disabled = false
+	Fx.pop(_confirm, 1.1, 0.2)
 
 
 func _start() -> void:
@@ -86,4 +77,9 @@ func _start() -> void:
 	Collection.grant_starters(prof, GameData.db, _picked, int(Time.get_unix_time_from_system()))
 	SaveManager.profile = prof
 	SaveManager.save()
-	SceneRouter.goto(SceneRouter.HUB)
+	var cfg := GameFlow.open_pending_config(prof, SceneRouter.HUB)
+	if cfg.is_empty():
+		SceneRouter.goto(SceneRouter.HUB)
+	else:
+		cfg["title"] = "STARTER PACK"
+		SceneRouter.goto(SceneRouter.PACK_OPEN, cfg)

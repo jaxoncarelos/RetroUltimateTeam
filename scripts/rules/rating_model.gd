@@ -69,12 +69,12 @@ static func max_throw_distance(t: GameplayTuning, thp: float) -> float:
 	return t.throw_dist_base + _n(thp) * t.throw_dist_range
 
 
-## Flight time and apex height (yards) for a throw of `dist` yards. Deep balls are lobbed.
+## Flight time and apex height (yards) for an open-lane throw of `dist` yards (automatic
+## loft: deep balls are lobbed). See PassModel.plan for lane clearance.
 static func throw_arc(t: GameplayTuning, thp: float, dist: float) -> Vector2:
-	var lob := clampf((dist - 12.0) / 30.0, 0.0, 1.0)
-	var dur := maxf(dist / throw_speed(t, thp), 0.25) * (1.0 + t.lob_extra_time * lob)
-	var apex := lerpf(0.6, 7.5, lob) + dist * 0.03
-	return Vector2(dur, apex)
+	var loft := PassModel.auto_loft(t, dist)
+	var apex := PassModel.apex_for(t, dist, loft)
+	return Vector2(PassModel.duration(t, thp, dist, apex, loft), apex)
 
 
 ## Radius (yards) of random aim error. Pressure is 0..1.
@@ -93,6 +93,16 @@ static func catch_prob(t: GameplayTuning, cth: float, contest: float, def_cov: f
 ## Chance a defender who beat the receiver to the ball comes down with it.
 static func int_prob(t: GameplayTuning, cov: float, cth: float) -> float:
 	return clampf(t.int_base + t.int_cov_scale * (_n(cov) * 0.6 + _n(cth) * 0.4) - 0.15, 0.05, 0.6)
+
+
+## Chance a defender the ball passes within reach of gets a hand on it.
+static func lane_play_prob(t: GameplayTuning, cov: float, awr: float) -> float:
+	return clampf(t.lane_play_prob * (0.55 + 0.6 * _n(cov) * 0.7 + 0.6 * _n(awr) * 0.3), 0.05, 0.9)
+
+
+## Given a hand on a passing ball, the chance he hauls it in (else it is tipped away).
+static func lane_int_prob(t: GameplayTuning, cth: float) -> float:
+	return clampf(t.lane_int_share * (0.4 + 0.9 * _n(cth)), 0.02, 0.6)
 
 
 static func tackle_prob(t: GameplayTuning, tak: float, elu: float, carrier_str: float, juking: bool) -> float:

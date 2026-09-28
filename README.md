@@ -32,7 +32,7 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 | Play call | the situational **BEST** call is preselected; tap another card or **MORE** for the full playbook (18 offense plays) |
 | Snap (pass) | press on the **QB** and keep dragging: **back** = aim (slingshot), release to throw · **forward** = scramble. A tap anywhere also snaps |
 | Snap (run) | press on the QB to snap; keep holding and drag up/down to steer once you have the ball |
-| QB with the ball | drag **back** (slingshot) to aim, release to throw · drag **forward** to scramble |
+| QB with the ball | drag **back** (slingshot) to aim, release to throw; farther = deeper. Loft is automatic and labeled on the arc: **BULLET** (short), **TOUCH** (over a defender / ~13+ yds), **LOB** (~32+ yds, drops in over the shoulder). Light aim assist snaps to a receiver in stride · drag **forward** to scramble |
 | Ball carrier | follows the play's lane on his own · hold + drag up/down to steer · drag back to slow |
 | | flick up/down = juke · double-tap = dive |
 | CPU defense | learns your tendencies: repeat a play and it gets **keyed** (red "DEFENSE IS KEYING ON …" warning) |
@@ -47,6 +47,12 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 
 ### Debug arguments
 ```
+godot --path . -- --demo-profile --screen=store   # any meta screen with an unsaved demo career
+                                                  # (title, hub, mode_select, store, collection, objectives,
+                                                  #  prematch, results, pack_open, season, settings, ...)
+godot --path . -- --demo-profile --screen=pack_open --elite --auto-open   # watch an Elite walkout
+godot --path . -- --demo-profile --screen=hub --no-popups                 # skip the daily check-in
+godot --headless --path . -- --ai-vs-ai=40 --pass-log   # CPU games + passing stats (deep %, lobs, tips)
 godot --path . -- --watch                 # CPU vs CPU full game (demo)
 godot --headless --path . -- --ai-vs-ai=100   # 100 headless CPU-vs-CPU games, prints averages
 godot --path . -- --home=BUF --away=SF --quarter=1.5   # pick teams / quarter length
@@ -84,7 +90,7 @@ iOS export needs a Mac with Xcode (planned for Phase 6).
 | Gameplay balance | `data/tuning/gameplay_tuning.tres` (every speed/catch/tackle constant) |
 | Player sprites | `art/players/player_template.png` (16×20 frames, key colors swapped per team) |
 
-`tools/build_playbooks.gd` and `tools/gen_placeholder_sprites.gd` bootstrap the playbook and
+`tools/build_playbooks.gd` and `tools/gen_player_sprites.gd` bootstrap the playbook and
 placeholder sheet; re-running them **overwrites** those files.
 
 All player names are used for personal, non-distributed play only; no logos or third-party art.

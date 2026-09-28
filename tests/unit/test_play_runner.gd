@@ -58,7 +58,7 @@ func test_every_offensive_play_ends_cleanly() -> void:
 			assert_false(r.is_empty(), "%s vs %s never ended" % [off.id, def.id])
 			if r.is_empty():
 				continue
-			assert_has(["tackle", "sack", "out", "incomplete", "td", "int", "safety"], r["type"])
+			assert_has(["tackle", "sack", "out", "incomplete", "td", "int", "safety", "fumble"], r["type"])
 			assert_between(float(r["spot_x"]), 0.0, FieldGeo.LENGTH)
 
 

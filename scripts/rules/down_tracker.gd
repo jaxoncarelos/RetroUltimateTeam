@@ -29,8 +29,10 @@ func is_goal_to_go() -> bool:
 ## Apply the dead-ball spot of a play. Incomplete passes pass the current los_x.
 func apply_spot(spot_x: float, scored_td := false) -> Outcome:
 	plays += 1
-	var spot := clampf(round(spot_x), 0.0, FieldGeo.LENGTH)
-	if scored_td or spot >= FieldGeo.OPP_GOAL:
+	# Only the play decides a touchdown (the ball crossed the plane). A carrier downed short of
+	# the goal line is spotted at the 1 at best, never rounded or pushed into the end zone.
+	var spot := clampf(round(spot_x), 0.0, FieldGeo.OPP_GOAL - 1.0)
+	if scored_td:
 		los_x = FieldGeo.OPP_GOAL
 		return Outcome.TOUCHDOWN
 	if spot <= FieldGeo.OWN_GOAL:

@@ -1,28 +1,37 @@
 class_name EconomyRules
 extends RefCounted
-## Coins, packs, quick-sell, duplicate training, sets and match rewards (PLAN.md §5).
-## Pure: every function takes the Profile / RosterDB / rng it needs.
+## Coins, packs, quick-sell, duplicate training, sets, match rewards and the postgame
+## payout (PLAN.md §5, rebalanced for real-rating cards). Pure: every function takes the
+## Profile / RosterDB / rng it needs.
 
 const MAX_BOOST := 3
+const TRAIN_XP := 500            ## development XP a duplicate gives (on top of the boost)
+## Match coins: GAME + WIN_BONUS = WIN_COINS (x difficulty multiplier).
 const WIN_COINS := 400
 const LOSS_COINS := 160
 const TIE_COINS := 240
+const GAME_COINS := LOSS_COINS
 const TD_BONUS := 20
 const TAKEAWAY_BONUS := 25
 const SHUTOUT_BONUS := 50
 const COMEBACK_BONUS := 100
 const DAILY_WIN_BONUS := 200
-const WEAK_POS_WEIGHT := 1.6   ## positions below your lineup average are this much likelier
+const STREAK_STEP := 0.10        ## +10% of the base per consecutive win after the first
+const STREAK_CAP := 0.50
+const FIRST_WINS_BONUS := [300, 200, 150]   ## career wins 1, 2, 3
+const WEAK_POS_WEIGHT := 1.25    ## positions below your lineup average are this much likelier
+const PRIME_WEIGHT := 0.12       ## a Prime card vs a base card of the same tier
+const IN_TIER_FALLOFF := 0.12    ## higher OVR inside a tier is rarer: weight 1/(1 + k*(ovr - tier min))
 
 ## Sets: trade cards in for rewards. needs = {tier, count, franchise_only}; reward = pack id
-## or "franchise_elite" (an Elite card of one of your franchise's real players).
+## or "franchise_elite" (a star card of one of your franchise's real players).
 const SETS := [
 	{"id": "bronze_to_silver", "name": "10 BRONZE -> SILVER PACK", "tier": 0, "count": 10, "franchise_only": false,
 			"reward": "silver"},
 	{"id": "silver_to_gold", "name": "5 SILVER -> GOLD PACK", "tier": 1, "count": 5, "franchise_only": false,
 			"reward": "gold"},
-	{"id": "franchise_elite", "name": "3 FRANCHISE GOLDS -> ELITE STAR", "tier": 2, "count": 3, "franchise_only": true,
-			"reward": "franchise_elite"},
+	{"id": "franchise_elite", "name": "3 FRANCHISE GOLDS -> FRANCHISE STAR", "tier": 2, "count": 3,
+			"franchise_only": true, "reward": "franchise_elite"},
 ]
 
 
@@ -73,30 +82,41 @@ static func open_pack(pack: PackDef, profile: Profile, db: RosterDB, rng: Random
 	var weak := weak_positions(profile, db)
 	var out: Array[String] = []
 	for tier in roll_pack_tiers(pack, rng):
-		var id := pick_card(tier, pack, profile, db, rng, weak)
-		if id == "":
-			id = pick_card(tier - 1 if tier > 0 else 0, pack, profile, db, rng, weak)
+		var id := ""
+		# Filtered packs (a team's roster) may lack a tier: try lower tiers, then higher.
+		for t in [tier, tier - 1, tier - 2, tier - 3, tier + 1, tier + 2]:
+			if t < 0 or t >= CardRules.TABLE.size():
+				continue
+			id = pick_card(t, pack, profile, db, rng, weak)
+			if id != "":
+				break
 		if id != "":
 			out.append(id)
 	return out
 
 
-## A random real player's card at `tier` that fits the pack's filters.
+## A random real player's card of `tier` (derived from card OVR) that fits the pack's
+## filters. Prime cards are rare; higher OVRs inside a tier are rarer; weak positions likelier.
 static func pick_card(tier: int, pack: PackDef, profile: Profile, db: RosterDB, rng: RandomNumberGenerator,
 		weak: Array[String] = []) -> String:
 	var ids: Array[String] = []
 	var weights := PackedFloat32Array()
 	var team := profile.franchise_team if pack.team == "FRANCHISE" else pack.team
-	for pid in db.players:
-		var p: PlayerData = db.players[pid]
-		if p.generated or not CardRules.eligible(tier, p.ovr):
-			continue
+	var tier_min := int(CardRules.TABLE[tier][0])
+	for cid in db.card_ids_of_tier(tier):
+		var c: CardDef = db.cards[cid]
+		var p: PlayerData = db.players[c.player_id]
 		if not pack.positions.is_empty() and p.pos not in pack.positions:
 			continue
 		if team != "" and p.team != team:
 			continue
-		ids.append(CardRules.card_id(p.id, tier))
-		weights.append(WEAK_POS_WEIGHT if p.pos in weak else 1.0)
+		var w := 1.0 / (1.0 + IN_TIER_FALLOFF * maxi(0, c.ovr - maxi(tier_min, 60)))
+		if c.is_prime():
+			w *= PRIME_WEIGHT
+		if p.pos in weak:
+			w *= WEAK_POS_WEIGHT
+		ids.append(cid)
+		weights.append(w)
 	if ids.is_empty():
 		return ""
 	return ids[AIPlayCaller.weighted_index(weights, rng)]
@@ -116,18 +136,44 @@ static func buy_and_open(profile: Profile, pack: PackDef, db: RosterDB, rng: Ran
 	return grant_pack(profile, pack, db, rng, unix_time)
 
 
+## Adds a pack's cards to the collection, counts it for objectives and coach XP.
 static func grant_pack(profile: Profile, pack: PackDef, db: RosterDB, rng: RandomNumberGenerator,
 		unix_time := 0) -> Array[int]:
 	var uids: Array[int] = []
+	var elite := 0
 	for id in open_pack(pack, profile, db, rng):
 		uids.append(profile.add_card(id, unix_time))
+		var c: CardDef = db.cards[id]
+		if c.tier >= CardRules.Tier.ELITE:
+			elite += 1
 	profile.stats["packs_opened"] += 1
+	var obj_t := unix_time if unix_time > 0 else -1
+	ObjectiveRules.record_event(profile, "packs_opened", 1, obj_t)
+	ObjectiveRules.record_event(profile, "packs_" + pack.id, 1, obj_t)
+	if elite > 0:
+		ObjectiveRules.record_event(profile, "pulls_elite", elite, obj_t)
+	ProgressionRules.add_xp(profile, ProgressionRules.XP_PACK)
 	return uids
+
+
+## Opens the first reward pack waiting in Profile.pending_packs (starter pack, level-up,
+## login streak, objective packs). Returns {"pack": id, "title": display name, "uids": [...]}
+## ({} when none are waiting).
+static func open_pending(profile: Profile, db: RosterDB, rng: RandomNumberGenerator, unix_time := 0) -> Dictionary:
+	while not profile.pending_packs.is_empty():
+		var id := str(profile.pending_packs.pop_front())
+		var pack := PackCatalog.get_pack(id)
+		if pack == null:
+			continue
+		return {"pack": id, "title": pack.display_name, "uids": grant_pack(profile, pack, db, rng, unix_time)}
+	return {}
 
 
 static func quicksell_value(db: RosterDB, entry: Dictionary) -> int:
 	var c: CardDef = db.cards.get(entry.get("def", ""))
-	return 10 if c == null else c.quicksell
+	if c == null:
+		return 10
+	return CardRules.quicksell(Collection.card_tier(db, entry), c.program)
 
 
 ## Sells an unlocked card that isn't in the lineup. Returns coins gained (0 = refused).
@@ -141,8 +187,9 @@ static func quicksell(profile: Profile, db: RosterDB, uid: int) -> int:
 	return value
 
 
-## Feeds a duplicate of the same player into a card for +1 OVR (max +3). Returns success.
-static func train(profile: Profile, db: RosterDB, target_uid: int, fodder_uid: int) -> bool:
+## Whether `fodder_uid` could train `target_uid` (same player, unlocked, benched, and the
+## target still has a boost left or room to develop).
+static func can_train(profile: Profile, db: RosterDB, target_uid: int, fodder_uid: int) -> bool:
 	if target_uid == fodder_uid:
 		return false
 	var t := profile.find(target_uid)
@@ -151,10 +198,24 @@ static func train(profile: Profile, db: RosterDB, target_uid: int, fodder_uid: i
 		return false
 	var tc: CardDef = db.cards.get(t["def"])
 	var fc: CardDef = db.cards.get(f["def"])
-	if tc == null or fc == null or tc.player_id != fc.player_id or int(t["boost"]) >= MAX_BOOST:
+	if tc == null or fc == null or tc.player_id != fc.player_id:
 		return false
-	t["boost"] = int(t["boost"]) + 1
+	return int(t["boost"]) < MAX_BOOST or Collection.dev_room(db, t) > 0
+
+
+## Feeds a duplicate of the same player into a card: +1 OVR boost (max +3) and TRAIN_XP
+## development XP. Returns success.
+static func train(profile: Profile, db: RosterDB, target_uid: int, fodder_uid: int) -> bool:
+	if not can_train(profile, db, target_uid, fodder_uid):
+		return false
+	var t := profile.find(target_uid)
+	if int(t["boost"]) < MAX_BOOST:
+		t["boost"] = int(t["boost"]) + 1
+	var lv := Collection.add_card_xp(db, t, TRAIN_XP)
 	profile.remove(fodder_uid)
+	ObjectiveRules.record_event(profile, "trains")
+	if lv > 0:
+		ObjectiveRules.record_event(profile, "levelups", lv)
 	return true
 
 
@@ -179,46 +240,150 @@ static func complete_set(profile: Profile, db: RosterDB, set_def: Dictionary) ->
 	for i in int(set_def["count"]):
 		profile.remove(cands[i])
 	profile.sets_done[set_def["id"]] = int(profile.sets_done.get(set_def["id"], 0)) + 1
+	ObjectiveRules.record_event(profile, "sets")
 	return set_def["reward"]
 
 
-## Best Elite card of a franchise player you don't own at Elite yet ("" if none).
+## A franchise star card for the franchise set: a random 85+ base card of your franchise
+## you don't own yet, else the franchise star's Prime card ("" if none).
 static func franchise_elite(profile: Profile, db: RosterDB, rng: RandomNumberGenerator) -> String:
+	var owned := {}
+	for e in profile.cards:
+		owned[str(e["def"])] = true
 	var options: Array[String] = []
 	for p: PlayerData in db.by_team.get(profile.franchise_team, []):
-		if CardRules.eligible(CardRules.Tier.ELITE, p.ovr):
-			options.append(CardRules.card_id(p.id, CardRules.Tier.ELITE))
+		if not p.generated and p.ovr >= 85 and not owned.has(CardRules.card_id(p.id)):
+			options.append(CardRules.card_id(p.id))
 	if options.is_empty():
-		for p: PlayerData in db.by_team.get(profile.franchise_team, []):
-			if CardRules.eligible(CardRules.Tier.GOLD, p.ovr):
-				options.append(CardRules.card_id(p.id, CardRules.Tier.GOLD))
+		var star := db.franchise_star(profile.franchise_team)
+		if star != null:
+			options.append(CardRules.prime_id(star.id) if db.cards.has(CardRules.prime_id(star.id))
+					else CardRules.card_id(star.id))
 	return "" if options.is_empty() else options[rng.randi() % options.size()]
 
 
-## Postgame coins (PLAN.md §5). Returns {"total": int, "lines": [[label, coins], ...]}.
-static func match_rewards(r: Dictionary, first_win_today := false) -> Dictionary:
-	var lines: Array = []
-	var forfeit: bool = r.get("forfeit", false)
+## Postgame coins (PLAN.md §5), itemized. r: MatchController.match_result() keys
+## (pf, pa, tds, def_ints, def_sacks, difficulty, came_back, forfeit).
+## win_streak = consecutive wins including this one; career_wins = wins including this one.
+## Returns {"total": int, "lines": [[label, coins], ...], "items": [{"id", "label", "coins"}]}.
+## Item ids: base, win, tie, streak, tds, defense, shutout, comeback, daily_win, first_wins.
+static func match_rewards(r: Dictionary, first_win_today := false, win_streak := 0, career_wins := 0) -> Dictionary:
+	var items: Array = []
 	var pf := int(r.get("pf", 0))
 	var pa := int(r.get("pa", 0))
 	var diff_i := clampi(int(r.get("difficulty", 1)), 0, TeamRating.DIFFICULTY.size() - 1)
 	var mult: float = TeamRating.DIFFICULTY[diff_i][2]
-	if forfeit:
-		return {"total": 0, "lines": [["FORFEIT", 0]]}
-	var base := WIN_COINS if pf > pa else (TIE_COINS if pf == pa else LOSS_COINS)
-	lines.append(["WIN" if pf > pa else ("TIE" if pf == pa else "LOSS"), int(round(base * mult))])
+	if r.get("forfeit", false):
+		return {"total": 0, "lines": [["FORFEIT", 0]], "items": [{"id": "forfeit", "label": "FORFEIT", "coins": 0}]}
+	var won := pf > pa
+	var base := int(round(GAME_COINS * mult))
+	items.append({"id": "base", "label": "GAME PLAYED", "coins": base})
+	var result_coins := 0
+	if won:
+		result_coins = int(round(WIN_COINS * mult)) - base
+		items.append({"id": "win", "label": "WIN BONUS", "coins": result_coins})
+	elif pf == pa:
+		result_coins = int(round(TIE_COINS * mult)) - base
+		items.append({"id": "tie", "label": "TIE BONUS", "coins": result_coins})
+	if won and win_streak >= 2:
+		var pct := minf(STREAK_STEP * (win_streak - 1), STREAK_CAP)
+		items.append({"id": "streak", "label": "WIN STREAK x%d (+%d%%)" % [win_streak, int(round(pct * 100))],
+				"coins": int(round((base + result_coins) * pct))})
 	if int(r.get("tds", 0)) > 0:
-		lines.append(["%d TOUCHDOWNS" % int(r["tds"]), int(r["tds"]) * TD_BONUS])
+		items.append({"id": "tds", "label": "%d TOUCHDOWNS" % int(r["tds"]), "coins": int(r["tds"]) * TD_BONUS})
 	var takeaways := int(r.get("def_ints", 0)) + int(r.get("def_sacks", 0))
 	if takeaways > 0:
-		lines.append(["%d INTS + SACKS" % takeaways, takeaways * TAKEAWAY_BONUS])
+		items.append({"id": "defense", "label": "%d INTS + SACKS" % takeaways, "coins": takeaways * TAKEAWAY_BONUS})
 	if pa == 0:
-		lines.append(["SHUTOUT", SHUTOUT_BONUS])
-	if pf > pa and r.get("came_back", false):
-		lines.append(["COMEBACK WIN", COMEBACK_BONUS])
-	if pf > pa and first_win_today:
-		lines.append(["FIRST WIN TODAY", DAILY_WIN_BONUS])
+		items.append({"id": "shutout", "label": "SHUTOUT", "coins": SHUTOUT_BONUS})
+	if won and r.get("came_back", false):
+		items.append({"id": "comeback", "label": "COMEBACK WIN", "coins": COMEBACK_BONUS})
+	if won and first_win_today:
+		items.append({"id": "daily_win", "label": "FIRST WIN TODAY", "coins": DAILY_WIN_BONUS})
+	if won and career_wins >= 1 and career_wins <= FIRST_WINS_BONUS.size():
+		items.append({"id": "first_wins", "label": "NEW COACH BONUS (WIN %d)" % career_wins,
+				"coins": int(FIRST_WINS_BONUS[career_wins - 1])})
+	return _total(items)
+
+
+static func _total(items: Array) -> Dictionary:
 	var total := 0
-	for l in lines:
-		total += int(l[1])
-	return {"total": total, "lines": lines}
+	var lines: Array = []
+	for i in items:
+		total += int(i["coins"])
+		lines.append([i["label"], int(i["coins"])])
+	return {"total": total, "lines": lines, "items": items}
+
+
+## Everything that happens to the profile after a match, in one call (the hub uses this):
+## record W/L/T, win streak, coins (itemized), objectives recorded AND auto-claimed (their
+## coins become items with id "objective"), player development XP, coach XP + level-ups.
+## r: MatchController.match_result() (optionally with "box": GameState.box_score(team)).
+## Returns {"total": coins added, "items": [{"id","label","coins"}], "lines": [[label, coins]],
+##  "won": bool, "streak": int, "objectives": [objective dicts completed this match],
+##  "level_ups": [{uid,name,from,to}] (players), "coach": {"xp": int, "items": [...],
+##  "level_ups": [{level,coins,pack}], "progress": ProgressionRules.level_progress()},
+##  "packs": [pack ids queued in Profile.pending_packs]}.
+static func postgame(profile: Profile, db: RosterDB, r: Dictionary, unix_time := -1) -> Dictionary:
+	var now := unix_time if unix_time >= 0 else int(Time.get_unix_time_from_system())
+	var forfeit: bool = r.get("forfeit", false)
+	var pf := int(r.get("pf", 0))
+	var pa := int(r.get("pa", 0))
+	var won := pf > pa and not forfeit
+	var tie := pf == pa and not forfeit
+	var packs_before := profile.pending_packs.size()
+	profile.stats["games"] += 1
+	if won:
+		profile.stats["wins"] += 1
+		profile.stats["win_streak"] = int(profile.stats.get("win_streak", 0)) + 1
+		profile.stats["best_streak"] = maxi(int(profile.stats.get("best_streak", 0)), int(profile.stats["win_streak"]))
+	else:
+		profile.stats["win_streak"] = 0
+		if tie:
+			profile.stats["ties"] += 1
+		else:
+			profile.stats["losses"] += 1
+	var today := DailyRules.day_of(now)
+	var first_win := won and int(profile.stats["last_win_day"]) != today
+	if won:
+		profile.stats["last_win_day"] = today
+	var rw := match_rewards(r, first_win, int(profile.stats["win_streak"]), int(profile.stats["wins"]) if won else 0)
+	var items: Array = rw["items"]
+	# Objectives: record the box, auto-claim what this match finished.
+	var box: Dictionary = r.get("box", {}).duplicate()
+	for k in ["pf", "pa", "tds", "def_ints", "def_sacks", "came_back", "forfeit"]:
+		if r.has(k) and not box.has(k):
+			box[k] = r[k]
+	box["won"] = won
+	var done_objs: Array = []
+	var coach_ups: Array = []
+	var done_ids := ObjectiveRules.record_match(profile, box, now)
+	done_ids.append_array(ObjectiveRules.record_best(profile, "team_ovr", Collection.team_ovr(profile, db), now))
+	for id in done_ids:
+		var o := ObjectiveRules.find(profile, id, now)
+		var c := ObjectiveRules.claim_details(profile, id, now)
+		if int(c["coins"]) > 0 or c["pack"] != "":
+			done_objs.append(o)
+			coach_ups.append_array(c["level_ups"])
+			var label := "%s: %s" % [o["kind"].to_upper(), o["title"]]
+			items.append({"id": "objective", "label": label, "coins": int(c["coins"]), "pack": c["pack"]})
+	# Match coins (objective coins were already added by claim_details).
+	var match_coins := int(rw["total"])
+	profile.coins += match_coins
+	profile.stats["coins_earned"] += match_coins
+	# Player development.
+	var dev_ups: Array[Dictionary] = [] if forfeit else Collection.award_xp(profile, db, won)
+	if not dev_ups.is_empty():
+		ObjectiveRules.record_event(profile, "levelups", dev_ups.size(), now)
+	# Coach XP.
+	var cxp := {"total": 0, "items": []} if forfeit else ProgressionRules.xp_for_match(box, won)
+	coach_ups.append_array(ProgressionRules.add_xp(profile, int(cxp["total"])))
+	var out := _total(items)
+	out["won"] = won
+	out["streak"] = int(profile.stats["win_streak"])
+	out["objectives"] = done_objs
+	out["level_ups"] = dev_ups
+	out["coach"] = {"xp": int(cxp["total"]), "items": cxp["items"], "level_ups": coach_ups,
+			"progress": ProgressionRules.level_progress(int(profile.coach["xp"]))}
+	out["packs"] = profile.pending_packs.slice(packs_before)
+	return out

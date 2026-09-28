@@ -47,11 +47,25 @@ var jump_timer := 0.0
 var jump_target := Vector2.ZERO
 var jump_started_at := -1.0   ## play_time of the last jump at the ball (-1 = none)
 var celebrating := false
+## Pre-snap crouch (linemen) until the ball is snapped (PlayRunner sets/clears it).
+var in_stance := false
 
 var highlight := false:
 	set(v):
 		if v != highlight:
 			highlight = v
+			queue_redraw()
+## Retro Bowl-style field markers: a star under a receiver you can throw to, and a bobbing
+## arrow over the ball carrier (alpha 0 = none).
+var star := false:
+	set(v):
+		if v != star:
+			star = v
+			queue_redraw()
+var arrow := Color(0, 0, 0, 0):
+	set(v):
+		if v != arrow:
+			arrow = v
 			queue_redraw()
 
 var sprite: AnimatedSprite2D
@@ -72,7 +86,7 @@ func setup(p_team: int, p_slot: String, p_pos: String, p_attrs: Dictionary, t: G
 	sprite = AnimatedSprite2D.new()
 	sprite.sprite_frames = PlayerSprites.frames()
 	sprite.centered = false
-	sprite.offset = Vector2(-8, -19)
+	sprite.offset = PlayerSprites.OFFSET
 	sprite.material = PlayerSprites.make_material(colors, hash(p_slot + p_name) + jersey)
 	sprite.play("idle")
 	add_child(sprite)
@@ -190,7 +204,9 @@ func _process(_delta: float) -> void:
 	sprite.position = FieldProjection.lift(z_height).round()
 	sprite.flip_h = facing < 0.0
 	var anim := "idle"
-	if is_down or stun > 0.3:
+	if in_stance:
+		anim = "stance"
+	elif is_down or stun > 0.3:
 		anim = "down"
 	elif dive_timer > 0.0:
 		anim = "dive"
@@ -207,11 +223,31 @@ func _process(_delta: float) -> void:
 	if sprite.animation != anim:
 		sprite.play(anim)
 	sprite.speed_scale = clampf(velocity.length() / 6.0, 0.6, 1.6) if anim == "run" else 1.0
+	if arrow.a > 0.0:
+		queue_redraw()   # the carrier arrow bobs
 
 
 func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.45))
 	draw_circle(Vector2.ZERO, 6.0, Color(0, 0, 0, 0.3))
+	if star:
+		draw_colored_polygon(_star_points(12.0, 5.0), Color(1.0, 0.93, 0.15, 0.55))
+		draw_polyline(_star_points(12.0, 5.0) + PackedVector2Array([_star_points(12.0, 5.0)[0]]),
+				Color("#ffec27"), 1.0)
 	if highlight:
 		draw_arc(Vector2.ZERO, 11.0, 0.0, TAU, 24, Color("#ffec27"), 2.0)
 	draw_set_transform(Vector2.ZERO)
+	if arrow.a > 0.0:
+		var bob := roundf(sin(Time.get_ticks_msec() / 120.0) * 1.5)
+		var tip := Vector2(0, -30 + bob)
+		var tri := PackedVector2Array([tip, tip + Vector2(-5, -6), tip + Vector2(5, -6)])
+		draw_colored_polygon(tri, arrow)
+		draw_polyline(tri + PackedVector2Array([tip]), Color("#141018"), 1.0)
+
+
+static func _star_points(outer: float, inner: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in 10:
+		var r := outer if i % 2 == 0 else inner
+		pts.append(Vector2.from_angle(-PI / 2.0 + i * PI / 5.0) * r)
+	return pts

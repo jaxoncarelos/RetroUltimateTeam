@@ -41,6 +41,7 @@ static func _season(r: Dictionary, profile: Profile, db: RosterDB) -> String:
 			SeasonRules.start_playoffs(s, GameData.teams)
 			if s["playoffs"]["made_it"]:
 				profile.coins += PLAYOFF_BERTH_COINS
+				ObjectiveRules.record_event(profile, "playoffs")
 				return "REGULAR SEASON OVER: PLAYOFFS! +%d COINS" % PLAYOFF_BERTH_COINS
 			return "REGULAR SEASON OVER: NO PLAYOFFS THIS YEAR"
 		return "SEASON: WEEK %d DONE" % int(s["week"])
@@ -58,6 +59,7 @@ static func _season(r: Dictionary, profile: Profile, db: RosterDB) -> String:
 				msg = "ELIMINATED IN THE %s" % SeasonRules.ROUND_NAMES[int(s["playoffs"]["round"])]
 		SeasonRules.advance_round(s, winners)
 		if s["phase"] == "done" and s["playoffs"]["champion"] == you:
+			ObjectiveRules.record_event(profile, "titles")
 			var pack := PackCatalog.get_pack("elite")
 			EconomyRules.grant_pack(profile, pack, db, rng)
 			msg = "SUPER BOWL CHAMPIONS! ELITE PACK ADDED TO YOUR COLLECTION"
@@ -75,6 +77,7 @@ static func _challenge(r: Dictionary, profile: Profile, db: RosterDB) -> String:
 	done[id] = true
 	profile.challenges["done"] = done
 	var def := ChallengeRules.find(id, int(extra.get("daily_seed", 0)))
+	ObjectiveRules.record_event(profile, "challenges")
 	if not first:
 		return "CHALLENGE COMPLETE (REWARD ALREADY CLAIMED)"
 	var rng := RandomNumberGenerator.new()

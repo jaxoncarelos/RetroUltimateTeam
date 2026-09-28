@@ -35,7 +35,7 @@ func _spawn_sideline(colors: Dictionary, from_x: float, to_x: float, seed_value:
 		var s := AnimatedSprite2D.new()
 		s.sprite_frames = PlayerSprites.frames()
 		s.centered = false
-		s.offset = Vector2(-8, -19)
+		s.offset = PlayerSprites.OFFSET
 		s.material = PlayerSprites.make_material(colors, seed_value * 31 + i)
 		var x := lerpf(from_x, to_x, (i + rng.randf_range(0.1, 0.9)) / n)
 		s.position = FieldProjection.to_screen(Vector2(x, -0.9 - rng.randf_range(0.0, 0.4))).round()

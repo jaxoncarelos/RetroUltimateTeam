@@ -5,6 +5,11 @@ extends Node
 ##     aims (drag BACK, slingshot) or scrambles (drag FORWARD). A tap anywhere also snaps.
 ##     Dragging from anywhere else snaps too and starts aiming.
 ##   QB with the ball: drag BACK to aim, release to throw; drag FORWARD to scramble.
+##     Aim = slingshot: the pull's direction is the throw direction and its length the
+##     distance (the reticle is where the ball lands). Loft is automatic and previewed:
+##     short = BULLET, 13+ yards rising to a full LOB by ~32 yards, and a TOUCH/LOB arc over
+##     any defender standing in the throwing lane. A light aim assist pulls the reticle onto a
+##     receiver's in-stride spot when it is close (GameplayTuning.aim_assist_*).
 ##   Ball carrier: auto-runs the play's lane, then straight; drag up/down to steer (relative
 ##   to where steering began), drag back to slow, flick up/down to juke, double-tap to dive.
 
@@ -115,6 +120,7 @@ func _on_dragged(_start: Vector2, pos: Vector2) -> void:
 				_cancel_aim()
 				return
 			aim_target = runner.aim_point(_aim_anchor, pos)
+			runner.aim_preview = aim_target
 			aim_changed.emit(true, aim_target)
 		Mode.STEER:
 			var dy := pos.y - _steer_anchor.y
@@ -137,6 +143,9 @@ func _on_released(_start: Vector2, pos: Vector2, was_drag: bool) -> void:
 func _cancel_aim() -> void:
 	if mode == Mode.AIM:
 		mode = Mode.NONE
+	if runner != null:
+		runner.aim_preview = Vector2.INF
+		runner.aim_assist_target = null
 	aim_changed.emit(false, Vector2.ZERO)
 
 
@@ -164,7 +173,7 @@ func apply(_dt: float) -> void:
 		c.throttle = steer_throttle
 		return
 	var lane := runner.carrier_lane
-	while not lane.is_empty() and c.field_pos.distance_to(lane[0]) < 1.2:
+	while not lane.is_empty() and (c.field_pos.distance_to(lane[0]) < 1.2 or lane[0].x < c.field_pos.x - 0.3):
 		lane.remove_at(0)
 	runner.carrier_lane = lane
 	c.desired_dir = (lane[0] - c.field_pos).normalized() if not lane.is_empty() else Vector2.RIGHT

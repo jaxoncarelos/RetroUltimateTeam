@@ -44,8 +44,17 @@ func test_turnover_on_downs() -> void:
 	assert_eq(dt.apply_spot(39.0), DownTracker.Outcome.TURNOVER_ON_DOWNS)
 
 
-func test_touchdown_at_goal_line() -> void:
-	assert_eq(dt.apply_spot(110.0), DownTracker.Outcome.TOUCHDOWN)
+func test_touchdown_needs_the_play_to_score() -> void:
+	assert_eq(dt.apply_spot(110.0, true), DownTracker.Outcome.TOUCHDOWN)
+
+
+func test_tackled_short_of_goal_line_is_not_a_touchdown() -> void:
+	dt.start_drive(105.0)
+	# Downed half a yard short (and even a spot that rounds/falls into the end zone) stays at the 1.
+	assert_ne(dt.apply_spot(109.6), DownTracker.Outcome.TOUCHDOWN)
+	assert_eq(dt.los_x, 109.0)
+	assert_ne(dt.apply_spot(110.4), DownTracker.Outcome.TOUCHDOWN)
+	assert_eq(dt.los_x, 109.0)
 
 
 func test_touchdown_flag() -> void:
