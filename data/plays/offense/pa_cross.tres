@@ -47,3 +47,5 @@ assignments = {
 "type": "route"
 }
 }
+counters = PackedStringArray()
+tags = PackedStringArray()

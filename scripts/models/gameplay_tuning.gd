@@ -11,6 +11,8 @@ extends Resource
 @export var reaction_fast := 0.10      ## seconds at awareness 99
 @export var cut_keep_min := 0.45       ## velocity kept through a route cut at route running 0
 @export var cut_keep_max := 0.9        ## … at route running 99
+@export var carrier_speed_mult := 0.94 ## ball carriers run a bit slower than their top speed
+@export var pursuit_speed_mult := 1.05 ## pursuing defenders run a bit faster (effort + angles)
 
 @export_group("Passing")
 @export var throw_speed_base := 17.0   ## yd/s

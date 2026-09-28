@@ -41,3 +41,5 @@ assignments = {
 "type": "block"
 }
 }
+counters = PackedStringArray()
+tags = PackedStringArray()

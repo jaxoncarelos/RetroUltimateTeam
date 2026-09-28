@@ -51,3 +51,5 @@ assignments = {
 "type": "zone"
 }
 }
+counters = PackedStringArray("SHORT")
+tags = PackedStringArray()

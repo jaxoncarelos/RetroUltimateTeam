@@ -5,11 +5,14 @@ extends CanvasLayer
 signal play_selected(play: PlayDef)
 signal restart_pressed
 
+const WARN_COLOR := Color("#ff004d")
+
 var _down_label: Label
 var _drive_label: Label
 var _banner: Label
 var _banner_sub: Label
 var _hint: Label
+var _warning: Label
 var _play_bar: HBoxContainer
 var _restart: Button
 var _buttons: Dictionary = {}
@@ -57,6 +60,21 @@ func _ready() -> void:
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_hint)
 
+	_warning = Label.new()
+	_anchor(_warning, Vector2(0.5, 0.0), Rect2(-80, 30, 160, 12))
+	_warning.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_warning.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_warning.add_theme_color_override("font_color", WARN_COLOR)
+	var warn_box := StyleBoxFlat.new()
+	warn_box.bg_color = Color(UiTheme.INK, 0.9)
+	warn_box.border_color = WARN_COLOR
+	warn_box.set_border_width_all(1)
+	warn_box.set_content_margin_all(2)
+	_warning.add_theme_stylebox_override("normal", warn_box)
+	_warning.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_warning.visible = false
+	root.add_child(_warning)
+
 	_play_bar = HBoxContainer.new()
 	_play_bar.alignment = BoxContainer.ALIGNMENT_CENTER
 	_play_bar.add_theme_constant_override("separation", 3)
@@ -102,6 +120,22 @@ func set_selected(play: PlayDef) -> void:
 		_buttons[p].button_pressed = p == play
 
 
+## Warns that the CPU defense is keying on a play and marks that play's card ("" clears).
+func set_keyed(plays: Array[PlayDef], keyed_id: String) -> void:
+	var keyed_name := ""
+	for p in plays:
+		if not _buttons.has(p):
+			continue
+		var b: Button = _buttons[p]
+		var hot := p.id == keyed_id
+		b.text = "%s%s\n%s" % ["! " if hot else "", p.display_name.to_upper(), p.category]
+		b.add_theme_color_override("font_color", WARN_COLOR if hot else UiTheme.TEXT)
+		if hot:
+			keyed_name = p.display_name.to_upper()
+	_warning.text = "DEFENSE IS KEYING ON %s" % keyed_name
+	_warning.visible = keyed_name != ""
+
+
 func show_play_bar(on: bool) -> void:
 	_play_bar.visible = on
 
@@ -133,6 +167,8 @@ func _process(delta: float) -> void:
 		if _banner_timer <= 0.0:
 			_banner.visible = false
 			_banner_sub.visible = false
+	if _warning.visible:
+		_warning.modulate.a = 0.6 + 0.4 * sin(Time.get_ticks_msec() / 120.0)
 	_play_bar.position.x = (get_viewport().get_visible_rect().size.x - _play_bar.size.x) * 0.5
 	_play_bar.position.y = get_viewport().get_visible_rect().size.y - _play_bar.size.y - 4
 

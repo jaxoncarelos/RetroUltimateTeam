@@ -3,7 +3,9 @@ extends Node2D
 ## Tap a play, tap the field to snap. R restarts the drive (keyboard).
 ## Debug user args (after "--"):
 ##   --autoplay   CPU calls plays, snaps and throws (watch a drive without touching)
-##   --sim=N      headless batch: autoplay N plays at 4x speed, print stats, quit
+##   --sim=N      headless batch: autoplay N plays (stepped as fast as possible), print stats, quit
+##   --spam=ID    autoplay always calls this play (tests the defense keying on repeats)
+##   --nokey      disable the CPU defense's memory (baseline for --spam comparisons)
 
 enum State { PLAY_CALL, LIVE, RESULT, DRIVE_OVER }
 
@@ -16,6 +18,7 @@ const DEF_OVR := 78
 @export var tuning: GameplayTuning = preload("res://data/tuning/gameplay_tuning.tres")
 @export var offense_book: PlaybookDef = preload("res://data/plays/offense_playbook.tres")
 @export var defense_book: PlaybookDef = preload("res://data/plays/defense_playbook.tres")
+@export var def_ai: DefenseAITuning = preload("res://data/tuning/defense_ai_tuning.tres")
 
 var state := State.PLAY_CALL
 var downs := DownTracker.new()
@@ -23,6 +26,7 @@ var selected_play: PlayDef
 var def_play: PlayDef
 var ball_y := FieldGeo.CENTER_Y
 var drive_start_x := START_X
+var memory: DefenseMemory
 var off_lineup: Dictionary = {}
 var def_lineup: Dictionary = {}
 
@@ -37,8 +41,10 @@ var control: HumanOffenseControl
 
 var autoplay := false
 var sim_target := 0
+var spam_id := ""
+var use_memory := true
 var stats := {"plays": 0, "yards": 0, "att": 0, "comp": 0, "int": 0, "sack": 0, "td": 0,
-		"runs": 0, "run_yds": 0, "pass_yds": 0, "broken": 0}
+		"runs": 0, "run_yds": 0, "pass_yds": 0, "broken": 0, "keyed": 0}
 
 
 func _ready() -> void:
@@ -48,7 +54,11 @@ func _ready() -> void:
 		elif arg.begins_with("--sim="):
 			autoplay = true
 			sim_target = int(arg.get_slice("=", 1))
-			Engine.time_scale = 4.0
+		elif arg.begins_with("--spam="):
+			spam_id = arg.get_slice("=", 1)
+		elif arg == "--nokey":
+			use_memory = false
+	memory = DefenseMemory.new(def_ai)
 	var teams := TeamData.load_all()
 	var off_team: TeamData = teams[OFF_TEAM]
 	var def_team: TeamData = teams[DEF_TEAM]
@@ -62,6 +72,7 @@ func _ready() -> void:
 
 	runner = PlayRunner.new()
 	runner.tuning = tuning
+	runner.def_ai = def_ai
 	runner.rng.randomize()
 	runner.off_colors = off_team.uniform_colors()
 	runner.def_colors = def_team.uniform_colors()
@@ -106,6 +117,28 @@ func _ready() -> void:
 	def_lineup = _generic_lineup(defense_book.plays[0].formation, DEF_OVR)
 	selected_play = offense_book.plays[0]
 	_restart_drive()
+	if sim_target > 0:
+		_run_sim.call_deferred()
+
+
+## Headless batch: steps plays synchronously at a fixed timestep (no timers, no rendering).
+func _run_sim() -> void:
+	const DT := 1.0 / 60.0
+	runner.set_physics_process(false)
+	set_physics_process(false)
+	while stats["plays"] < sim_target:
+		match state:
+			State.PLAY_CALL:
+				_snap()
+			State.LIVE:
+				_autoplay_throw()
+				runner._physics_process(DT)
+			State.RESULT:
+				_start_play_call()
+			State.DRIVE_OVER:
+				_restart_drive()
+	_print_stats()
+	get_tree().quit()
 
 
 ## Phase 1 placeholder lineup: every slot gets position-profile ratings at one OVR.
@@ -130,16 +163,25 @@ func _restart_drive() -> void:
 
 func _start_play_call() -> void:
 	state = State.PLAY_CALL
-	def_play = defense_book.plays[runner.rng.randi() % defense_book.plays.size()]
+	var situation := {"down": downs.down, "to_go": downs.to_go(), "los_x": downs.los_x}
+	def_play = AIPlayCaller.pick_defense(defense_book.plays, memory if use_memory else null,
+			situation, runner.rng, def_play)
 	_setup_formation()
 	hud.show_play_bar(true)
 	hud.set_selected(selected_play)
+	hud.set_keyed(offense_book.plays, memory.keyed_play() if use_memory else "")
 	hud.set_hint("PICK A PLAY  ·  TAP THE FIELD TO SNAP")
 	_update_scorebug()
 	if autoplay:
 		selected_play = offense_book.plays[runner.rng.randi() % offense_book.plays.size()]
+		if spam_id != "":
+			for p in offense_book.plays:
+				if p.id == spam_id:
+					selected_play = p
 		hud.set_selected(selected_play)
 		_setup_formation()
+		if sim_target > 0:
+			return
 		get_tree().create_timer(0.5).timeout.connect(func() -> void:
 			if state == State.PLAY_CALL:
 				_snap())
@@ -176,6 +218,11 @@ func _on_tap(_pos: Vector2) -> void:
 func _snap() -> void:
 	state = State.LIVE
 	hud.show_play_bar(false)
+	if use_memory:
+		runner.key_level = memory.key_level(selected_play.id, selected_play.formation.id, selected_play.category)
+	if runner.key_level > 0.0:
+		stats["keyed"] += 1
+	hud.set_keyed(offense_book.plays, "")
 	runner.snap()
 	if selected_play.is_run():
 		hud.set_hint("DRAG UP/DOWN TO STEER  ·  FLICK TO JUKE  ·  DOUBLE-TAP TO DIVE")
@@ -184,6 +231,10 @@ func _snap() -> void:
 
 
 func _physics_process(_dt: float) -> void:
+	_autoplay_throw()
+
+
+func _autoplay_throw() -> void:
 	if autoplay and state == State.LIVE and runner.qb_is_passer() and runner.play_time > 1.0:
 		var read := QBReadLogic.best_throw(runner)
 		if not read.is_empty() and (read["openness"] > 2.5 or runner.play_time > 2.4):
@@ -192,6 +243,9 @@ func _physics_process(_dt: float) -> void:
 
 func _record(result: Dictionary) -> void:
 	var type: String = result["type"]
+	var gained: int = result["yards"] if type != "incomplete" and type != "int" else 0
+	memory.record(selected_play.id, selected_play.formation.id, selected_play.category,
+			-10 if type == "int" else gained, selected_play.display_name)
 	stats["plays"] += 1
 	stats["yards"] += result["yards"] if type != "incomplete" and type != "int" else 0
 	stats["broken"] += result.get("broken_tackles", 0)
@@ -206,18 +260,16 @@ func _record(result: Dictionary) -> void:
 	if type in stats:
 		stats[type] += 1
 	if sim_target > 0 and OS.get_cmdline_user_args().has("--verbose"):
-		print("  %-10s %-10s %+3d  bt=%d" % [selected_play.id, type, result["yards"], result.get("broken_tackles", 0)])
-	if sim_target > 0 and stats["plays"] >= sim_target:
-		_print_stats()
-		get_tree().quit()
+		print("  %-10s vs %-9s key=%.2f %-10s %+3d  bt=%d" % [selected_play.id, def_play.id, runner.key_level,
+				type, result["yards"], result.get("broken_tackles", 0)])
 
 
 func _print_stats() -> void:
 	var s := stats
-	print("SIM %d plays | %.1f yds/play | pass %d/%d (%.0f%%) %d yds, %d INT, %d sacks | run %d for %d (%.1f ypc) | %d TD | %d broken tackles" % [
+	print("SIM %d plays | %.1f yds/play | pass %d/%d (%.0f%%) %d yds, %d INT, %d sacks | run %d for %d (%.1f ypc) | %d TD | %d broken tackles | %d keyed" % [
 		s["plays"], float(s["yards"]) / maxf(s["plays"], 1), s["comp"], s["att"],
 		100.0 * s["comp"] / maxf(s["att"], 1), s["pass_yds"], s["int"], s["sack"],
-		s["runs"], s["run_yds"], float(s["run_yds"]) / maxf(s["runs"], 1), s["td"], s["broken"]])
+		s["runs"], s["run_yds"], float(s["run_yds"]) / maxf(s["runs"], 1), s["td"], s["broken"], s["keyed"]])
 
 
 func _on_play_ended(result: Dictionary) -> void:
@@ -258,6 +310,8 @@ func _on_play_ended(result: Dictionary) -> void:
 		_:
 			hud.show_banner(headline, downs.down_text())
 	_update_scorebug()
+	if sim_target > 0:
+		return
 	get_tree().create_timer(1.3).timeout.connect(func() -> void:
 		if state == State.RESULT:
 			_start_play_call())
@@ -277,7 +331,7 @@ func _drive_over(title: String, sub: String) -> void:
 	hud.show_banner(title, sub, 99.0)
 	hud.set_hint("TAP TO START A NEW DRIVE")
 	hud.show_restart(true)
-	if autoplay:
+	if autoplay and sim_target == 0:
 		get_tree().create_timer(1.0).timeout.connect(_restart_drive)
 
 

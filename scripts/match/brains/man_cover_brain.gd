@@ -17,7 +17,7 @@ func _init(p_agent: PlayerAgent, p_ctx: PlayRunner, p_mark: PlayerAgent) -> void
 
 func think() -> void:
 	if mark != null:
-		aim = mark.field_pos + mark.velocity * 0.3 + Vector2(CUSHION, 0.0)
+		aim = ctx.anticipate(mark) + Vector2(CUSHION, 0.0)
 
 
 func act(_dt: float) -> void:

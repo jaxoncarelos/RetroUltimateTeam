@@ -44,3 +44,5 @@ assignments = {
 "type": "zone"
 }
 }
+counters = PackedStringArray("RUN")
+tags = PackedStringArray()

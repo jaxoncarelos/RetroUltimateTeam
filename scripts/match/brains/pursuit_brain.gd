@@ -5,6 +5,11 @@ extends Brain
 var aim := Vector2.ZERO
 
 
+func _init(p_agent: PlayerAgent, p_ctx: PlayRunner) -> void:
+	super(p_agent, p_ctx)
+	agent.speed_mult = maxf(agent.speed_mult, ctx.tuning.pursuit_speed_mult)
+
+
 func think() -> void:
 	var c := ctx.carrier
 	if c == null or c.team == agent.team:

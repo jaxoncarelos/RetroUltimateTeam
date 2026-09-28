@@ -17,6 +17,10 @@ const WATCHDOG_SECONDS := 15.0
 const HANDOFF_RANGE := 1.8
 
 var tuning: GameplayTuning
+var def_ai: DefenseAITuning = DefenseAITuning.new()
+## 0..1: how strongly the CPU defense is keyed on this offensive call (DefenseMemory).
+## Set after setup_play(), before snap().
+var key_level := 0.0
 var rng := RandomNumberGenerator.new()
 var phase := Phase.IDLE
 var human_team := PlayerAgent.Team.OFFENSE
@@ -83,6 +87,7 @@ func setup_play(p_off: PlayDef, p_def: PlayDef, p_los_x: float, p_ball_y: float,
 	broken_tackles = 0
 	carrier = null
 	handoff_to = null
+	key_level = 0.0
 	_pending_result = {}
 
 	var origin := Vector2(los_x, ball_y)
@@ -140,6 +145,11 @@ func snap() -> void:
 	carrier = qb
 	for a in agents:
 		a.brain = _brain_for(a)
+	if key_level > 0.0:
+		for d in defense:
+			d.reaction *= 1.0 - def_ai.reaction_cut * key_level
+			if is_run_play() and d.brain is RushBrain:
+				d.speed_mult = 1.0 + def_ai.rush_speed_bonus * key_level
 	Events.play_started.emit(off_play.display_name)
 
 
@@ -201,6 +211,22 @@ func pressure_on_qb() -> float:
 	return clampf(1.0 - (r.field_pos.distance_to(qb.field_pos) - 1.0) / 4.0, 0.0, 1.0)
 
 
+## Where a receiver is headed. Keyed defenders read the repeated route and aim at the
+## next break point instead of trailing the receiver.
+func anticipate(o: PlayerAgent) -> Vector2:
+	var drift := o.field_pos + o.velocity * 0.3
+	if key_level <= 0.0 or not (o.brain is RouteBrain):
+		return drift
+	var rb := o.brain as RouteBrain
+	var next := rb.next_point()
+	return drift.lerp(next, def_ai.jump_blend * key_level)
+
+
+## Extra yards a keyed zone defender will leave his zone to jump a route.
+func jump_reach() -> float:
+	return def_ai.jump_reach * key_level
+
+
 ## The field point the camera should follow.
 func focus_point() -> Vector2:
 	if ball.state == Ball.State.AIR:
@@ -253,7 +279,7 @@ func throw_ball(target: Vector2) -> void:
 	for d in defense:
 		if d.engaged_with != null or not d.can_act() or d.brain is RushBrain:
 			continue
-		if d.field_pos.distance_to(landing) < 11.0:
+		if d.field_pos.distance_to(landing) < 11.0 + def_ai.ball_react_extra * key_level:
 			d.brain = BallHawkBrain.new(d, self, landing, d.reaction + 0.1, d.brain)
 	ball_thrown.emit(landing)
 
@@ -283,6 +309,7 @@ func _set_controlled(a: PlayerAgent) -> void:
 func _set_carrier(a: PlayerAgent) -> void:
 	carrier = a
 	ball.give_to(a)
+	a.speed_mult = tuning.carrier_speed_mult
 	if a.team == human_team:
 		_set_controlled(a)
 		a.human = true
@@ -384,13 +411,14 @@ func _resolve_arrival() -> void:
 	if o == null and d == null:
 		_end_play("incomplete", Vector2(los_x, ball_y), "INCOMPLETE")
 		return
-	if d != null and (o == null or dd + 0.3 < od):
-		if rng.randf() < RatingModel.int_prob(t, d.attr("cov"), d.attr("cth")):
+	if d != null and (o == null or dd + 0.3 + def_ai.contest_bonus * key_level < od):
+		var p_int := RatingModel.int_prob(t, d.attr("cov"), d.attr("cth")) * (1.0 + def_ai.int_bonus * key_level)
+		if rng.randf() < p_int:
 			_set_carrier(d)
 		else:
 			_end_play("incomplete", Vector2(los_x, ball_y), "BROKEN UP!")
 		return
-	var contest := 0.0 if d == null else clampf(1.0 - dd / t.contest_radius, 0.0, 1.0)
+	var contest := 0.0 if d == null else clampf(1.0 - dd / t.contest_radius + def_ai.catch_contest_bonus * key_level, 0.0, 1.0)
 	var def_cov := d.attr("cov") if d != null else 50.0
 	if rng.randf() < RatingModel.catch_prob(t, o.attr("cth"), contest, def_cov):
 		_set_carrier(o)

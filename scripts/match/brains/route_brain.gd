@@ -15,6 +15,15 @@ func _init(p_agent: PlayerAgent, p_ctx: PlayRunner, p_points: PackedVector2Array
 	end_mode = p_end
 
 
+## The waypoint this runner is heading to (or a point ahead once the route is done).
+func next_point() -> Vector2:
+	if idx < points.size():
+		return points[idx]
+	if end_mode == "sit" and points.size() > 0:
+		return points[points.size() - 1]
+	return agent.field_pos + last_dir * 4.0
+
+
 func update(dt: float) -> void:
 	act(dt)
 

@@ -14,7 +14,8 @@ func _init(p_agent: PlayerAgent, p_ctx: PlayRunner, center_rel: Vector2, size: V
 
 
 func think() -> void:
-	var watch := zone.grow(2.0)
+	var reach := ctx.jump_reach()
+	var watch := zone.grow(2.0 + reach)
 	var best: PlayerAgent = null
 	var best_d := INF
 	for o in ctx.offense:
@@ -25,8 +26,8 @@ func think() -> void:
 			best_d = d
 			best = o
 	if best != null:
-		var p := best.field_pos + best.velocity * 0.3 + Vector2(1.5, 0.0)
-		var lim := zone.grow(3.0)
+		var p := ctx.anticipate(best) + Vector2(1.5, 0.0)
+		var lim := zone.grow(3.0 + reach)
 		aim = Vector2(clampf(p.x, lim.position.x, lim.end.x), clampf(p.y, lim.position.y, lim.end.y))
 	else:
 		aim = zone.get_center()

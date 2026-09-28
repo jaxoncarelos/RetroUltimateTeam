@@ -88,7 +88,7 @@ func _init() -> void:
 		"CB1": _m("WR1"), "CB2": _m("WR2"), "LB1": _m("TE"), "LB2": _m("RB"),
 		"S1": _z(Vector2(16, 0), Vector2(22, 30)),
 		"S2": _z(Vector2(7, 0), Vector2(10, 16)),
-	})))
+	}), ["DEEP", "SHORT"]))
 	def_plays.append(_play("cover2", "Cover 2 Zone", "defense", "ZONE", base_d, _merge(rush, {
 		"CB1": _z(Vector2(4, -14), Vector2(10, 12)),
 		"CB2": _z(Vector2(4, 14), Vector2(10, 12)),
@@ -96,7 +96,7 @@ func _init() -> void:
 		"LB2": _z(Vector2(7, 5), Vector2(9, 10)),
 		"S1": _z(Vector2(18, -10), Vector2(24, 26)),
 		"S2": _z(Vector2(18, 10), Vector2(24, 26)),
-	})))
+	}), ["SHORT"]))
 	def_plays.append(_play("cover3", "Cover 3 Zone", "defense", "ZONE", base_d, _merge(rush, {
 		"CB1": _z(Vector2(17, -15), Vector2(24, 18)),
 		"CB2": _z(Vector2(17, 15), Vector2(24, 18)),
@@ -104,12 +104,12 @@ func _init() -> void:
 		"S2": _z(Vector2(6, -8), Vector2(10, 12)),
 		"LB1": _z(Vector2(6, 0), Vector2(8, 10)),
 		"LB2": _z(Vector2(6, 9), Vector2(10, 12)),
-	})))
+	}), ["DEEP"]))
 	def_plays.append(_play("lb_blitz", "LB Blitz", "defense", "BLITZ", base_d, _merge(rush, {
 		"LB1": _r(), "LB2": _r(),
 		"CB1": _m("WR1"), "CB2": _m("WR2"), "S1": _m("TE"),
 		"S2": _z(Vector2(16, 0), Vector2(22, 30)),
-	})))
+	}), ["RUN"]))
 
 	var ob := PlaybookDef.new()
 	ob.id = "offense_basic"
@@ -132,8 +132,11 @@ func _formation(id: String, name: String, side: String, slots: Dictionary) -> Fo
 	return _save(f, "res://data/formations/%s.tres" % id) as FormationDef
 
 
-func _play(id: String, name: String, side: String, cat: String, form: FormationDef, asg: Dictionary) -> PlayDef:
+func _play(id: String, name: String, side: String, cat: String, form: FormationDef, asg: Dictionary,
+		counters: Array = [], tags: Array = []) -> PlayDef:
 	var p := PlayDef.new()
+	p.counters = PackedStringArray(counters)
+	p.tags = PackedStringArray(tags)
 	p.id = id
 	p.display_name = name
 	p.side = side

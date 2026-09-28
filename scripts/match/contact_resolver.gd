@@ -36,6 +36,8 @@ func _blocks(dt: float) -> void:
 				d.shed_timer = RatingModel.shed_time(t, b.attr("blk"), rush_rating(d), jitter)
 				if ctx.carrier != null and ctx.carrier != ctx.qb:
 					d.shed_timer *= t.open_field_shed_mult
+				if ctx.is_run_play():
+					d.shed_timer *= 1.0 - ctx.def_ai.shed_cut * ctx.key_level
 				break
 
 
