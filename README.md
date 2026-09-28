@@ -12,7 +12,7 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 |---|---|---|
 | 0 | Tooling, project skeleton, Android export | ✅ done (APK builds; on-device check pending) |
 | 1 | One playable offensive drive, placeholder art | ✅ playable in `drive_sandbox` |
-| 2 | Defense playable | next |
+| 2 | Defense playable | ✅ `drive_sandbox -- --defend` |
 | 3 | Full game (clock, both halves, AI opponent) | — |
 | 4 | Roster import, cards affect gameplay | — |
 | 5 | Packs, economy, collection | — |
@@ -33,7 +33,11 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 | Ball carrier | follows the play's lane on his own · hold + drag up/down to steer · drag back to slow |
 | CPU defense | learns your tendencies: repeat a play and it gets **keyed** (red "DEFENSE IS KEYING ON …" warning) |
 | | flick up/down = juke · double-tap = dive |
-| Keyboard | `R` restarts the drive |
+| **Defense** (`-- --defend`) | pick a call (BEST preselected), tap the field when ready |
+| | drag anywhere = move your defender (yellow ring) · tap the ball carrier = dive tackle |
+| | tap the ball's landing marker = leap to swat/pick (time it for the ball's arrival; from far away it sprints you there) |
+| | tap any defender = take control · INT return: drag up/down to steer |
+| Keyboard | `R` restarts the drive · `F1` AI debug overlay (three-finger tap on a phone) |
 
 ### Debug arguments
 ```

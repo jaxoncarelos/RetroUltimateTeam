@@ -560,7 +560,7 @@ func _check_return(p: Vector2) -> void:
 func defender_jump(d: PlayerAgent) -> void:
 	if phase != Phase.LIVE or ball.state != Ball.State.AIR or d.jump_timer > 0.0 or not d.can_act():
 		return
-	d.start_jump(tuning)
+	d.start_jump(tuning, ball.to)
 	d.jump_started_at = play_time
 
 

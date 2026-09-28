@@ -42,7 +42,10 @@ func update(dt: float, force := false) -> void:
 	_think -= dt
 	if _think > 0.0 and not force:
 		return
-	_think = THINK_INTERVAL
+	# Pre-throw reads change constantly; re-evaluate them less often than pursuit.
+	var pre_throw := ctx.ball.state != Ball.State.AIR and ctx.carrier == ctx.qb and not ctx.scrambling \
+			and not ctx.is_run_play()
+	_think = THINK_INTERVAL * (2.5 if pre_throw else 1.0)
 	var best := best_defender()
 	if best == null or best == cur:
 		return
@@ -90,5 +93,5 @@ func score(d: PlayerAgent) -> float:
 	if target == null:
 		return d.field_pos.distance_to(Vector2(ctx.los_x + 5.0, ctx.ball_y)) / spd + penalty
 	if d.brain is RushBrain:
-		penalty += 0.6   # prefer coverage players over rushers pre-throw
+		penalty += 3.0   # pre-throw the human covers; rushers rush on their own
 	return d.field_pos.distance_to(target.field_pos) / spd + penalty

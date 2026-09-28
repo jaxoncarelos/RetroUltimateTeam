@@ -25,7 +25,8 @@ func _draw() -> void:
 	if runner == null:
 		return
 	if kind == Kind.ROUTES:
-		if runner.phase == PlayRunner.Phase.PRE_SNAP:
+		# Only the offense's own player gets the route preview (no peeking on defense).
+		if runner.phase == PlayRunner.Phase.PRE_SNAP and runner.human_team != PlayerAgent.Team.DEFENSE:
 			_draw_routes()
 	else:
 		if runner.phase == PlayRunner.Phase.PRE_SNAP and runner.human_team == PlayerAgent.Team.OFFENSE:

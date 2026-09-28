@@ -78,6 +78,7 @@ extends Resource
 @export var jump_time := 0.5           ## seconds a defender's leap lasts; ideal = ball arrives at the peak
 @export var jump_height := 0.9         ## yards
 @export var jump_reach := 0.9          ## extra yards of reach while leaping
+@export var jump_start_range := 4.5    ## yards from the landing spot a leap can start
 @export var jump_perfect := 0.09       ## s of timing error for a perfect jump
 @export var jump_good := 0.22          ## s of timing error that still gets a hand on it
 @export var jump_int_perfect := 0.55   ## base INT chance on a perfect jump (scaled by coverage/hands)

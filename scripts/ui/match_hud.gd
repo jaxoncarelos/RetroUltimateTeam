@@ -189,7 +189,11 @@ func show_play_bar(on: bool) -> void:
 ## Compact cards (grid) show only the name; bar cards add the category.
 func _style_card(b: Button, p: PlayDef) -> void:
 	var name := ("! " if p.id == _keyed_id else "") + p.display_name.to_upper()
-	b.text = name if b.get_meta("compact", false) else "%s\n%s" % [name, p.category]
+	# Second line: the category, or the formation when the name already says it.
+	var sub := p.category
+	if sub in name and p.formation != null:
+		sub = p.formation.display_name.to_upper()
+	b.text = name if b.get_meta("compact", false) else "%s\n%s" % [name, sub]
 	b.add_theme_color_override("font_color", WARN_COLOR if p.id == _keyed_id else UiTheme.TEXT)
 
 

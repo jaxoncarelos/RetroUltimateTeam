@@ -12,6 +12,7 @@ extends Node2D
 ##   --nokey      disable the CPU defense's memory (baseline for --spam comparisons)
 ##   --smart      autoplay calls plays with PlayAdvisor (situational) instead of at random
 ##   --look=X,Y   pin the camera on a field point (screenshots)   --grid  open the playbook grid
+##   --autosnap   (with --defend) snap automatically so the human-defense view can be recorded
 
 enum State { PLAY_CALL, LIVE, RESULT, DRIVE_OVER }
 
@@ -55,6 +56,7 @@ var sim_target := 0
 var spam_id := ""
 var use_memory := true
 var smart_calls := false
+var autosnap := false
 var stats := {"plays": 0, "yards": 0, "att": 0, "comp": 0, "int": 0, "sack": 0, "td": 0,
 		"runs": 0, "run_yds": 0, "pass_yds": 0, "broken": 0, "keyed": 0, "drives": 0, "fumble": 0}
 var by_play: Dictionary = {}   ## play id -> [calls, yards, tds]
@@ -78,6 +80,8 @@ func _ready() -> void:
 			use_memory = false
 		elif arg == "--smart":
 			smart_calls = true
+		elif arg == "--autosnap":
+			autosnap = true
 		elif arg.begins_with("--look="):
 			var xy := arg.get_slice("=", 1).split(",")
 			(func() -> void: camera.pinned = Vector2(float(xy[0]), float(xy[1]))).call_deferred()
@@ -225,8 +229,8 @@ func _start_play_call() -> void:
 		hud.set_keyed(defense_book.plays, "")
 		hud.set_hint("PICK A DEFENSE  ·  TAP THE FIELD WHEN READY")
 		_update_scorebug()
-		if autoplay and sim_target == 0:
-			get_tree().create_timer(0.5).timeout.connect(func() -> void:
+		if (autoplay or autosnap) and sim_target == 0:
+			get_tree().create_timer(0.5 if autoplay else 1.2).timeout.connect(func() -> void:
 				if state == State.PLAY_CALL:
 					_snap())
 		return

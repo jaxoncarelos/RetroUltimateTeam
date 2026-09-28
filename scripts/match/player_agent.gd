@@ -44,6 +44,7 @@ var throw_anim := 0.0
 var tackled_speed := 0.0   ## x speed at the moment of the tackle (fall-forward spot)
 var jam_timer := 0.0   ## seconds of slowed release (press coverage)
 var jump_timer := 0.0
+var jump_target := Vector2.ZERO
 var jump_started_at := -1.0   ## play_time of the last jump at the ball (-1 = none)
 var celebrating := false
 
@@ -123,8 +124,9 @@ func start_dive(t: GameplayTuning, dir: Vector2, recover := -1.0) -> void:
 
 
 ## Defender leaps at a thrown ball (swat / pick attempt).
-func start_jump(t: GameplayTuning) -> void:
+func start_jump(t: GameplayTuning, toward: Vector2) -> void:
 	jump_timer = t.jump_time
+	jump_target = toward
 
 
 func start_juke(t: GameplayTuning, dir: float) -> bool:
@@ -162,9 +164,12 @@ func step(dt: float, t: GameplayTuning) -> void:
 		return
 	var target_v := desired_dir * max_speed * throttle * speed_mult
 	if jump_timer > 0.0:
+		# The leap carries him toward the ball, ignoring his brain until he lands.
 		jump_timer -= dt
 		z_height = t.jump_height * sin(clampf(1.0 - jump_timer / t.jump_time, 0.0, 1.0) * PI)
-		target_v *= 0.4
+		var to_ball := jump_target - field_pos
+		target_v = to_ball.limit_length(max_speed * 0.9) if to_ball.length() > 0.2 else Vector2.ZERO
+		velocity = target_v
 		if jump_timer <= 0.0:
 			z_height = 0.0
 	if jam_timer > 0.0:

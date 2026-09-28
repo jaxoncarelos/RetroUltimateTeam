@@ -116,8 +116,12 @@ func _on_tapped(view_pos: Vector2) -> void:
 		return
 	var t := tuning
 	# 1) Ball in the air: leap if the tap is near the landing marker and we can get there.
+	#    Too far to leap yet: sprint to the spot (tap again to jump).
 	if runner.ball.state == Ball.State.AIR and p.distance_to(runner.ball.to) <= t.tap_ball_radius:
-		runner.defender_jump(me)
+		if me.field_pos.distance_to(runner.ball.to) <= t.jump_start_range:
+			runner.defender_jump(me)
+		else:
+			me.brain = BallHawkBrain.new(me, runner, runner.ball.to, 0.0, null)
 		return
 	# 2) Dive at the ball carrier.
 	var c := runner.carrier
@@ -133,9 +137,10 @@ func _on_tapped(view_pos: Vector2) -> void:
 		if dist < best_d:
 			best_d = dist
 			best = d
-	if best != null and best != me:
-		switcher.manual(best)
-		switched.emit(best)
+	if best != null:
+		switcher.manual(best)   # tapping your own man locks him in, too
+		if best != me:
+			switched.emit(best)
 
 
 func _on_flicked(dir: Vector2) -> void:
