@@ -36,6 +36,7 @@ var _banner: Label
 var _banner_sub: Label
 var _hint: Label
 var _warning: Label
+var _tag: Label
 var _play_bar: HBoxContainer
 var _restart: Button
 var _buttons: Dictionary = {}
@@ -82,6 +83,13 @@ func _ready() -> void:
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_hint)
+
+	_tag = Label.new()
+	_anchor(_tag, Vector2(0.0, 1.0), Rect2(6, -68, 220, 10))
+	_tag.add_theme_color_override("font_color", Color("#ffec27"))
+	_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tag.visible = false
+	root.add_child(_tag)
 
 	_warning = Label.new()
 	_anchor(_warning, Vector2(0.5, 0.0), Rect2(-80, 30, 160, 12))
@@ -384,6 +392,12 @@ func show_restart(on: bool) -> void:
 func set_scorebug(down_text: String, drive_text: String) -> void:
 	_down_label.text = down_text
 	_drive_label.text = drive_text
+
+
+## Name/number of the player the human controls ("" hides it).
+func set_player_tag(text: String) -> void:
+	_tag.text = text
+	_tag.visible = text != ""
 
 
 func set_hint(text: String) -> void:

@@ -14,15 +14,16 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 | 1 | One playable offensive drive, placeholder art | ✅ playable in `drive_sandbox` |
 | 2 | Defense playable | ✅ `drive_sandbox -- --defend` |
 | 3 | Full game (clock, both halves, AI opponent) | ✅ main scene (`scenes/match/match.tscn`) |
-| 4 | Roster import, cards affect gameplay | — |
+| 4 | Roster import, cards affect gameplay | ✅ team picker → your real players as cards |
 | 5 | Packs, economy, collection | — |
 | 6 | Season, challenges, polish | — |
 
 ## Running
 
 1. Install **Godot 4.7.x** (standard build, not .NET).
-2. Open `project.godot`, press **F5**. You play a full game as KC vs PHI: offense when you
-   have the ball, defense when they do. The drive sandbox is still there for debugging
+2. Open `project.godot`, press **F5**. First run: pick your NFL team (you get its real players
+   as Silver/Bronze cards), then play from the hub: offense when you have the ball, defense
+   when they do. `-- --quick` jumps straight into KC vs PHI; `-- --reset-save` starts over. The drive sandbox is still there for debugging
    (`scenes/debug/drive_sandbox.tscn`, or launch with `-- --sandbox`).
 
 ### Controls (touch, or mouse on desktop)

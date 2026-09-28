@@ -25,6 +25,9 @@ Godot 4.7 + GDScript retro football game. Design/roadmap: `PLAN.md`. Status tabl
 - `data/roster.csv` uses the `keep` importer (raw file) — keep `roster.csv.import` as is.
 - Plays/formations are `.tres`; `tools/build_playbooks.gd` regenerates (and overwrites) them.
 - Commit `.uid` files; never commit `.godot/` or `export/`.
+- Flow: boot.tscn routes → team picker (no save) / hub; debug flags → sandbox or match.
+  `-- --reset-save` wipes the local save. Autoloads: Events, UiTheme, Settings, GameData,
+  SaveManager (disabled for --sim/--ai-vs-ai/--nosave), SceneRouter.
 
 ## Next steps / handoff (keep this list current; top item = next task)
 User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
@@ -53,6 +56,11 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    FG/PAT meter), `KickMeter` UI, PAT/2-pt choice, CPU 4th-down/2-pt/timeouts, pause menu,
    final screen. `--ai-vs-ai=N` batch: ~23 pts/team, 58% comp, 0.9 INT/team, 0 stuck plays
    (runs 2.9 ypc — still low).
-8. [ ] Phase 4 – roster import (GameData), cards affect play, team picker, lineup.
+8. [x] Phase 4 – `RosterDB` (CSV parse, bad-row errors, generated depth "KC OL3" players so every
+   team fields 19 slots, card catalog), `GameData` autoload, `CardRules` tiers, `TeamRating`
+   (weights, auto-best, difficulty rescale), `Profile` + `SaveManager` (atomic, .bak, migrate),
+   `Collection` (starters, lineup, chemistry), `SceneRouter`, team picker, minimal hub, HUD
+   player tag. roster.csv now has 4–6 stars for every team (verify names/numbers!).
+   A/B: `--ai-vs-ai=20 --home-ovr=88 --away-ovr=64` → home wins 100%.
 9. [ ] Phase 5 – packs, coins, save system, collection.
 10. [ ] Phase 6 – season, challenges, polish.

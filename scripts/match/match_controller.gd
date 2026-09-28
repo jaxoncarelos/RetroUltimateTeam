@@ -44,6 +44,7 @@ var _kick_kind := ""                ## "fg" / "pat" while the kick meter is up
 var _queued: Callable               ## sim mode: next transition (instead of a timer)
 var _paused_from := Phase.PLAY_CALL
 var _kickoff_pending := ""           ## team that must kick off when the next quarter starts
+var _comeback := false               ## the human trailed by 10+ at some point
 var _sim_totals: Dictionary = {}
 var _games_done := 0
 
@@ -60,6 +61,8 @@ var overlay: DebugOverlay
 
 
 func _ready() -> void:
+	if config.is_empty():
+		config = SceneRouter.take_config()
 	var home_abbr: String = config.get("home", "KC")
 	var away_abbr: String = config.get("away", "PHI")
 	var quarter_min: float = config.get("quarter_minutes", Settings.quarter_minutes)
@@ -86,8 +89,7 @@ func _ready() -> void:
 	human = "" if watch or sim_games > 0 else home_abbr
 	memory = DefenseMemory.new(def_ai)
 	_build_scene(teams[home_abbr], teams[away_abbr])
-	lineups[home_abbr] = config.get("home_lineup", _generic_lineups(int(config.get("home_ovr", 78))))
-	lineups[away_abbr] = config.get("away_lineup", _generic_lineups(int(config.get("away_ovr", 78))))
+	_resolve_lineups(home_abbr, away_abbr)
 	gs = GameState.new(home_abbr, away_abbr, quarter_min * 60.0)
 	if sim_games > 0:
 		_run_sim_batch.call_deferred()
@@ -153,8 +155,38 @@ func _build_scene(home_team: TeamData, away_team: TeamData) -> void:
 	runner.play_ended.connect(_on_play_ended)
 
 
-## Placeholder lineups (Phase 4 replaces them with real roster cards): every slot gets
-## position-profile ratings at one OVR.
+## Lineups: config overrides; else your franchise cards (if home is your franchise) vs the
+## real opponent rescaled for difficulty; CPU vs CPU uses both teams' real rosters.
+func _resolve_lineups(home_abbr: String, away_abbr: String) -> void:
+	if config.has("home_lineup") and config.has("away_lineup"):
+		lineups[home_abbr] = config["home_lineup"]
+		lineups[away_abbr] = config["away_lineup"]
+		return
+	var prof: Profile = SaveManager.profile
+	if human != "" and prof.has_team() and prof.franchise_team == home_abbr and not prof.lineup.is_empty():
+		var mine := TeamRating.match_lineup(Collection.lineup_entries(prof, GameData.db))
+		var your_ovr := Collection.team_ovr(prof, GameData.db) + int(Collection.chemistry(prof, GameData.db))
+		mine["ovr"] = your_ovr
+		lineups[home_abbr] = mine
+		lineups[away_abbr] = GameData.opponent_lineup(away_abbr, your_ovr, int(config.get("difficulty", Settings.difficulty)))
+		return
+	lineups[home_abbr] = GameData.real_lineup(home_abbr)
+	lineups[away_abbr] = GameData.real_lineup(away_abbr)
+	# A/B balance runs: --home-ovr=90 --away-ovr=60 rescale the real rosters.
+	for arg in OS.get_cmdline_user_args():
+		for side in [["--home-ovr=", home_abbr], ["--away-ovr=", away_abbr]]:
+			if arg.begins_with(side[0]):
+				lineups[side[1]] = _rescaled(side[1], int(arg.get_slice("=", 1)))
+
+
+func _rescaled(abbr: String, ovr: int) -> Dictionary:
+	var entries := GameData.db.team_entries(abbr)
+	var out := TeamRating.match_lineup(TeamRating.rescale_entries(entries, TeamRating.team_ovr(entries), ovr))
+	out["ovr"] = ovr
+	return out
+
+
+## Placeholder lineups: every slot gets position-profile ratings at one OVR (tests/fallback).
 static func _generic_lineups(ovr: int) -> Dictionary:
 	var off := {}
 	var def := {}
@@ -349,6 +381,8 @@ func _ball_y() -> float:
 
 
 func _update_scorebug() -> void:
+	if human != "" and gs.score_diff(human) <= -10:
+		_comeback = true
 	var h: String = gs.home
 	var a: String = gs.away
 	# "*" marks the team with the ball.
@@ -405,7 +439,15 @@ func _on_special(action: String) -> void:
 				_update_scorebug()
 
 
+var _tagged: PlayerAgent = null
+
+
 func _process(delta: float) -> void:
+	# Name + number of the player you control.
+	var ctrl := runner.controlled if human != "" else null
+	if ctrl != _tagged:
+		_tagged = ctrl
+		hud.set_player_tag("" if ctrl == null else "#%d %s  %s" % [ctrl.jersey, ctrl.display_name, ctrl.pos_code])
 	# The play clock "runs" while the play is called: tick the runoff down in real time.
 	if phase == Phase.PLAY_CALL and _pending_runoff > 0.0 and not _sim():
 		var step := minf(_pending_runoff, delta * gs.clock.speed * 0.5)
@@ -629,7 +671,10 @@ func _on_choice(index: int) -> void:
 		Phase.PAUSED:
 			_on_pause_choice(index)
 		Phase.FINAL:
-			get_tree().reload_current_scene()
+			if config.get("from_hub", false):
+				SceneRouter.goto(SceneRouter.HUB, {"last_result": match_result()})
+			else:
+				get_tree().reload_current_scene()
 
 
 func _begin_two_point() -> void:
@@ -760,7 +805,21 @@ func _final() -> void:
 	var title := "FINAL" if w == "" else ("YOU WIN!" if w == human else ("%s WIN" % teams[w].team_name.to_upper()))
 	if human == "":
 		title = "FINAL"
-	hud.show_choice(title, _final_summary(), ["PLAY AGAIN"] as Array[String])
+	hud.show_choice(title, _final_summary(),
+			["CONTINUE" if config.get("from_hub", false) else "PLAY AGAIN"] as Array[String])
+
+
+## Summary handed back to the hub (rewards, season results).
+func match_result(forfeit := false) -> Dictionary:
+	var mine := human if human != "" else gs.home
+	var opp := gs.other(mine)
+	var s: Dictionary = gs.stats[mine]
+	return {"team": mine, "opponent": opp, "pf": int(gs.score[mine]), "pa": int(gs.score[opp]),
+			"forfeit": forfeit, "tds": int(s["pass_td"]) + int(s["rush_td"]),
+			"def_ints": int(gs.stats[opp]["int"]), "def_sacks": int(gs.stats[opp]["sacks"]),
+			"difficulty": int(config.get("difficulty", Settings.difficulty)),
+			"mode": str(config.get("mode", "quick")), "extra": config.get("extra", {}),
+			"came_back": _comeback}
 
 
 func _final_summary() -> String:
@@ -782,7 +841,8 @@ func _pause() -> void:
 	phase = Phase.PAUSED
 	runner.set_physics_process(false)
 	var opts: Array[String] = ["RESUME", "DEFENSE PACE: %s" % DefensePace.NAMES[pace],
-			"QUARTER: %.1f MIN (NEXT GAME)" % Settings.quarter_minutes, "RESTART GAME"]
+			"QUARTER: %.1f MIN (NEXT GAME)" % Settings.quarter_minutes,
+			"QUIT (FORFEIT)" if config.get("from_hub", false) else "RESTART GAME"]
 	hud.show_choice("PAUSED", "%s  ·  %s %d  %s %d" % [gs.clock.label(), gs.home, gs.score[gs.home], gs.away, gs.score[gs.away]], opts)
 
 
@@ -804,7 +864,10 @@ func _on_pause_choice(index: int) -> void:
 			_pause()
 			return
 		3:
-			get_tree().reload_current_scene()
+			if config.get("from_hub", false):
+				SceneRouter.goto(SceneRouter.HUB, {"last_result": match_result(true)})
+			else:
+				get_tree().reload_current_scene()
 			return
 	phase = _paused_from
 	runner.set_physics_process(true)
@@ -880,9 +943,10 @@ func _record_sim_game() -> void:
 func _print_sim_totals() -> void:
 	var t := _sim_totals
 	var teams_n := maxf(t["games"] * 2, 1)
-	print("AIVSAI %d games | %.1f pts/team (max %d, %d shutouts) | comp %.0f%% (%d/%d) | %.1f pass yds/team | %.2f INT/team | %.1f sacks/team | rush %.1f ypc, %.1f att/team | %.1f plays/team | FG %d/%d | %.1f punts/team | OT %d, ties %d | stuck plays %d" % [
+	print("AIVSAI %d games | %.1f pts/team (max %d, %d shutouts) | comp %.0f%% (%d/%d) | %.1f pass yds/team | %.2f INT/team | %.1f sacks/team | rush %.1f ypc, %.1f att/team | %.1f plays/team | FG %d/%d | %.1f punts/team | OT %d, ties %d | home wins %.0f%% | stuck plays %d" % [
 		t["games"], t["points"] / teams_n, t["max_pts"], t["shutouts"],
 		100.0 * t["pass_comp"] / maxf(t["pass_att"], 1), t["pass_comp"], t["pass_att"],
 		t["pass_yds"] / teams_n, t["int"] / teams_n, t["sacks"] / teams_n,
 		float(t["rush_yds"]) / maxf(t["rush_att"], 1), t["rush_att"] / teams_n, t["plays"] / teams_n,
-		t["fg_made"], t["fg_att"], t["punts"] / teams_n, t["ot"], t["ties"], t["watchdog"]])
+		t["fg_made"], t["fg_att"], t["punts"] / teams_n, t["ot"], t["ties"],
+		100.0 * t["home_wins"] / maxf(t["games"], 1), t["watchdog"]])
