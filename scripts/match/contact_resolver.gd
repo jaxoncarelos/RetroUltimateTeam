@@ -43,10 +43,17 @@ func _engage(b: PlayerAgent, d: PlayerAgent) -> void:
 	d.shed_timer = RatingModel.shed_time(t, b.attr("blk"), rush_rating(d), jitter)
 	if ctx.carrier != null and ctx.carrier != ctx.qb and not ctx.is_run_play():
 		d.shed_timer *= t.open_field_shed_mult
+	if _is_pass_pro():
+		d.shed_timer *= t.pass_shed_mult
 	if ctx.is_run_play():
 		d.shed_timer *= 1.0 - ctx.def_ai.shed_cut * ctx.key_level
 	if d == ctx.controlled and d.team == ctx.human_team:
 		d.shed_timer *= t.human_shed_mult   # your man fights off blocks fast
+
+
+## True while the offense protects a QB who still holds the ball on a pass play.
+func _is_pass_pro() -> bool:
+	return not ctx.is_run_play() and ctx.carrier == ctx.qb and not ctx.pass_thrown and not ctx.scrambling
 
 
 static func rush_rating(d: PlayerAgent) -> float:
@@ -80,8 +87,9 @@ func _hold(b: PlayerAgent, d: PlayerAgent, dt: float) -> void:
 	if d.shed_timer <= 0.0 or d.is_down or b.is_down or d == ctx.carrier:
 		b.engaged_with = null
 		d.engaged_with = null
-		d.block_cd = 0.8
-		b.block_cd = 0.6
+		var pro := _is_pass_pro()
+		d.block_cd = t.pass_rusher_cd if pro else 0.8
+		b.block_cd = t.pass_blocker_cd if pro else 0.6
 		return
 	var edge := rush_rating(d) - b.attr("blk")
 	var drift: Vector2

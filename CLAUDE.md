@@ -75,4 +75,5 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    back; settings screen; Franchise Chemistry boosts your players in matches; juice (hit
    shake, TD/turnover flash, synthesized SFX); first-game coach tips (Settings.tutorial_done).
    Not done: left-handed mode, iOS export, on-device perf pass, music.
+11. [x] Playtest round 2 (docs/ART_AND_PROTECTION_PLAN.md): slimmer helmet/longer-body sprites, Madden-style feet ring on the ball carrier (incl. QB), pass-pro blocks hold longer (`pass_shed_mult` etc.; base coverages ~5 s to sack, blitzes ~1.7 s).
 Next ideas (after the owner's playtest): see MORNING_NOTES.md.

@@ -40,23 +40,22 @@ const PAL := {
 
 ## Side-view helmet facing right: crown stripe, shine, ear hole, face opening and facemask.
 const HEAD := [
-	"..CCCCC...",
-	".HHHHHHWH.",
-	"HHHHHHHHWH",
-	"HHHHHHHVVM",
-	"hHHHHHVEsM",
-	".hHHHHSSSM",
-	"..hhhhsMM.",
+	"..CCCC..",
+	".HHHHWH.",
+	"HHHHHHHH",
+	"hHHHHVVM",
+	".hHHHSEM",
+	"..hhhMM.",
 ]
 ## Shoulder pads + jersey (three-quarter view) with a number patch and shoulder stripes.
 const TORSO := [
 	".rRRRRRRRR.",
 	"rRGRRRRRRGR",
-	"rRGRRRGGGRR",
-	"rRRRRRGgGRR",
-	"rrRRRRGGGRr",
-	".rRRRRRRRr.",
-	"..rrRRRRr..",
+	"rRGRRGGGRRR",
+	".rRRRGgGRr.",
+	".rRRRGGGRr.",
+	"..rRRRRRRr.",
+	"...rrRRRr..",
 ]
 const PELVIS := [
 	"yYYYYYYY",
@@ -64,8 +63,8 @@ const PELVIS := [
 ]
 
 ## Default placements (bob 0): torso top-left, head relative to torso, hip, shoulders.
-const TORSO_AT := Vector2i(8, 11)
-const HEAD_REL := Vector2i(2, -7)
+const TORSO_AT := Vector2i(8, 10)
+const HEAD_REL := Vector2i(2, -5)
 
 var img: Image
 var ox := 0

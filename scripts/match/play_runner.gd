@@ -625,14 +625,14 @@ func _process(_delta: float) -> void:
 
 
 ## Who is who at a glance: stars under your receivers until the ball is thrown, and an arrow
-## over the ball carrier (yellow = yours, red = theirs).
+## ring at the ball carrier's feet, QB included (yellow = yours, red = theirs).
 func _update_markers() -> void:
 	var human_off := human_team == PlayerAgent.Team.OFFENSE
 	var show_stars := human_off and (phase == Phase.PRE_SNAP or qb_is_passer())
 	for a in agents:
 		a.star = show_stars and a.is_eligible() and a != carrier
 		var mark := Color(0, 0, 0, 0)
-		if phase == Phase.LIVE and a == carrier and not qb_is_passer():
+		if (phase == Phase.LIVE and a == carrier) or (phase == Phase.PRE_SNAP and a == qb):
 			mark = Color("#ffec27") if a.team == human_team else Color("#ff4b4b")
 		a.arrow = mark
 
@@ -898,6 +898,7 @@ func _end_play(type: String, spot: Vector2, text: String) -> void:
 		"pass_thrown": pass_thrown,
 		"air_yards": ball.to.x - los_x if pass_thrown else 0.0,
 		"throw_kind": int(throw_plan.get("kind", -1)),
+		"time": play_time,
 	}
 	_set_spot(_pending_result, spot)
 

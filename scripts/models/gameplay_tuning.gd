@@ -112,6 +112,10 @@ extends Resource
 @export var shed_per_point := 0.035
 @export var shed_min := 0.5
 @export var shed_jitter := 0.35
+@export_subgroup("Pass protection")
+@export var pass_shed_mult := 1.9      ## pass-pro blocks hold this much longer while the QB still has the ball
+@export var pass_rusher_cd := 0.35     ## s a rusher who shed a pass block can't be re-engaged (run: 0.8)
+@export var pass_blocker_cd := 0.1     ## s before that blocker may pick up another rusher (run: 0.6)
 
 @export var fumble_base := 0.012      ## fumble chance per tackle at equal ratings
 @export var fumble_scale := 0.03       ## extra chance per 40 points of hit power over ball security

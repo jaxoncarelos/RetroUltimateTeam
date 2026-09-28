@@ -236,13 +236,17 @@ func _draw() -> void:
 				Color("#ffec27"), 1.0)
 	if highlight:
 		draw_arc(Vector2.ZERO, 11.0, 0.0, TAU, 24, Color("#ffec27"), 2.0)
-	draw_set_transform(Vector2.ZERO)
 	if arrow.a > 0.0:
-		var bob := roundf(sin(Time.get_ticks_msec() / 120.0) * 1.5)
-		var tip := Vector2(0, -30 + bob)
-		var tri := PackedVector2Array([tip, tip + Vector2(-5, -6), tip + Vector2(5, -6)])
-		draw_colored_polygon(tri, arrow)
-		draw_polyline(tri + PackedVector2Array([tip]), Color("#141018"), 1.0)
+		# Madden-style carrier ring at his feet: pulsing disc, dark rim, bright ring, ticks.
+		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 140.0)
+		var r := 12.0 + roundf(pulse * 1.5)
+		draw_circle(Vector2.ZERO, r, Color(arrow.r, arrow.g, arrow.b, 0.28 + 0.12 * pulse))
+		draw_arc(Vector2.ZERO, r + 1.0, 0.0, TAU, 32, Color("#141018"), 3.0)
+		draw_arc(Vector2.ZERO, r, 0.0, TAU, 32, arrow, 2.0)
+		for i in 4:
+			var d := Vector2.from_angle(i * PI / 2.0 + PI / 4.0)
+			draw_line(d * (r - 2.0), d * (r + 3.0), Color.WHITE, 1.5)
+	draw_set_transform(Vector2.ZERO)
 
 
 static func _star_points(outer: float, inner: float) -> PackedVector2Array:

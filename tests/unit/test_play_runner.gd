@@ -144,3 +144,27 @@ func test_draw_waits_before_the_handoff() -> void:
 	for i in 30:
 		runner._physics_process(DT)
 	assert_eq(runner.carrier, runner.qb, "still the QB's ball at 0.5s")
+
+
+func test_pocket_holds_against_base_coverage() -> void:
+	# A QB who never throws must survive long enough for deep routes to develop (3.5 s+).
+	for def_id in ["cover1", "cover3", "cover4"]:
+		for off_id in ["post_wheel", "deep_shot", "four_verts"]:
+			var off: PlayDef = null
+			var def: PlayDef = null
+			for p in off_book.plays:
+				if p.id == off_id:
+					off = p
+			for p in def_book.plays:
+				if p.id == def_id:
+					def = p
+			ended.clear()
+			runner.setup_play(off, def, 35.0, FieldGeo.CENTER_Y, _lineup(off.formation, 92), _lineup(def.formation, 88))
+			runner.snap()
+			for i in int(8.0 / DT):
+				runner._physics_process(DT)
+				if not ended.is_empty():
+					break
+			assert_false(ended.is_empty(), "%s vs %s never ended" % [off_id, def_id])
+			if not ended.is_empty() and ended[0]["type"] == "sack":
+				assert_gt(float(ended[0]["time"]), 3.5, "%s vs %s sacked too fast" % [off_id, def_id])
