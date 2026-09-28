@@ -24,11 +24,13 @@ extends Resource
 
 @export_group("Keyed defenders")
 @export var reaction_cut := 0.35       ## keyed defenders react this much faster at level 1
-@export var jump_blend := 0.5         ## how far coverage aims shift toward the next route point
+@export var jump_blend := 0.65         ## how far coverage aims shift toward the next route point
+@export var zone_shift := 0.8         ## zones slide this share of the way onto the repeated play's route points
+@export var zone_shift_reach := 10.0   ## …for route points within this many yards of the zone center
 @export var jump_reach := 3.0          ## extra yards a zone defender will leave his zone to jump a route
 @export var ball_react_extra := 3.0    ## extra yards of radius in which defenders break on a throw
-@export var int_bonus := 0.5           ## INT chance multiplier bonus at level 1
-@export var contest_bonus := 0.4       ## yards of head start defenders get racing to the ball
-@export var catch_contest_bonus := 0.15 ## added contest (0..1) on catches
+@export var int_bonus := 1.0           ## INT chance multiplier bonus at level 1
+@export var contest_bonus := 0.8       ## yards of head start defenders get racing to the ball
+@export var catch_contest_bonus := 0.35 ## added contest (0..1) on catches
 @export var rush_speed_bonus := 0.06   ## blitzers run faster vs a keyed run
 @export var shed_cut := 0.3           ## blocks hold this much shorter vs a keyed run

@@ -1,0 +1,57 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/def_dime.tres" id="1_o5yfo"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_oelq6"]
+
+[resource]
+script = ExtResource("2_oelq6")
+id = "prevent"
+display_name = "Prevent"
+side = "defense"
+category = "ZONE"
+formation = ExtResource("1_o5yfo")
+assignments = {
+"CB1": {
+"center": Vector2(22, -16),
+"size": Vector2(22, 16),
+"type": "zone"
+},
+"CB2": {
+"center": Vector2(22, 16),
+"size": Vector2(22, 16),
+"type": "zone"
+},
+"DL1": {
+"type": "rush"
+},
+"DL2": {
+"center": Vector2(5, 0),
+"size": Vector2(8, 12),
+"type": "zone"
+},
+"DL3": {
+"type": "rush"
+},
+"LB1": {
+"center": Vector2(11, -8),
+"size": Vector2(12, 14),
+"type": "zone"
+},
+"LB2": {
+"center": Vector2(11, 8),
+"size": Vector2(12, 14),
+"type": "zone"
+},
+"S1": {
+"center": Vector2(28, -6),
+"size": Vector2(24, 16),
+"type": "zone"
+},
+"S2": {
+"center": Vector2(28, 6),
+"size": Vector2(24, 16),
+"type": "zone"
+}
+}
+counters = PackedStringArray("DEEP")
+tags = PackedStringArray("prevent", "deep")

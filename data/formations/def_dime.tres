@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="FormationDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/formation_def.gd" id="1_vxm04"]
+
+[resource]
+script = ExtResource("1_vxm04")
+id = "def_dime"
+display_name = "Dime"
+side = "defense"
+slots = {
+"CB1": {
+"align": "WR1",
+"at": Vector2(10, 0),
+"pos": "CB"
+},
+"CB2": {
+"align": "WR2",
+"at": Vector2(10, 0),
+"pos": "CB"
+},
+"DL1": {
+"at": Vector2(1, -2),
+"pos": "DL"
+},
+"DL2": {
+"at": Vector2(1.5, 0),
+"pos": "DL"
+},
+"DL3": {
+"at": Vector2(1, 2),
+"pos": "DL"
+},
+"LB1": {
+"at": Vector2(8, -6),
+"pos": "LB"
+},
+"LB2": {
+"at": Vector2(8, 6),
+"pos": "LB"
+},
+"S1": {
+"at": Vector2(20, -8),
+"pos": "S"
+},
+"S2": {
+"at": Vector2(20, 8),
+"pos": "S"
+}
+}

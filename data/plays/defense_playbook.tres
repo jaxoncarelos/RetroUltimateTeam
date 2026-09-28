@@ -1,13 +1,19 @@
 [gd_resource type="Resource" script_class="PlaybookDef" format=3]
 
-[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="1_2api8"]
-[ext_resource type="Resource" path="res://data/plays/defense/cover1.tres" id="2_bxlqi"]
-[ext_resource type="Resource" path="res://data/plays/defense/cover2.tres" id="3_8wlcg"]
-[ext_resource type="Resource" path="res://data/plays/defense/cover3.tres" id="4_0kjcu"]
-[ext_resource type="Resource" path="res://data/plays/defense/lb_blitz.tres" id="5_qmtg7"]
-[ext_resource type="Script" path="res://scripts/models/playbook_def.gd" id="6_ccvsf"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="1_6k3in"]
+[ext_resource type="Resource" path="res://data/plays/defense/cover0.tres" id="2_thqjk"]
+[ext_resource type="Resource" path="res://data/plays/defense/cover1.tres" id="3_mp58y"]
+[ext_resource type="Resource" path="res://data/plays/defense/press.tres" id="4_3nylk"]
+[ext_resource type="Resource" path="res://data/plays/defense/cover2.tres" id="5_osy5l"]
+[ext_resource type="Resource" path="res://data/plays/defense/cover3.tres" id="6_ljhf2"]
+[ext_resource type="Resource" path="res://data/plays/defense/cover4.tres" id="7_vf7rw"]
+[ext_resource type="Resource" path="res://data/plays/defense/zone_blitz.tres" id="8_1o04m"]
+[ext_resource type="Resource" path="res://data/plays/defense/lb_blitz.tres" id="9_5a5kb"]
+[ext_resource type="Resource" path="res://data/plays/defense/prevent.tres" id="10_bvve5"]
+[ext_resource type="Resource" path="res://data/plays/defense/goal_line.tres" id="11_sok4l"]
+[ext_resource type="Script" path="res://scripts/models/playbook_def.gd" id="12_s7rti"]
 
 [resource]
-script = ExtResource("6_ccvsf")
-id = "defense_basic"
-plays = Array[ExtResource("1_2api8")]([ExtResource("2_bxlqi"), ExtResource("3_8wlcg"), ExtResource("4_0kjcu"), ExtResource("5_qmtg7")])
+script = ExtResource("12_s7rti")
+id = "defense_full"
+plays = Array[ExtResource("1_6k3in")]([ExtResource("2_thqjk"), ExtResource("3_mp58y"), ExtResource("4_3nylk"), ExtResource("5_osy5l"), ExtResource("6_ljhf2"), ExtResource("7_vf7rw"), ExtResource("8_1o04m"), ExtResource("9_5a5kb"), ExtResource("10_bvve5"), ExtResource("11_sok4l")])

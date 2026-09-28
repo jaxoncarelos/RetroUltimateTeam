@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_goal_line.tres" id="1_oqred"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_46ab8"]
+
+[resource]
+script = ExtResource("2_46ab8")
+id = "gl_power"
+display_name = "GL Power"
+category = "RUN"
+formation = ExtResource("1_oqred")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"mesh": Vector2(-2.4, 0.8),
+"to": "RB",
+"type": "handoff"
+},
+"RB": {
+"path": PackedVector2Array(2.5, 1.2, 5, 4.5, 14, 5.5),
+"type": "carry"
+},
+"TE": {
+"type": "block"
+},
+"WR1": {
+"type": "block"
+},
+"WR2": {
+"type": "block"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray("short_yardage", "goal_line")

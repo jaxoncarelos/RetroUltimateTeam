@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_goal_line.tres" id="1_3ynfh"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_a36u3"]
+
+[resource]
+script = ExtResource("2_a36u3")
+id = "qb_sneak"
+display_name = "QB Sneak"
+category = "RUN"
+formation = ExtResource("1_3ynfh")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"path": PackedVector2Array(3, 0, 10, 0),
+"type": "sneak"
+},
+"RB": {
+"type": "block"
+},
+"TE": {
+"type": "block"
+},
+"WR1": {
+"type": "block"
+},
+"WR2": {
+"type": "block"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray("short_yardage", "goal_line")

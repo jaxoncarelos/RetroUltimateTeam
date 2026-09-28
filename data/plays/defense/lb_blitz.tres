@@ -45,4 +45,4 @@ assignments = {
 }
 }
 counters = PackedStringArray("RUN")
-tags = PackedStringArray()
+tags = PackedStringArray("blitz")

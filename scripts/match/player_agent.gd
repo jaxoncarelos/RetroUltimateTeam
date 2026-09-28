@@ -41,6 +41,8 @@ var juke_dir := 0.0
 var dive_timer := 0.0
 var dive_recover := -1.0
 var throw_anim := 0.0
+var tackled_speed := 0.0   ## x speed at the moment of the tackle (fall-forward spot)
+var jam_timer := 0.0   ## seconds of slowed release (press coverage)
 var celebrating := false
 
 var highlight := false:
@@ -152,6 +154,9 @@ func step(dt: float, t: GameplayTuning) -> void:
 	if engaged_with != null:
 		return
 	var target_v := desired_dir * max_speed * throttle * speed_mult
+	if jam_timer > 0.0:
+		jam_timer -= dt
+		target_v *= t.press_jam_speed
 	if juke_timer > 0.0:
 		juke_timer -= dt
 		target_v.y = juke_dir * t.juke_speed

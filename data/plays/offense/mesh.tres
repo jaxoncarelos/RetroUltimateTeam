@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_trips.tres" id="1_hywuv"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_l8yxp"]
+
+[resource]
+script = ExtResource("2_l8yxp")
+id = "mesh"
+display_name = "Mesh"
+formation = ExtResource("1_hywuv")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"drop": 2.0,
+"type": "pass"
+},
+"RB": {
+"end": "continue",
+"path": PackedVector2Array(0, 3, 3, 8),
+"type": "route"
+},
+"TE": {
+"end": "continue",
+"path": PackedVector2Array(3, 0, 5, -8, 6, -24),
+"type": "route"
+},
+"WR1": {
+"end": "continue",
+"path": PackedVector2Array(2, 0, 4, 8, 5, 24),
+"type": "route"
+},
+"WR2": {
+"end": "sit",
+"path": PackedVector2Array(10, 0, 10, -6),
+"type": "route"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray("quick")

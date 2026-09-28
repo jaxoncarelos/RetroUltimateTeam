@@ -14,6 +14,37 @@ func resolve(dt: float) -> void:
 	_tackles()
 
 
+## Run plays: each blocker fires off the ball into the nearest free defender over him.
+func snap_engage() -> void:
+	var t := ctx.tuning
+	for b in ctx.offense:
+		if not (b.brain is BlockBrain) or b.pos_code not in ["OL", "TE"]:
+			continue
+		var best: PlayerAgent = null
+		var best_d := t.snap_engage_range
+		for d in ctx.defense:
+			if d.engaged_with != null or d.start_pos.x - ctx.los_x > 2.0:
+				continue
+			var dist := b.field_pos.distance_to(d.field_pos)
+			if dist < best_d:
+				best_d = dist
+				best = d
+		if best != null:
+			_engage(b, best)
+
+
+func _engage(b: PlayerAgent, d: PlayerAgent) -> void:
+	var t := ctx.tuning
+	b.engaged_with = d
+	d.engaged_with = b
+	var jitter := ctx.rng.randf_range(-1.0, 1.0)
+	d.shed_timer = RatingModel.shed_time(t, b.attr("blk"), rush_rating(d), jitter)
+	if ctx.carrier != null and ctx.carrier != ctx.qb and not ctx.is_run_play():
+		d.shed_timer *= t.open_field_shed_mult
+	if ctx.is_run_play():
+		d.shed_timer *= 1.0 - ctx.def_ai.shed_cut * ctx.key_level
+
+
 static func rush_rating(d: PlayerAgent) -> float:
 	return maxf(d.attr("prs"), d.attr("str") * 0.9)
 
@@ -29,15 +60,9 @@ func _blocks(dt: float) -> void:
 		for d in ctx.defense:
 			if d == ctx.carrier or d.engaged_with != null or not d.can_act() or d.block_cd > 0.0:
 				continue
-			if b.field_pos.distance_to(d.field_pos) < t.engage_range:
-				b.engaged_with = d
-				d.engaged_with = b
-				var jitter := ctx.rng.randf_range(-1.0, 1.0)
-				d.shed_timer = RatingModel.shed_time(t, b.attr("blk"), rush_rating(d), jitter)
-				if ctx.carrier != null and ctx.carrier != ctx.qb:
-					d.shed_timer *= t.open_field_shed_mult
-				if ctx.is_run_play():
-					d.shed_timer *= 1.0 - ctx.def_ai.shed_cut * ctx.key_level
+			var reach := t.run_engage_range if ctx.is_run_play() else t.engage_range
+			if b.field_pos.distance_to(d.field_pos) < reach:
+				_engage(b, d)
 				break
 
 

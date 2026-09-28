@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_trips.tres" id="1_jy7lp"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_vwc08"]
+
+[resource]
+script = ExtResource("2_vwc08")
+id = "flood"
+display_name = "Flood"
+category = "DEEP"
+formation = ExtResource("1_jy7lp")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"drop": 3.0,
+"type": "pass"
+},
+"RB": {
+"end": "continue",
+"path": PackedVector2Array(0, 5, 3, 15),
+"type": "route"
+},
+"TE": {
+"end": "continue",
+"path": PackedVector2Array(12, 0, 13, 6),
+"type": "route"
+},
+"WR1": {
+"end": "continue",
+"path": PackedVector2Array(12, 0, 14, 12),
+"type": "route"
+},
+"WR2": {
+"end": "continue",
+"path": PackedVector2Array(30, 0),
+"type": "route"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray()

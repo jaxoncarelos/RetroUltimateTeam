@@ -28,18 +28,39 @@ func _draw() -> void:
 		if runner.phase == PlayRunner.Phase.PRE_SNAP:
 			_draw_routes()
 	else:
+		if runner.phase == PlayRunner.Phase.PRE_SNAP and runner.human_team == PlayerAgent.Team.OFFENSE:
+			_draw_snap_hint()
 		if aim_active and runner.qb_is_passer():
 			_draw_aim()
 		if show_landing and runner.ball.state == Ball.State.AIR:
 			_draw_reticle(FieldProjection.to_screen(runner.ball.to), RETICLE_COLOR, 0.5 + 0.5 * sin(Time.get_ticks_msec() / 90.0))
 
 
+## Pre-snap: a pulsing grab ring on the QB with a "pull back" chevron trail behind him.
+func _draw_snap_hint() -> void:
+	if runner.qb == null:
+		return
+	var c := FieldProjection.to_screen(runner.qb.field_pos).round() + Vector2(0, -8)
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 160.0)
+	draw_arc(c, 13.0 + pulse * 3.0, 0.0, TAU, 20, Color(RETICLE_COLOR, 0.45 + 0.4 * pulse), 1.0)
+	if runner.is_run_play():
+		return
+	var shift := int(Time.get_ticks_msec() / 90) % 6
+	for i in 3:
+		var x := c.x - 20.0 - i * 7.0 - shift
+		var a := Color(AIM_COLOR, 0.8 - i * 0.22)
+		# "<" chevron: pull the QB back to aim.
+		draw_rect(Rect2(x, c.y - 1, 2, 2), a)
+		draw_rect(Rect2(x + 2, c.y - 3, 2, 2), a)
+		draw_rect(Rect2(x + 2, c.y + 1, 2, 2), a)
+
+
 func _draw_routes() -> void:
 	for a in runner.offense:
 		var t := str(a.assignment.get("type", ""))
-		if t != "route" and t != "carry":
+		if t != "route" and t != "carry" and t != "sneak":
 			continue
-		var color := RUN_COLOR if t == "carry" else ROUTE_COLOR
+		var color := ROUTE_COLOR if t == "route" else RUN_COLOR
 		var prev := FieldProjection.to_screen(a.start_pos)
 		var path: PackedVector2Array = a.assignment.get("path", PackedVector2Array())
 		for p in path:

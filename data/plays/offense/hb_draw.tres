@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_shotgun.tres" id="1_eik65"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_yeoab"]
+
+[resource]
+script = ExtResource("2_yeoab")
+id = "hb_draw"
+display_name = "HB Draw"
+category = "RUN"
+formation = ExtResource("1_eik65")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"delay": 0.5,
+"mesh": Vector2(-5.6, 0.9),
+"to": "RB",
+"type": "handoff"
+},
+"RB": {
+"delay": 0.45,
+"path": PackedVector2Array(-1.4, -0.6, 3, -1.6, 16, -1.6),
+"type": "carry"
+},
+"TE": {
+"type": "block"
+},
+"WR1": {
+"end": "continue",
+"path": PackedVector2Array(14, 0),
+"type": "route"
+},
+"WR2": {
+"end": "continue",
+"path": PackedVector2Array(14, 0),
+"type": "route"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray("draw")

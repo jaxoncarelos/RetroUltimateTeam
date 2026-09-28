@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_singleback.tres" id="1_argng"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_3dw6j"]
+
+[resource]
+script = ExtResource("2_3dw6j")
+id = "toss"
+display_name = "Toss Stretch"
+category = "RUN"
+formation = ExtResource("1_argng")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"mesh": Vector2(-2.6, 1.4),
+"range": 4.5,
+"to": "RB",
+"type": "handoff"
+},
+"RB": {
+"path": PackedVector2Array(1.5, 3, 4, 7, 8, 9, 22, 10),
+"type": "carry"
+},
+"TE": {
+"type": "block"
+},
+"WR1": {
+"type": "block"
+},
+"WR2": {
+"type": "block"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray("outside")

@@ -103,6 +103,16 @@ static func tackle_prob(t: GameplayTuning, tak: float, elu: float, carrier_str: 
 	return clampf(p, t.tackle_min, t.tackle_max)
 
 
+## Seconds a pressed receiver is slowed at the line.
+static func press_jam(t: GameplayTuning, cov: float, rte: float) -> float:
+	return clampf(t.press_jam_base + (cov - rte) * t.press_jam_per_point, 0.1, t.press_jam_max)
+
+
+## Seconds an underneath defender bites on a play-action fake (smart defenders bite less).
+static func pa_bite(t: GameplayTuning, awr: float) -> float:
+	return t.pa_bite_time * (1.0 - 0.6 * clampf((awr - 60.0) / 39.0, 0.0, 1.0))
+
+
 ## Seconds a block holds before the defender sheds it.
 static func shed_time(t: GameplayTuning, blk: float, rush: float, jitter: float) -> float:
 	return maxf(t.shed_min, t.shed_base + (blk - rush) * t.shed_per_point + jitter * t.shed_jitter)

@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="FormationDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/formation_def.gd" id="1_idsm5"]
+
+[resource]
+script = ExtResource("1_idsm5")
+id = "def_nickel"
+display_name = "Nickel"
+side = "defense"
+slots = {
+"CB1": {
+"align": "WR1",
+"at": Vector2(7, 0),
+"pos": "CB"
+},
+"CB2": {
+"align": "WR2",
+"at": Vector2(7, 0),
+"pos": "CB"
+},
+"DL1": {
+"at": Vector2(1, -2.5),
+"pos": "DL"
+},
+"DL2": {
+"at": Vector2(1, 0),
+"pos": "DL"
+},
+"DL3": {
+"at": Vector2(1, 2.5),
+"pos": "DL"
+},
+"LB1": {
+"at": Vector2(5, -2),
+"pos": "LB"
+},
+"LB2": {
+"align": "TE",
+"at": Vector2(4, 0),
+"pos": "LB"
+},
+"S1": {
+"at": Vector2(14, -9),
+"pos": "S"
+},
+"S2": {
+"at": Vector2(14, 9),
+"pos": "S"
+}
+}

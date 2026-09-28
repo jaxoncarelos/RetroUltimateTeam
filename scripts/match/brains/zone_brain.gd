@@ -4,6 +4,7 @@ extends Brain
 
 var zone: Rect2
 var aim := Vector2.ZERO
+var bite := 0.0   ## seconds spent stepping up on a play-action fake
 
 
 func _init(p_agent: PlayerAgent, p_ctx: PlayRunner, center_rel: Vector2, size: Vector2) -> void:
@@ -11,6 +12,12 @@ func _init(p_agent: PlayerAgent, p_ctx: PlayRunner, center_rel: Vector2, size: V
 	var c := Vector2(ctx.los_x + center_rel.x, clampf(ctx.ball_y + center_rel.y, 2.0, FieldGeo.WIDTH - 2.0))
 	zone = Rect2(c - size * 0.5, size)
 	aim = c
+
+
+## Keyed defense: slide the zone toward where the repeated play's receivers will be.
+func shift_zone(offset: Vector2) -> void:
+	zone.position += offset
+	aim += offset
 
 
 func think() -> void:
@@ -33,7 +40,11 @@ func think() -> void:
 		aim = zone.get_center()
 
 
-func act(_dt: float) -> void:
+func act(dt: float) -> void:
+	if bite > 0.0:
+		bite -= dt
+		agent.move_to(Vector2(ctx.los_x + 1.0, agent.field_pos.y), 1.0, false)
+		return
 	agent.move_to(aim, 0.9, true)
 
 

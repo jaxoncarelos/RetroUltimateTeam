@@ -26,9 +26,12 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 ### Controls (touch, or mouse on desktop)
 | When | Gesture |
 |---|---|
-| Play call | tap a play card, then tap the field to snap |
+| Play call | the situational **BEST** call is preselected; tap another card or **MORE** for the full playbook (18 offense plays) |
+| Snap (pass) | press on the **QB** and keep dragging: **back** = aim (slingshot), release to throw · **forward** = scramble. A tap anywhere also snaps |
+| Snap (run) | press on the QB to snap; keep holding and drag up/down to steer once you have the ball |
 | QB with the ball | drag **back** (slingshot) to aim, release to throw · drag **forward** to scramble |
-| Ball carrier | runs forward on his own · hold + drag up/down to steer · drag back to slow |
+| Ball carrier | follows the play's lane on his own · hold + drag up/down to steer · drag back to slow |
+| CPU defense | learns your tendencies: repeat a play and it gets **keyed** (red "DEFENSE IS KEYING ON …" warning) |
 | | flick up/down = juke · double-tap = dive |
 | Keyboard | `R` restarts the drive |
 
@@ -37,6 +40,9 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 godot --path . -- --autoplay          # CPU calls plays and throws; watch a drive
 godot --headless --path . -- --sim=300 # 300 autoplay plays at 4x, prints stats, quits
 godot --headless --path . -- --sim=80 --verbose   # plus one line per play
+godot --headless --path . -- --sim=1000 --smart    # CPU calls plays situationally (PlayAdvisor)
+godot --headless --path . -- --sim=1000 --spam=mesh  # always call one play (defense keys on it)
+godot --headless --path . -- --sim=1000 --by-play --nokey  # per-play averages, no defensive memory
 ```
 
 ## Tests

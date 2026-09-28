@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/def_goal_line.tres" id="1_62lbn"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_ouupb"]
+
+[resource]
+script = ExtResource("2_ouupb")
+id = "goal_line"
+display_name = "Goal Line"
+side = "defense"
+category = "BLITZ"
+formation = ExtResource("1_62lbn")
+assignments = {
+"CB1": {
+"press": true,
+"target": "WR1",
+"type": "man"
+},
+"CB2": {
+"press": true,
+"target": "WR2",
+"type": "man"
+},
+"DL1": {
+"type": "rush"
+},
+"DL2": {
+"type": "rush"
+},
+"DL3": {
+"type": "rush"
+},
+"LB1": {
+"type": "rush"
+},
+"LB2": {
+"type": "rush"
+},
+"S1": {
+"target": "TE",
+"type": "man"
+},
+"S2": {
+"center": Vector2(3, 0),
+"size": Vector2(6, 16),
+"type": "zone"
+}
+}
+counters = PackedStringArray("RUN")
+tags = PackedStringArray("goal_line")

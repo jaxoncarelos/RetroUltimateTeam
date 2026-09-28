@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/def_base.tres" id="1_llgc5"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_8lx3q"]
+
+[resource]
+script = ExtResource("2_8lx3q")
+id = "cover0"
+display_name = "Cover 0 Blitz"
+side = "defense"
+category = "BLITZ"
+formation = ExtResource("1_llgc5")
+assignments = {
+"CB1": {
+"press": true,
+"target": "WR1",
+"type": "man"
+},
+"CB2": {
+"press": true,
+"target": "WR2",
+"type": "man"
+},
+"DL1": {
+"type": "rush"
+},
+"DL2": {
+"type": "rush"
+},
+"DL3": {
+"type": "rush"
+},
+"LB1": {
+"type": "rush"
+},
+"LB2": {
+"type": "rush"
+},
+"S1": {
+"target": "TE",
+"type": "man"
+},
+"S2": {
+"target": "RB",
+"type": "man"
+}
+}
+counters = PackedStringArray("RUN", "SHORT")
+tags = PackedStringArray("blitz")

@@ -6,6 +6,16 @@ signal play_selected(play: PlayDef)
 signal restart_pressed
 
 const WARN_COLOR := Color("#ff004d")
+const BAR_SIZE := 4
+
+var _all_plays: Array[PlayDef] = []
+var _bar_plays: Array[PlayDef] = []
+var _best: PlayDef
+var _selected: PlayDef
+var _keyed_id := ""
+var _grid: PanelContainer
+var _grid_rows: VBoxContainer
+var _grid_buttons: Dictionary = {}
 
 var _down_label: Label
 var _drive_label: Label
@@ -55,7 +65,7 @@ func _ready() -> void:
 	root.add_child(_banner_sub)
 
 	_hint = Label.new()
-	_anchor(_hint, Vector2(0.5, 1.0), Rect2(-240, -46, 480, 10))
+	_anchor(_hint, Vector2(0.5, 1.0), Rect2(-240, -56, 480, 10))
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_hint)
@@ -80,6 +90,31 @@ func _ready() -> void:
 	_play_bar.add_theme_constant_override("separation", 3)
 	root.add_child(_play_bar)
 
+	_grid = PanelContainer.new()
+	_anchor(_grid, Vector2(0.5, 0.5), Rect2(-230, -100, 460, 150))
+	_grid.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_grid.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_grid.visible = false
+	root.add_child(_grid)
+	var grid_box := VBoxContainer.new()
+	grid_box.add_theme_constant_override("separation", 3)
+	_grid.add_child(grid_box)
+	var grid_head := HBoxContainer.new()
+	grid_box.add_child(grid_head)
+	var grid_title := Label.new()
+	grid_title.text = "PLAYBOOK"
+	grid_title.add_theme_color_override("font_color", UiTheme.ACCENT)
+	grid_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid_head.add_child(grid_title)
+	var close := Button.new()
+	close.text = "BACK"
+	close.custom_minimum_size = Vector2(44, 16)
+	close.pressed.connect(func() -> void: _grid.visible = false)
+	grid_head.add_child(close)
+	_grid_rows = VBoxContainer.new()
+	_grid_rows.add_theme_constant_override("separation", 2)
+	grid_box.add_child(_grid_rows)
+
 	_restart = Button.new()
 	_restart.text = "NEW DRIVE"
 	_anchor(_restart, Vector2(0.5, 0.5), Rect2(-48, 10, 96, 24))
@@ -99,45 +134,143 @@ static func _anchor(c: Control, anchor: Vector2, r: Rect2) -> void:
 	c.offset_bottom = r.end.y
 
 
+## Offers plays: the bar shows the top BAR_SIZE of `ranked` (first = "BEST", preselected
+## by the caller) plus a MORE button that opens the full playbook grid of `all`.
+func set_play_options(ranked: Array[PlayDef], all: Array[PlayDef]) -> void:
+	_all_plays = all
+	_best = ranked[0] if not ranked.is_empty() else null
+	_bar_plays = ranked.slice(0, BAR_SIZE)
+	_rebuild_bar()
+	_rebuild_grid()
+
+
+## Back-compat: every play on the bar, no ranking.
 func set_playbook(plays: Array[PlayDef]) -> void:
-	for c in _play_bar.get_children():
-		c.queue_free()
-	_buttons.clear()
-	for p in plays:
-		var b := Button.new()
-		b.text = "%s\n%s" % [p.display_name.to_upper(), p.category]
-		b.custom_minimum_size = Vector2(62, 24)
-		b.toggle_mode = true
-		b.pressed.connect(func() -> void: play_selected.emit(p))
-		_play_bar.add_child(b)
-		_buttons[p] = b
-	# Re-center after the container sizes itself.
-	_play_bar.reset_size.call_deferred()
+	set_play_options(plays, plays)
 
 
 func set_selected(play: PlayDef) -> void:
+	_selected = play
+	if play != null and play not in _bar_plays:
+		# A pick from the grid replaces the last card so the call is always visible.
+		if _bar_plays.size() >= BAR_SIZE:
+			_bar_plays[BAR_SIZE - 1] = play
+		else:
+			_bar_plays.append(play)
+		_rebuild_bar()
 	for p in _buttons:
 		_buttons[p].button_pressed = p == play
+	for p in _grid_buttons:
+		_grid_buttons[p].button_pressed = p == play
 
 
 ## Warns that the CPU defense is keying on a play and marks that play's card ("" clears).
-func set_keyed(plays: Array[PlayDef], keyed_id: String) -> void:
+func set_keyed(_plays: Array[PlayDef], keyed_id: String) -> void:
+	_keyed_id = keyed_id
 	var keyed_name := ""
-	for p in plays:
-		if not _buttons.has(p):
-			continue
-		var b: Button = _buttons[p]
-		var hot := p.id == keyed_id
-		b.text = "%s%s\n%s" % ["! " if hot else "", p.display_name.to_upper(), p.category]
-		b.add_theme_color_override("font_color", WARN_COLOR if hot else UiTheme.TEXT)
-		if hot:
+	for p in _all_plays:
+		if p.id == keyed_id:
 			keyed_name = p.display_name.to_upper()
+	_refresh_card_texts()
 	_warning.text = "DEFENSE IS KEYING ON %s" % keyed_name
 	_warning.visible = keyed_name != ""
 
 
+func show_playbook_grid(on: bool) -> void:
+	_grid.visible = on
+
+
 func show_play_bar(on: bool) -> void:
 	_play_bar.visible = on
+	if not on:
+		_grid.visible = false
+
+
+## Compact cards (grid) show only the name; bar cards add the category.
+func _style_card(b: Button, p: PlayDef) -> void:
+	var name := ("! " if p.id == _keyed_id else "") + p.display_name.to_upper()
+	b.text = name if b.get_meta("compact", false) else "%s\n%s" % [name, p.category]
+	b.add_theme_color_override("font_color", WARN_COLOR if p.id == _keyed_id else UiTheme.TEXT)
+
+
+func _refresh_card_texts() -> void:
+	for p in _buttons:
+		_style_card(_buttons[p], p)
+	for p in _grid_buttons:
+		_style_card(_grid_buttons[p], p)
+
+
+func _make_card(p: PlayDef, size: Vector2, compact := false) -> Button:
+	var b := Button.new()
+	b.set_meta("compact", compact)
+	b.custom_minimum_size = size
+	b.toggle_mode = true
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b.clip_text = false
+	_style_card(b, p)
+	b.pressed.connect(func() -> void:
+		_grid.visible = false
+		play_selected.emit(p))
+	return b
+
+
+func _rebuild_bar() -> void:
+	for c in _play_bar.get_children():
+		_play_bar.remove_child(c)
+		c.queue_free()
+	_buttons.clear()
+	for p in _bar_plays:
+		var b := _make_card(p, Vector2(78, 28))
+		b.button_pressed = p == _selected
+		_play_bar.add_child(b)
+		_buttons[p] = b
+		if p == _best:
+			var tag := Label.new()
+			tag.text = "BEST"
+			tag.add_theme_color_override("font_color", UiTheme.INK)
+			var sb := StyleBoxFlat.new()
+			sb.bg_color = UiTheme.ACCENT
+			sb.set_content_margin_all(1)
+			tag.add_theme_stylebox_override("normal", sb)
+			tag.position = Vector2(2, -10)
+			tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			b.add_child(tag)
+	var more := Button.new()
+	more.text = "MORE\n..."
+	more.custom_minimum_size = Vector2(40, 28)
+	more.pressed.connect(func() -> void: _grid.visible = not _grid.visible)
+	_play_bar.add_child(more)
+	# Re-center after the container sizes itself.
+	_play_bar.reset_size.call_deferred()
+
+
+func _rebuild_grid() -> void:
+	for c in _grid_rows.get_children():
+		_grid_rows.remove_child(c)
+		c.queue_free()
+	_grid_buttons.clear()
+	var cats: Array[String] = []
+	for p in _all_plays:
+		if p.category not in cats:
+			cats.append(p.category)
+	for cat in cats:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 2)
+		var lbl := Label.new()
+		lbl.text = cat
+		lbl.custom_minimum_size = Vector2(34, 0)
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.add_theme_color_override("font_color", UiTheme.ACCENT)
+		row.add_child(lbl)
+		for p in _all_plays:
+			if p.category != cat:
+				continue
+			var b := _make_card(p, Vector2(56, 28), true)
+			b.button_pressed = p == _selected
+			row.add_child(b)
+			_grid_buttons[p] = b
+		_grid_rows.add_child(row)
+	_grid.reset_size.call_deferred()
 
 
 func show_restart(on: bool) -> void:
@@ -177,6 +310,8 @@ func _process(delta: float) -> void:
 func is_point_over_ui(p: Vector2) -> bool:
 	if _restart.visible and _restart.get_global_rect().has_point(p):
 		return true
+	if _grid.visible:
+		return true   # the playbook grid is modal
 	if _play_bar.visible:
 		for b in _play_bar.get_children():
 			if b is Control and b.get_global_rect().has_point(p):

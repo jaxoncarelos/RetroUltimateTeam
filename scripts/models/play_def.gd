@@ -1,12 +1,14 @@
 class_name PlayDef
 extends Resource
 ## One play call. Assignments map slot -> behavior dictionary:
-##   offense: {"type": "pass"}                         QB drops back (drop = yards)
-##            {"type": "handoff", "to": "RB", "mesh": Vector2}   QB hands off at mesh (rel. ball)
-##            {"type": "route", "path": PackedVector2Array, "end": "continue"|"sit"}
-##            {"type": "carry", "path": PackedVector2Array}      runner path; takes the handoff
+##   offense: {"type": "pass", "drop": 3.0, "fake": true}   QB drops back; fake = play action
+##            {"type": "handoff", "to": "RB", "mesh": Vector2, "delay": s, "range": yd}
+##                                                            QB hands off (range > 2 = pitch)
+##            {"type": "sneak", "path": PackedVector2Array}  QB keeps it (runner from the snap)
+##            {"type": "route", "path": PackedVector2Array, "end": "continue"|"sit", "delay": s}
+##            {"type": "carry", "path": PackedVector2Array, "delay": s}  runner path; takes the handoff
 ##            {"type": "block"}
-##   defense: {"type": "rush"} | {"type": "man", "target": "WR1"}
+##   defense: {"type": "rush"} | {"type": "man", "target": "WR1", "press": true}
 ##            {"type": "zone", "center": Vector2, "size": Vector2}  (rel. ball, x = depth)
 ## Route/carry paths are waypoints relative to the player's alignment.
 

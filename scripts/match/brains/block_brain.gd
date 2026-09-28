@@ -15,12 +15,16 @@ func _init(p_agent: PlayerAgent, p_ctx: PlayRunner, p_mode := "pass") -> void:
 
 
 func think() -> void:
+	# Run blocks are sticky: keep driving the man you picked until he is free of you and gone.
+	if mode == "run" and target != null and not target.is_down and target.engaged_with == null \
+			and target.field_pos.distance_to(agent.field_pos) < 9.0:
+		return
 	target = null
 	var best := INF
 	var focus := agent.field_pos
 	if mode == "escort" and ctx.carrier != null:
 		focus = ctx.carrier.field_pos
-	var reach := 4.5 if mode == "pass" else (5.0 if mode == "escort" else 7.0)
+	var reach := 4.5 if mode == "pass" else (8.0 if mode == "escort" else 7.0)
 	for d in ctx.defense:
 		if d.is_down or d.engaged_with != null or d.block_cd > 0.0:
 			continue

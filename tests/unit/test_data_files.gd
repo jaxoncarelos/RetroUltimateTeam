@@ -75,3 +75,39 @@ func test_defense_playbook_man_targets_exist() -> void:
 			var a: Dictionary = p.assignments[slot]
 			if a.get("type") == "man":
 				assert_has(off_slots, a.get("target"), "%s %s man target" % [p.id, slot])
+
+
+func test_playbook_sizes_and_variety() -> void:
+	var off: PlaybookDef = load("res://data/plays/offense_playbook.tres")
+	var def: PlaybookDef = load("res://data/plays/defense_playbook.tres")
+	assert_gte(off.plays.size(), 16)
+	assert_gte(def.plays.size(), 8)
+	var forms := {}
+	var cats := {}
+	var ids := {}
+	for p in off.plays:
+		forms[p.formation.id] = true
+		cats[p.category] = true
+		assert_false(ids.has(p.id), "duplicate play id %s" % p.id)
+		ids[p.id] = true
+	assert_gte(forms.size(), 5, "offensive formations")
+	assert_eq(cats.size(), 3, "RUN/SHORT/DEEP all present")
+	for p in def.plays:
+		assert_false(p.counters.is_empty(), "%s should counter something" % p.id)
+
+
+func test_offense_formations_share_lineup_slots() -> void:
+	var off: PlaybookDef = load("res://data/plays/offense_playbook.tres")
+	var def: PlaybookDef = load("res://data/plays/defense_playbook.tres")
+	var o_slots := off.plays[0].formation.slots.keys()
+	o_slots.sort()
+	for p in off.plays:
+		var k := p.formation.slots.keys()
+		k.sort()
+		assert_eq(k, o_slots, p.id)
+	var d_slots := def.plays[0].formation.slots.keys()
+	d_slots.sort()
+	for p in def.plays:
+		var k := p.formation.slots.keys()
+		k.sort()
+		assert_eq(k, d_slots, p.id)

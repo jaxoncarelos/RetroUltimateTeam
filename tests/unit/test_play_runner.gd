@@ -90,3 +90,57 @@ func test_aim_point_clamped_to_throw_range() -> void:
 	var max_d := RatingModel.max_throw_distance(runner.tuning, runner.qb.attr("thp"))
 	assert_almost_eq(runner.qb.field_pos.distance_to(target), max_d, 0.01)
 	assert_gt(target.x, runner.qb.field_pos.x, "pulling left throws downfield")
+
+
+func _find(book: PlaybookDef, id: String) -> PlayDef:
+	for p in book.plays:
+		if p.id == id:
+			return p
+	return null
+
+
+func test_every_run_play_gets_the_ball_to_its_runner() -> void:
+	for off in off_book.plays:
+		if not off.is_run():
+			continue
+		runner.setup_play(off, def_book.plays[0], 35.0, FieldGeo.CENTER_Y, {}, {})
+		runner.snap()
+		for i in 100:
+			runner._physics_process(DT)
+		var expected := "QB" if off.assignments["QB"]["type"] == "sneak" else "RB"
+		assert_not_null(runner.carrier, off.id)
+		if runner.carrier != null:
+			assert_eq(runner.carrier.slot, expected, "%s runner" % off.id)
+
+
+func test_qb_sneak_is_a_run_not_a_sack() -> void:
+	runner.setup_play(_find(off_book, "qb_sneak"), _find(def_book, "goal_line"), 35.0, FieldGeo.CENTER_Y, {}, {})
+	runner.snap()
+	assert_eq(runner.carrier, runner.qb)
+	assert_false(runner.qb_is_passer())
+
+
+func test_press_coverage_jams_the_receiver() -> void:
+	runner.setup_play(_find(off_book, "slants"), _find(def_book, "press"), 35.0, FieldGeo.CENTER_Y, {}, {})
+	var wr: PlayerAgent = runner.off_slots["WR1"]
+	var cb: PlayerAgent = runner.def_slots["CB1"]
+	assert_almost_eq(cb.field_pos.distance_to(wr.field_pos), runner.tuning.press_depth, 0.01)
+	runner.snap()
+	assert_gt(wr.jam_timer, 0.0)
+
+
+func test_play_action_makes_underneath_zones_bite() -> void:
+	runner.setup_play(_find(off_book, "pa_cross"), _find(def_book, "cover3"), 35.0, FieldGeo.CENTER_Y, {}, {})
+	runner.snap()
+	var lb: PlayerAgent = runner.def_slots["LB1"]
+	assert_gt((lb.brain as ZoneBrain).bite, 0.0)
+	var deep: PlayerAgent = runner.def_slots["S1"]
+	assert_eq((deep.brain as ZoneBrain).bite, 0.0)
+
+
+func test_draw_waits_before_the_handoff() -> void:
+	runner.setup_play(_find(off_book, "hb_draw"), def_book.plays[0], 35.0, FieldGeo.CENTER_Y, {}, {})
+	runner.snap()
+	for i in 30:
+		runner._physics_process(DT)
+	assert_eq(runner.carrier, runner.qb, "still the QB's ball at 0.5s")

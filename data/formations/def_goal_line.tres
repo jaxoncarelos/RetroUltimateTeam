@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="FormationDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/formation_def.gd" id="1_ibjmp"]
+
+[resource]
+script = ExtResource("1_ibjmp")
+id = "def_goal_line"
+display_name = "Goal Line"
+side = "defense"
+slots = {
+"CB1": {
+"align": "WR1",
+"at": Vector2(2.5, 0),
+"pos": "CB"
+},
+"CB2": {
+"align": "WR2",
+"at": Vector2(2.5, 0),
+"pos": "CB"
+},
+"DL1": {
+"at": Vector2(1, -3),
+"pos": "DL"
+},
+"DL2": {
+"at": Vector2(1, 0),
+"pos": "DL"
+},
+"DL3": {
+"at": Vector2(1, 3),
+"pos": "DL"
+},
+"LB1": {
+"at": Vector2(3, -4),
+"pos": "LB"
+},
+"LB2": {
+"at": Vector2(3, 4),
+"pos": "LB"
+},
+"S1": {
+"at": Vector2(5, -2),
+"pos": "S"
+},
+"S2": {
+"at": Vector2(5, 3),
+"pos": "S"
+}
+}

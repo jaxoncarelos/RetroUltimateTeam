@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/def_nickel.tres" id="1_hjqsp"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_t8a76"]
+
+[resource]
+script = ExtResource("2_t8a76")
+id = "cover4"
+display_name = "Cover 4"
+side = "defense"
+category = "ZONE"
+formation = ExtResource("1_hjqsp")
+assignments = {
+"CB1": {
+"center": Vector2(16, -17),
+"size": Vector2(22, 13),
+"type": "zone"
+},
+"CB2": {
+"center": Vector2(16, 17),
+"size": Vector2(22, 13),
+"type": "zone"
+},
+"DL1": {
+"type": "rush"
+},
+"DL2": {
+"type": "rush"
+},
+"DL3": {
+"type": "rush"
+},
+"LB1": {
+"center": Vector2(6, -5),
+"size": Vector2(9, 12),
+"type": "zone"
+},
+"LB2": {
+"center": Vector2(6, 5),
+"size": Vector2(9, 12),
+"type": "zone"
+},
+"S1": {
+"center": Vector2(17, -6),
+"size": Vector2(22, 12),
+"type": "zone"
+},
+"S2": {
+"center": Vector2(17, 6),
+"size": Vector2(22, 12),
+"type": "zone"
+}
+}
+counters = PackedStringArray("DEEP")
+tags = PackedStringArray("deep")

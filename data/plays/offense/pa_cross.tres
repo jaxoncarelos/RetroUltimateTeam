@@ -24,6 +24,7 @@ assignments = {
 },
 "QB": {
 "drop": 4.0,
+"fake": true,
 "type": "pass"
 },
 "RB": {
@@ -48,4 +49,4 @@ assignments = {
 }
 }
 counters = PackedStringArray()
-tags = PackedStringArray()
+tags = PackedStringArray("play_action")

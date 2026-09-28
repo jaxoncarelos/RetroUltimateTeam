@@ -7,6 +7,7 @@ var points: PackedVector2Array
 var end_mode := "continue"
 var idx := 0
 var last_dir := Vector2.RIGHT
+var delay := 0.0   ## seconds to hold (sell a block / screen timing) before starting
 
 
 func _init(p_agent: PlayerAgent, p_ctx: PlayRunner, p_points: PackedVector2Array, p_end := "continue") -> void:
@@ -17,6 +18,8 @@ func _init(p_agent: PlayerAgent, p_ctx: PlayRunner, p_points: PackedVector2Array
 
 ## The waypoint this runner is heading to (or a point ahead once the route is done).
 func next_point() -> Vector2:
+	if delay > 0.0:
+		return agent.field_pos
 	if idx < points.size():
 		return points[idx]
 	if end_mode == "sit" and points.size() > 0:
@@ -25,6 +28,10 @@ func next_point() -> Vector2:
 
 
 func update(dt: float) -> void:
+	if delay > 0.0:
+		delay -= dt
+		agent.move_to(agent.start_pos + Vector2(-0.6, 0.0), 0.4, true)
+		return
 	act(dt)
 
 

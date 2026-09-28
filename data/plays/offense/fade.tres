@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_goal_line.tres" id="1_wu1mn"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_iqymd"]
+
+[resource]
+script = ExtResource("2_iqymd")
+id = "fade"
+display_name = "Fade"
+category = "DEEP"
+formation = ExtResource("1_wu1mn")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"drop": 2.5,
+"type": "pass"
+},
+"RB": {
+"type": "block"
+},
+"TE": {
+"end": "sit",
+"path": PackedVector2Array(4, 0, 4, -5),
+"type": "route"
+},
+"WR1": {
+"end": "continue",
+"path": PackedVector2Array(2, -2, 14, -8),
+"type": "route"
+},
+"WR2": {
+"end": "continue",
+"path": PackedVector2Array(2, 2, 14, 9),
+"type": "route"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray("goal_line", "red_zone")

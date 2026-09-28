@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_singleback.tres" id="1_20xij"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_r4yue"]
+
+[resource]
+script = ExtResource("2_r4yue")
+id = "counter"
+display_name = "Counter"
+category = "RUN"
+formation = ExtResource("1_20xij")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"mesh": Vector2(-3.6, 0.3),
+"to": "RB",
+"type": "handoff"
+},
+"RB": {
+"path": PackedVector2Array(0.6, -1.2, 2.4, 1.8, 5.5, 3.5, 18, 4),
+"type": "carry"
+},
+"TE": {
+"type": "block"
+},
+"WR1": {
+"type": "block"
+},
+"WR2": {
+"type": "block"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray()

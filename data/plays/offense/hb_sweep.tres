@@ -42,4 +42,4 @@ assignments = {
 }
 }
 counters = PackedStringArray()
-tags = PackedStringArray()
+tags = PackedStringArray("outside")

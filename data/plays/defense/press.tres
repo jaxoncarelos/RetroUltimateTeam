@@ -1,0 +1,54 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/def_nickel.tres" id="1_8a8ks"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_xo55k"]
+
+[resource]
+script = ExtResource("2_xo55k")
+id = "press"
+display_name = "Cover 1 Press"
+side = "defense"
+category = "MAN"
+formation = ExtResource("1_8a8ks")
+assignments = {
+"CB1": {
+"press": true,
+"target": "WR1",
+"type": "man"
+},
+"CB2": {
+"press": true,
+"target": "WR2",
+"type": "man"
+},
+"DL1": {
+"type": "rush"
+},
+"DL2": {
+"type": "rush"
+},
+"DL3": {
+"type": "rush"
+},
+"LB1": {
+"target": "RB",
+"type": "man"
+},
+"LB2": {
+"press": true,
+"target": "TE",
+"type": "man"
+},
+"S1": {
+"center": Vector2(17, 0),
+"size": Vector2(24, 30),
+"type": "zone"
+},
+"S2": {
+"center": Vector2(6, 0),
+"size": Vector2(10, 16),
+"type": "zone"
+}
+}
+counters = PackedStringArray("SHORT")
+tags = PackedStringArray()

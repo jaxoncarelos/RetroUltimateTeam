@@ -52,4 +52,4 @@ assignments = {
 }
 }
 counters = PackedStringArray("DEEP")
-tags = PackedStringArray()
+tags = PackedStringArray("deep")
