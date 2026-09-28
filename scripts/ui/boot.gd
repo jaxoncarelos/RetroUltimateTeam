@@ -25,6 +25,9 @@ func _ready() -> void:
 		if arg.begins_with("--screen="):
 			target = "res://scenes/meta/%s.tscn" % arg.get_slice("=", 1)
 			cfg = _demo_config(arg.get_slice("=", 1))
+		if arg.begins_with("--coins="):
+			# Debug: top up coins (pair with --demo-profile so the real save is untouched).
+			SaveManager.profile.coins = int(arg.get_slice("=", 1))
 	if target == "":
 		target = SceneRouter.TITLE
 	SceneRouter.pending_config = cfg
