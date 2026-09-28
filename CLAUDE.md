@@ -19,3 +19,19 @@ Godot 4.7 + GDScript retro football game. Design/roadmap: `PLAN.md`. Status tabl
 - `data/roster.csv` uses the `keep` importer (raw file) — keep `roster.csv.import` as is.
 - Plays/formations are `.tres`; `tools/build_playbooks.gd` regenerates (and overwrites) them.
 - Commit `.uid` files; never commit `.godot/` or `export/`.
+
+## Next steps / handoff (keep this list current; top item = next task)
+User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
+1. [ ] Defensive adaptation: the CPU defense tracks your play/formation/category tendencies and
+   counters repeats (counter-call weights + "keyed" defenders react faster and jump routes);
+   HUD warns "DEFENSE IS KEYING ON <PLAY>". Repeating a play must stop working.
+2. [ ] Bigger playbook (~16 offense incl. QB sneak, draw, screen, goal line; ~8 defense).
+3. [ ] Situational play suggestion: preselect/highlight the best call (3rd & 1 -> short run, etc.).
+4. [ ] Retro Bowl-style snap: pressing/dragging from the QB snaps and starts aiming in one
+   gesture (no "tap the middle of the field"); dragging forward = scramble; runs stay simple.
+5. [ ] Field detail: crowd/stands strip, midfield emblem, goalposts, pylons, down marker, turf texture.
+6. [ ] Phase 2 – playable defense (PLAN.md §4).
+7. [ ] Phase 3 – full game: clock, quarters, possessions, kicks/FG meter, AI offense, ai_vs_ai sim.
+8. [ ] Phase 4 – roster import (GameData), cards affect play, team picker, lineup.
+9. [ ] Phase 5 – packs, coins, save system, collection.
+10. [ ] Phase 6 – season, challenges, polish.
