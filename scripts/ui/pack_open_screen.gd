@@ -265,6 +265,10 @@ func _walkout() -> void:
 			if is_instance_valid(n):
 				_fade_out(n)
 		_walk_nodes.clear()
+		# Let the team band clear so the OVR slams onto a clean stage.
+		await _wait(0.3)
+		if _skip:
+			return
 		# 3) OVR.
 		var o := _big_text(str(ovr), 7, tc)
 		_slam(o, Vector2(0, -10))
@@ -373,14 +377,17 @@ func _big_text(text: String, px: int, col: Color) -> TextureRect:
 func _slam(r: Control, offset: Vector2) -> void:
 	r.position = ((_vp() - r.size) * 0.5).round() + offset
 	r.pivot_offset = r.size * 0.5
+	# Integer steps keep the pixel digits crisp while they slam down (3x -> 2x -> 1x).
 	r.scale = Vector2(3, 3)
-	r.modulate.a = 0.0
-	var tw := create_tween().set_parallel()
-	tw.tween_property(r, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.tween_property(r, "modulate:a", 1.0, 0.12)
-	tw.chain().tween_callback(func() -> void:
+	r.modulate.a = 1.0
+	var tw := create_tween()
+	tw.tween_property(r, "scale", Vector2(2, 2), 0.08)
+	tw.tween_property(r, "scale", Vector2.ONE, 0.08)
+	tw.tween_callback(func() -> void:
 		Sfx.play("slam")
 		Fx.shake(_content, 3.0, 0.2))
+	tw.tween_property(r, "scale", Vector2(1.1, 1.1), 0.05)
+	tw.tween_property(r, "scale", Vector2.ONE, 0.07)
 
 
 func _fade_out(n: Variant) -> void:
