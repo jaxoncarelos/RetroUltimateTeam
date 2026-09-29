@@ -281,6 +281,9 @@ func _kicker(team: String) -> Dictionary:
 func _start_game() -> void:
 	phase = Phase.PREGAME
 	hud.show_pause_button(human != "")
+	if not _sim():
+		Music.play("game")
+		Music.set_crowd(true)
 	if config.has("challenge") and human != "":
 		_start_challenge(config["challenge"])
 		return
@@ -449,6 +452,8 @@ func _ball_y() -> float:
 func _update_scorebug() -> void:
 	if human != "" and gs.score_diff(human) <= -10:
 		_comeback = true
+	if not _sim():   # close late game: the tense loop
+		Music.play("clutch" if (gs.clock.quarter >= 4 and absi(int(gs.score[gs.home]) - int(gs.score[gs.away])) <= 8) else "game")
 	var q: String = "OT" if gs.clock.is_overtime() else ["1ST", "2ND", "3RD", "4TH"][clampi(gs.clock.quarter - 1, 0, 3)] + " QTR"
 	hud.set_score_bar({"home": gs.home, "away": gs.away, "home_score": int(gs.score[gs.home]),
 			"away_score": int(gs.score[gs.away]), "possession": gs.possession, "quarter": q,
@@ -657,14 +662,17 @@ func _play_juice(type: String, offense: String) -> void:
 	match type:
 		"td":
 			Sfx.play("td" if ours or human == "" else "bad")
+			Sfx.play("cheer" if ours or human == "" else "groan")
 			hud.flash(UiTheme.ACCENT if ours else Color("#ff004d"), 0.55)
 			if Settings.shake:
 				camera.add_trauma(0.35)
 		"int", "int_td", "fumble":
 			Sfx.play("bad" if ours else "big")
+			Sfx.play("groan" if ours else "cheer")
 			hud.flash(Color("#ff004d") if ours else Color("#00e436"), 0.45)
 		"sack":
 			Sfx.play("hit")
+			Sfx.play("oh")
 		_:
 			Sfx.play("whistle")
 
@@ -941,6 +949,9 @@ func _final() -> void:
 		_record_sim_game()
 		return
 	var w := gs.winner()
+	Music.set_crowd(false)
+	if human != "" and not _sim():
+		Music.jingle("win" if w == human else "lose")
 	var title := "FINAL" if w == "" else ("YOU WIN!" if w == human else ("%s WIN" % teams[w].team_name.to_upper()))
 	if human == "":
 		title = "FINAL"
@@ -1188,6 +1199,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _exit_tree() -> void:
 	get_tree().quit_on_go_back = _quit_on_back_was
+	Music.set_crowd(false)
 
 
 # ---------------------------------------------------------------- ai vs ai batch

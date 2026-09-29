@@ -72,6 +72,9 @@ func goto(path: String, config: Dictionary = {}) -> void:
 	pending_config = config
 	_wipe.mouse_filter = Control.MOUSE_FILTER_STOP
 	Sfx.play("swoosh")
+	if path != MATCH:
+		Music.play("menu")
+		Music.set_crowd(false)
 	var tw := create_tween()
 	tw.tween_property(_wipe, "progress", 1.0, WIPE_TIME)
 	await tw.finished

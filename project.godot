@@ -25,6 +25,7 @@ GameData="*res://autoload/game_data.gd"
 SaveManager="*res://autoload/save_manager.gd"
 SceneRouter="*res://autoload/scene_router.gd"
 Sfx="*res://autoload/sfx.gd"
+Music="*res://autoload/music.gd"
 
 [display]
 
