@@ -57,6 +57,11 @@ func _ready() -> void:
 	vs.texture = UiSkin.logo(["VS"], 3, Color.WHITE, Color("#b9c6e8"), UiSkin.STAR_RED, UiSkin.SHADOW)
 	vs.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
 	mid.add_child(vs)
+	var cond: Dictionary = cfg.get("conditions", {})
+	if GameConditions.label(cond) != "":
+		mid.add_child(MetaUI.label(GameConditions.label(cond), UiSkin.YELLOW, 8, HORIZONTAL_ALIGNMENT_CENTER))
+		if GameConditions.effect_text(cond) != "":
+			mid.add_child(MetaUI.label(GameConditions.effect_text(cond), UiSkin.MUTED, 8, HORIZONTAL_ALIGNMENT_CENTER))
 	var mp := RetroPanel.new("REWARDS", UiSkin.PANEL, 5)
 	mid.add_child(mp)
 	_reward_col = VBoxContainer.new()

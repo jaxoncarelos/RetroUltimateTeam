@@ -49,6 +49,7 @@ var _seconds_before_play := 0.0
 var _pending_runoff := 0.0
 var _two_point := false
 var _kick_kind := ""                ## "fg" / "pat" while the kick meter is up
+var conditions: Dictionary = {}     ## GameConditions for this game (day/night + weather)
 var _queued: Callable               ## sim mode: next transition (instead of a timer)
 var _paused_from := Phase.PLAY_CALL
 var _pause_menu := PauseMenu.MAIN
@@ -130,7 +131,17 @@ func _build_scene(home_team: TeamData, away_team: TeamData) -> void:
 	runner.record_replay = human != "" and Settings.replays and not _sim()
 	if human != "" and not (SaveManager.disabled):   # your coach perks tune the match
 		tuning = CoachPerks.apply_tuning(tuning, SaveManager.profile)
+	conditions = config.get("conditions", {})
+	for a in OS.get_cmdline_user_args():   # debug: --weather=rain|snow|fog|night|dome
+		if a.begins_with("--weather="):
+			var w := a.trim_prefix("--weather=")
+			conditions = {"time": "night" if w == "night" else "day", "weather": "clear" if w == "night" else w}
+	tuning = GameConditions.apply_tuning(tuning, conditions)
 	runner.tuning = tuning
+	if not _sim() and not conditions.is_empty():
+		var wfx := WeatherFx.new()
+		add_child(wfx)
+		wfx.setup(conditions, self)
 	runner.def_ai = def_ai
 	runner.rng = rng
 	routes = PlayOverlay.new()
@@ -299,7 +310,7 @@ func _start_game() -> void:
 	if not _sim():
 		camera.show_spot(FieldGeo.OWN_GOAL + 50.0)
 		camera.snap_to_target()
-		hud.show_banner("%s  VS  %s" % [h.team_name.to_upper(), a.team_name.to_upper()], "KICKOFF", 1.8)
+		hud.show_banner("%s  VS  %s" % [h.team_name.to_upper(), a.team_name.to_upper()], "KICKOFF" + ("  -  " + GameConditions.label(conditions) if GameConditions.label(conditions) != "" else ""), 1.8)
 	_after(1.8, func() -> void: _kickoff(gs.away))
 
 

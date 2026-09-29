@@ -26,7 +26,7 @@ static func next_quick_opponents(prof: Profile, n := 3) -> Array[String]:
 static func next_quick_config(prof: Profile) -> Dictionary:
 	var opp := next_quick_opponents(prof, 1)
 	return {"home": prof.franchise_team, "away": opp[0] if not opp.is_empty() else "PHI", "from_hub": true,
-			"difficulty": Settings.difficulty, "mode": "quick"}
+			"difficulty": Settings.difficulty, "mode": "quick", "conditions": roll_conditions(prof.franchise_team)}
 
 
 ## The season game the player plays next ({} if no season game is waiting).
@@ -54,6 +54,7 @@ static func _cfg(prof: Profile, g: Array, label: String) -> Dictionary:
 	var you := prof.franchise_team
 	var opp: String = g[1] if g[0] == you else g[0]
 	return {"home": you, "away": opp, "from_hub": true, "difficulty": Settings.difficulty, "mode": "season",
+			"conditions": roll_conditions(g[0]),
 			"label": label, "extra": {"home": g[0], "away": g[1], "label": label}}
 
 
@@ -123,3 +124,10 @@ static func open_pending_config(prof: Profile, back := SceneRouter.HUB) -> Dicti
 		return {}
 	SaveManager.save()
 	return {"uids": res["uids"], "title": res["title"], "pack": res["pack"], "back": back}
+
+
+## Day / night and weather for a game at `home`'s stadium (shown on the prematch screen).
+static func roll_conditions(home: String) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	return GameConditions.roll(home, rng)
