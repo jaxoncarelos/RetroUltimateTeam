@@ -207,9 +207,13 @@ func _tackles() -> void:
 	var c := ctx.carrier
 	if c == null or c.is_down or c.dive_timer > 0.0 and c.z_height > 0.3:
 		return
+	if c == ctx.qb and not ctx.scrambling and ctx.play_time < ctx.qb_immune_until:
+		return   # he just sidestepped a rusher
 	var t := ctx.tuning
 	var opponents := ctx.defense if c.team == PlayerAgent.Team.OFFENSE else ctx.offense
 	for d in opponents:
+		if c == ctx.qb and not ctx.scrambling and ctx.play_time < ctx.qb_immune_until:
+			return   # an earlier rusher this frame missed: he is out of reach
 		if d.tackle_cd > 0.0 or d.is_down:
 			continue
 		var diving := d.dive_timer > 0.0
@@ -248,6 +252,9 @@ func _roll(d: PlayerAgent, c: PlayerAgent, diving: bool, human: bool, mult := 1.
 		p += t.human_tackle_bonus + (t.human_dive_bonus if diving else 0.0)
 		p += t.human_assist_bonus * _helpers(d, c)
 		cap = t.human_tackle_max
+	if ctx.human_team == PlayerAgent.Team.OFFENSE and c == ctx.qb and not ctx.pass_thrown and not ctx.scrambling:
+		# Your QB sidesteps the first rushes: a sack is never a touch (fades out over qb_evade_time).
+		p *= lerpf(t.qb_evade_mult, 1.0, clampf(ctx.play_time / t.qb_evade_time, 0.0, 1.0))
 	p = minf(p * mult, cap)
 	stats["human_tries" if human else "tries"] += 1
 	if diving and not human:
@@ -261,6 +268,8 @@ func _roll(d: PlayerAgent, c: PlayerAgent, diving: bool, human: bool, mult := 1.
 	d.tackle_cd = t.missed_tackle_cd
 	c.velocity *= t.missed_tackle_slow
 	ctx.broken_tackles += 1
+	if ctx.human_team == PlayerAgent.Team.OFFENSE and c == ctx.qb and not ctx.pass_thrown and not ctx.scrambling:
+		ctx.qb_immune_until = ctx.play_time + t.qb_evade_immunity
 	return false
 
 

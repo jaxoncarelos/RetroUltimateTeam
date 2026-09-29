@@ -98,6 +98,8 @@ func _ready() -> void:
 	if not teams.has(away_abbr) or away_abbr == home_abbr:
 		away_abbr = "PHI" if home_abbr != "PHI" else "KC"
 	human = "" if watch or sim_games > 0 else home_abbr
+	if OS.get_cmdline_user_args().has("--human=away"):   # debug: you play the away team (defend first)
+		human = away_abbr
 	# Android back opens the pause menu instead of quitting the app (restored on exit).
 	_quit_on_back_was = get_tree().quit_on_go_back
 	if human != "":
@@ -113,6 +115,8 @@ func _ready() -> void:
 		for a in OS.get_cmdline_user_args():
 			if a.begins_with("--show="):
 				_debug_show.call_deferred(a.trim_prefix("--show="))
+			if a == "--drawtest":
+				_debug_drawtest.call_deferred()
 
 
 # ---------------------------------------------------------------- scene
@@ -122,6 +126,7 @@ func _build_scene(home_team: TeamData, away_team: TeamData) -> void:
 	field.set_teams(home_team, away_team)
 	add_child(field)
 	runner = PlayRunner.new()
+	runner.aim_sens = Settings.aim_mult()
 	runner.tuning = tuning
 	runner.def_ai = def_ai
 	runner.rng = rng
@@ -165,6 +170,9 @@ func _build_scene(home_team: TeamData, away_team: TeamData) -> void:
 	ocontrol.snap_requested.connect(func() -> void:
 		if phase == Phase.PLAY_CALL and _human_offense():
 			_snap())
+	ocontrol.pass_kind_changed.connect(func(kind_name: String) -> void:
+		Sfx.play("tap")
+		hud.set_hint("PASS TYPE: %s  ·  TAP AGAIN TO SWITCH  ·  DRAG BACK TO AIM" % kind_name))
 	ocontrol.aim_changed.connect(func(on: bool, target: Vector2) -> void:
 		aim.aim_active = on
 		aim.aim_target = target)
@@ -554,7 +562,7 @@ func _snap() -> void:
 		hud.set_hint(DEFENSE_LIVE_HINT)
 	elif _human_offense():
 		hud.set_hint("DRAG UP/DOWN TO STEER  ·  FLICK TO JUKE  ·  DOUBLE-TAP TO DIVE" if off_play.is_run()
-				else "DRAG BACK TO AIM, RELEASE TO THROW  ·  DRAG FORWARD TO RUN")
+				else "DRAG BACK TO AIM, RELEASE TO THROW  ·  TAP = PASS TYPE  ·  DRAG FORWARD TO RUN")
 	else:
 		hud.set_hint("")
 
@@ -1352,3 +1360,44 @@ func _on_hero_event(kind: String, _at: Vector2) -> void:
 			Sfx.play("tap")
 		"burst":
 			Sfx.play("whoosh")
+
+
+## Debug (`--drawtest`): synthetic touches through the real input path draw a path for the hero
+## on the first defensive snap, then screenshots can show it (pairs with --human=away --snap).
+func _debug_drawtest() -> void:
+	while not (phase == Phase.PLAY_CALL and _human_defense()):
+		await get_tree().create_timer(0.2).timeout
+	await get_tree().create_timer(1.0).timeout
+	var hero := runner.controlled
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--drawslot=") and runner.def_slots.has(a.trim_prefix("--drawslot=")):
+			hero = runner.def_slots[a.trim_prefix("--drawslot=")]
+	if hero == null:
+		print("DRAWTEST no hero")
+		return
+	var xf := get_viewport().get_canvas_transform()
+	var win := Vector2(DisplayServer.window_get_size()) / get_viewport().get_visible_rect().size   # events arrive in window pixels
+	var start := xf * FieldProjection.to_screen(hero.field_pos + Vector2(0, -1.0)) * win
+	var pts: Array[Vector2] = []
+	for i in 8:
+		pts.append(xf * FieldProjection.to_screen(hero.field_pos + Vector2(-0.6 * i, -1.5 * i)) * win)
+	print("DRAWTEST hero ", hero.slot, " at ", start, " ui_blocked=", hud.is_point_over_ui(start))
+	var t := InputEventScreenTouch.new()
+	t.index = 0
+	t.position = start
+	t.pressed = true
+	Input.parse_input_event(t)
+	await get_tree().process_frame
+	for p in pts:
+		var d := InputEventScreenDrag.new()
+		d.index = 0
+		d.position = p
+		Input.parse_input_event(d)
+		await get_tree().process_frame
+	var r := InputEventScreenTouch.new()
+	r.index = 0
+	r.position = pts[pts.size() - 1]
+	r.pressed = false
+	Input.parse_input_event(r)
+	await get_tree().process_frame
+	print("DRAWTEST hero_path points=", runner.hero_path.size(), " preview=", runner.hero_path_preview.size(), " controlled=", runner.controlled.slot)

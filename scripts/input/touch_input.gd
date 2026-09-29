@@ -12,6 +12,8 @@ signal double_tapped(pos: Vector2)
 signal flicked(dir: Vector2)
 ## Three fingers down at once (toggles the debug overlay).
 signal three_finger_tap
+## A second finger touched down while the first is still on the screen (e.g. tap to switch the pass type mid-aim).
+signal extra_tapped(pos: Vector2)
 
 const DRAG_THRESHOLD := 8.0
 const TAP_TIME := 0.25
@@ -56,6 +58,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_fingers.erase(e.index)
 		if e.pressed:
 			if _index != -1:
+				if e.index != _index and not (ui_blocker.is_valid() and ui_blocker.call(e.position)):
+					extra_tapped.emit(e.position)
 				return
 			if ui_blocker.is_valid() and ui_blocker.call(e.position):
 				return

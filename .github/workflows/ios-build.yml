@@ -28,6 +28,13 @@ jobs:
           cp -R tpl/templates/. "$T/"
           echo "GODOT=$PWD/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
 
+      - name: Stamp build id
+        run: |
+          echo 'class_name BuildInfo' > scripts/build_info.gd
+          echo 'extends RefCounted' >> scripts/build_info.gd
+          echo "const ID := \"${GITHUB_SHA::7}\"" >> scripts/build_info.gd
+          cat scripts/build_info.gd
+
       - name: Import project
         run: |
           "$GODOT" --headless --path . --import || true

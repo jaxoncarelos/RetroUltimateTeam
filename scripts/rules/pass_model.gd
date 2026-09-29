@@ -88,8 +88,16 @@ static func clearance_apex(t: GameplayTuning, from: Vector2, to: Vector2, blocke
 ## Full throw plan. Loft is automatic (distance), raised to clear lane blockers but never
 ## above a full lob for that distance.
 static func plan(t: GameplayTuning, thp: float, from: Vector2, landing: Vector2,
-		blockers := PackedVector2Array()) -> Dictionary:
+		blockers := PackedVector2Array(), kind_override := -1) -> Dictionary:
 	var dist := from.distance_to(landing)
+	if kind_override >= 0:
+		# The player picked the pass type: a flat bullet, a touch pass or a high lob, no matter
+		# who stands in the lane (a bullet through traffic is the risk he chose).
+		var lofts := [0.0, (t.touch_threshold + t.lob_threshold) * 0.5, 1.0]
+		var picked := float(lofts[clampi(kind_override, 0, 2)])
+		var apex_p := apex_for(t, dist, picked)
+		return {"landing": landing, "dur": duration(t, thp, dist, apex_p, picked), "apex": apex_p,
+				"loft": picked, "kind": clampi(kind_override, 0, 2)}
 	var auto := apex_for(t, dist, auto_loft(t, dist))
 	var clear := clearance_apex(t, from, landing, blockers)
 	var apex := minf(maxf(auto, clear), lob_apex(t, dist))
@@ -156,5 +164,5 @@ static func assist(t: GameplayTuning, raw: Vector2, leads: PackedVector2Array) -
 
 ## Slingshot pull (pixels) -> throw distance (yards). Slightly progressive so deep balls
 ## don't need a screen-wide drag while short throws stay precise.
-static func pull_to_yards(t: GameplayTuning, pull_px: float) -> float:
-	return pull_px * t.aim_gain * (1.0 + pull_px / t.aim_curve_px)
+static func pull_to_yards(t: GameplayTuning, pull_px: float, sens := 1.0) -> float:
+	return pull_px * t.aim_gain * sens * (1.0 + pull_px / t.aim_curve_px)

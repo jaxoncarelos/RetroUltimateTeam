@@ -60,6 +60,12 @@ var handoff_range := HANDOFF_RANGE
 ## Remaining designed run lane for the current ball carrier (absolute field points).
 var carrier_lane := PackedVector2Array()
 ## The hero defender's drawn path (absolute field points; empty = none) and the one being drawn.
+## Throw aim sensitivity multiplier (Settings.aim_mult(); 1 = the raw tuning).
+var aim_sens := 1.0
+## Pass type the human picked by tapping (-1 auto, else PassModel.Kind); CPU throws stay auto.
+var pass_kind := -1
+## play_time until which your QB cannot be tackled (he just sidestepped a rusher).
+var qb_immune_until := -1.0
 var hero_path := PackedVector2Array()
 var hero_path_preview := PackedVector2Array()
 var pass_thrown := false
@@ -145,6 +151,8 @@ func setup_play(p_off: PlayDef, p_def: PlayDef, p_los_x: float, p_ball_y: float,
 	aim_preview = Vector2.INF
 	aim_assist_target = null
 	throw_plan = {}
+	pass_kind = -1
+	qb_immune_until = -1.0
 	intended = null
 	_human_throw = false
 	_lane_checked = {}
@@ -219,6 +227,8 @@ func snap() -> void:
 		a.in_stance = false
 		a.brain = _brain_for(a)
 	_apply_presnap_reads()
+	if human_team == PlayerAgent.Team.OFFENSE and not is_run_play():
+		qb_immune_until = tuning.qb_free_time
 	if human_team == PlayerAgent.Team.DEFENSE and controlled != null and hero_path.size() >= 2:
 		controlled.brain = DrawnPathBrain.new(controlled, self, hero_path, controlled.brain)
 	if is_run_play():
@@ -311,6 +321,8 @@ func _apply_presnap_reads() -> void:
 				mark.jam_timer = RatingModel.press_jam(tuning, d.attr("cov"), mark.attr("rte"))
 	if qb.assignment.get("fake", false):
 		for d in defense:
+			if d.brain is RushBrain:
+				(d.brain as RushBrain).hold = tuning.pa_rush_bite * (1.0 - 0.6 * clampf((d.attr("awr") - 60.0) / 39.0, 0.0, 1.0))
 			var zone_depth: float = (d.assignment.get("center", Vector2(99, 0)) as Vector2).x
 			if d.brain is ZoneBrain and zone_depth < 9.0:
 				(d.brain as ZoneBrain).bite = RatingModel.pa_bite(tuning, d.attr("awr"))
@@ -382,7 +394,7 @@ func aim_point(drag_start: Vector2, drag_now: Vector2) -> Vector2:
 	var max_d := RatingModel.max_throw_distance(tuning, qb.attr("thp"))
 	var raw := qb.field_pos - pull * tuning.aim_gain
 	var dir := (raw - qb.field_pos).normalized() if pull.length() > 0.01 else Vector2.RIGHT
-	var yards := minf(PassModel.pull_to_yards(tuning, pull.length()), max_d)
+	var yards := minf(PassModel.pull_to_yards(tuning, pull.length(), aim_sens), max_d)
 	var target := qb.field_pos + dir * yards
 	aim_assist_target = null
 	var leads := PackedVector2Array()
@@ -415,7 +427,7 @@ func lane_blockers(target: Vector2) -> PackedVector2Array:
 
 ## PassModel plan for a throw from the QB to `target` (what the aim preview shows).
 func plan_throw(target: Vector2) -> Dictionary:
-	return PassModel.plan(tuning, qb.attr("thp"), qb.field_pos, target, lane_blockers(target))
+	return PassModel.plan(tuning, qb.attr("thp"), qb.field_pos, target, lane_blockers(target), pass_kind)
 
 
 ## Where a receiver will be `secs` from now if he keeps running his route at full speed.
@@ -966,3 +978,14 @@ func _set_spot(r: Dictionary, spot: Vector2) -> void:
 		r["yards"] = 0
 	else:
 		r["yards"] = int(DownTracker.spot_yard(spot_x) - roundf(los_x))
+
+
+## Tap to switch the pass type: auto -> bullet -> touch -> lob -> auto. Returns the new kind (-1 auto).
+func cycle_pass_kind() -> int:
+	pass_kind = pass_kind + 1 if pass_kind < PassModel.Kind.LOB else -1
+	return pass_kind
+
+
+## Name shown for the current pass type choice.
+func pass_kind_name() -> String:
+	return "AUTO" if pass_kind < 0 else PassModel.KIND_NAMES[pass_kind]

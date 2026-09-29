@@ -14,6 +14,16 @@ var left_handed := false
 var shake := true                    ## screen shake on big hits
 var tutorial_done := false
 var season_games := 8                ## 8 (short) or 17
+var aim_sens := 1                   ## throw aim sensitivity index into AIM_NAMES / AIM_MULT (default MEDIUM)
+
+
+const AIM_NAMES := ["LOW", "MEDIUM", "HIGH"]
+## Multiplier on the slingshot pull -> throw distance (GameplayTuning.aim_gain). HIGH = the old feel.
+const AIM_MULT := [0.55, 0.75, 1.0]
+
+
+func aim_mult() -> float:
+	return AIM_MULT[clampi(aim_sens, 0, AIM_MULT.size() - 1)]
 
 
 func _ready() -> void:
@@ -36,6 +46,7 @@ func load_settings() -> void:
 	shake = bool(cfg.get_value("video", "shake", shake))
 	tutorial_done = bool(cfg.get_value("game", "tutorial_done", tutorial_done))
 	season_games = int(cfg.get_value("game", "season_games", season_games))
+	aim_sens = clampi(int(cfg.get_value("controls", "aim_sens", aim_sens)), 0, AIM_MULT.size() - 1)
 
 
 func save_settings() -> void:
@@ -49,5 +60,6 @@ func save_settings() -> void:
 	cfg.set_value("video", "shake", shake)
 	cfg.set_value("game", "tutorial_done", tutorial_done)
 	cfg.set_value("game", "season_games", season_games)
+	cfg.set_value("controls", "aim_sens", aim_sens)
 	cfg.save(PATH)
 	changed.emit()

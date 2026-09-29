@@ -37,3 +37,4 @@ extends Resource
 @export var catch_contest_bonus := 0.35 ## added contest (0..1) on catches
 @export var rush_speed_bonus := 0.06   ## blitzers run faster vs a keyed run
 @export var shed_cut := 0.3           ## blocks hold this much shorter vs a keyed run
+@export var blitz_weight := 0.5        ## CPU blitz calls (not goal line) are this much likelier to be picked vs a human offense (they get home in under 2 s)

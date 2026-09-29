@@ -42,6 +42,8 @@ static func defense_weights(plays: Array[PlayDef], memory: DefenseMemory, situat
 	for p in plays:
 		var w := memory.counter_weight(p.counters, expected) if memory != null else 1.0
 		w *= defense_situation_mult(p, situation)
+		if memory != null and p.category == "BLITZ" and "goal_line" not in p.tags and "RUN" not in p.counters:
+			w *= memory.tuning.blitz_weight
 		if p == last_call and memory != null:
 			w *= memory.tuning.repeat_call_penalty
 		out.append(maxf(w, 0.001))

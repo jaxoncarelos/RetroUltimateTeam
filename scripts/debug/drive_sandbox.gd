@@ -118,6 +118,7 @@ func _ready() -> void:
 	add_child(field)
 
 	runner = PlayRunner.new()
+	runner.aim_sens = Settings.aim_mult()
 	runner.tuning = tuning
 	runner.def_ai = def_ai
 	var bot_on := bot_skill >= 0.0 and human_side == PlayerAgent.Team.DEFENSE

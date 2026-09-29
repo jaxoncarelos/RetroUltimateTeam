@@ -67,16 +67,20 @@ func _draw_hero_path() -> void:
 	if pts.size() < 2:
 		return
 	var col := Color("#29adff")
-	var prev := FieldProjection.to_screen(pts[0])
-	for i in range(1, pts.size()):
-		var cur := FieldProjection.to_screen(pts[i])
-		_dotted(prev, cur, col)
-		prev = cur
-	# Arrowhead at the end.
-	var back := FieldProjection.to_screen(pts[pts.size() - 2])
+	var sp := PackedVector2Array()
+	for p in pts:
+		sp.append(FieldProjection.to_screen(p).round())
+	# Bold line: dark outline under a bright 2 px core, dots at the corners, arrowhead at the end.
+	draw_polyline(sp, Color(0.02, 0.04, 0.2, 0.75), 4.0)
+	draw_polyline(sp, col, 2.0)
+	for i in range(1, sp.size() - 1):
+		draw_circle(sp[i], 2.0, Color.WHITE)
+	var prev := sp[sp.size() - 1]
+	var back := sp[sp.size() - 2]
 	var dir := (prev - back).normalized() if prev.distance_to(back) > 0.1 else Vector2.RIGHT
 	var n := Vector2(-dir.y, dir.x)
-	draw_colored_polygon(PackedVector2Array([prev + dir * 4.0, prev - dir * 2.0 + n * 3.0, prev - dir * 2.0 - n * 3.0]), col)
+	draw_colored_polygon(PackedVector2Array([prev + dir * 6.0, prev - dir * 3.0 + n * 4.5, prev - dir * 3.0 - n * 4.5]), Color(0.02, 0.04, 0.2, 0.9))
+	draw_colored_polygon(PackedVector2Array([prev + dir * 4.5, prev - dir * 2.0 + n * 3.0, prev - dir * 2.0 - n * 3.0]), col)
 
 
 ## Pre-snap: a pulsing grab ring on the QB with a "pull back" chevron trail behind him.

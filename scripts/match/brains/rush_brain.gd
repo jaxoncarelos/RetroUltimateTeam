@@ -1,8 +1,10 @@
 class_name RushBrain
 extends Brain
-## Pass rusher: attacks the QB, or the ball carrier once someone else has the ball.
+## Pass rusher: attacks the QB, or the ball carrier once someone else has the ball. On a
+## play-action fake he holds `hold` seconds reading the run first.
 
 var aim := Vector2.ZERO
+var hold := 0.0
 
 
 func think() -> void:
@@ -14,7 +16,11 @@ func think() -> void:
 	aim = tgt.field_pos + tgt.velocity * t
 
 
-func act(_dt: float) -> void:
+func act(dt: float) -> void:
+	if hold > 0.0:
+		hold -= dt
+		agent.stop()
+		return
 	if aim == Vector2.ZERO:
 		agent.stop()
 	else:

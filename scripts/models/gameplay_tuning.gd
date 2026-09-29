@@ -23,8 +23,8 @@ extends Resource
 @export var aim_curve_px := 170.0      ## pull gets progressive: × (1 + px / this) (deep = shorter drag)
 @export var aim_min_drag := 10.0       ## px; shorter drags cancel the throw
 @export var aim_error_base := 0.07     ## yards of error per yard thrown at accuracy 0
-@export var aim_assist_radius := 4.0   ## yards: reticle this close to a receiver's lead point gets pulled
-@export var aim_assist_strength := 0.35 ## 0 = off; share of the way the reticle is pulled onto the lead
+@export var aim_assist_radius := 4.6   ## yards: reticle this close to a receiver's lead point gets pulled
+@export var aim_assist_strength := 0.45 ## 0 = off; share of the way the reticle is pulled onto the lead
 @export var lob_lead_extra := 1.5      ## yards: CPU/assist leads lobs this much further in stride
 @export_subgroup("Trajectory")
 @export var lob_start := 13.0          ## yards: automatic loft starts rising here…
@@ -117,6 +117,11 @@ extends Resource
 @export_subgroup("Pass protection")
 @export var pass_shed_mult := 1.9      ## pass-pro blocks hold this much longer while the QB still has the ball
 @export var pass_rusher_cd := 0.35     ## s a rusher who shed a pass block can't be re-engaged (run: 0.8)
+@export var qb_evade_mult := 0.42      ## human QB: a rusher's tackle chance is scaled by this at the snap (he sidesteps)…
+@export var qb_evade_time := 3.8       ## …fading back to normal by this many seconds into the play
+@export var qb_evade_immunity := 0.8    ## s the QB cannot be tackled after he sidesteps a rusher
+@export var qb_free_time := 2.4        ## s your QB cannot be sacked at the start of a pass play (time to read, or step up and scramble)
+@export var pa_rush_bite := 0.55       ## s pass rushers hold and read on a play-action fake (smart ones bite less)
 @export var pass_blocker_cd := 0.1     ## s before that blocker may pick up another rusher (run: 0.6)
 
 @export var fumble_base := 0.012      ## fumble chance per tackle at equal ratings

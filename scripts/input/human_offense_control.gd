@@ -16,6 +16,8 @@ extends Node
 signal aim_changed(active: bool, target: Vector2)
 ## Emitted when a pre-snap gesture should snap the ball (the owner decides and calls snap).
 signal snap_requested
+## The pass type changed by a tap (name: AUTO / BULLET / TOUCH / LOB).
+signal pass_kind_changed(kind_name: String)
 
 enum Mode { NONE, AIM, STEER }
 
@@ -45,6 +47,8 @@ func bind(p_runner: PlayRunner, input: TouchInput, p_tuning: GameplayTuning) -> 
 	input.released.connect(_on_released)
 	input.flicked.connect(_on_flicked)
 	input.double_tapped.connect(_on_double_tapped)
+	input.tapped.connect(_on_tapped)
+	input.extra_tapped.connect(_on_extra_tapped)
 	runner.carrier_changed.connect(func(_a: PlayerAgent) -> void: _cancel_aim())
 
 
@@ -178,3 +182,22 @@ func apply(_dt: float) -> void:
 	runner.carrier_lane = lane
 	c.desired_dir = (lane[0] - c.field_pos).normalized() if not lane.is_empty() else Vector2.RIGHT
 	c.throttle = 1.0
+
+
+## Tap to switch the pass type: a second finger while you aim, or a plain tap while the QB
+## holds the ball (the tap that snapped it doesn't count).
+func _on_tapped(_pos: Vector2) -> void:
+	if _live() and runner.qb_is_passer() and runner.play_time > 0.3:
+		_cycle_kind()
+
+
+func _on_extra_tapped(_pos: Vector2) -> void:
+	if _live() and runner.qb_is_passer():
+		_cycle_kind()
+
+
+func _cycle_kind() -> void:
+	runner.cycle_pass_kind()
+	if mode == Mode.AIM:
+		aim_changed.emit(true, aim_target)   # the preview arc re-plans with the new type
+	pass_kind_changed.emit(runner.pass_kind_name())

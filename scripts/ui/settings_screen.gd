@@ -9,7 +9,7 @@ var _confirm_reset := false
 
 func _ready() -> void:
 	var ui := MetaUI.screen(self, "OPTIONS")
-	var ver := MetaUI.label("V0.7", UiSkin.WHITE)
+	var ver := MetaUI.label("V0.7 " + BuildInfo.ID, UiSkin.WHITE)
 	ui["top_right"].add_child(ver)
 	var center := CenterContainer.new()
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -37,6 +37,8 @@ func _refresh() -> void:
 	_row("SOUND", "OFF" if s.sfx_volume <= 0.0 else ("LOW" if s.sfx_volume < 0.6 else "HIGH"), func() -> void:
 		s.sfx_volume = 0.4 if s.sfx_volume <= 0.0 else (0.8 if s.sfx_volume < 0.6 else 0.0))
 	_row("SCREEN\nSHAKE", "ON" if s.shake else "OFF", func() -> void: s.shake = not s.shake)
+	_row("THROW\nAIM", Settings.AIM_NAMES[s.aim_sens], func() -> void:
+		s.aim_sens = (s.aim_sens + 1) % Settings.AIM_NAMES.size())
 	_row("COACH\nTIPS", "REPLAY" if s.tutorial_done else "ON", func() -> void: s.tutorial_done = false)
 	var team: TeamData = GameData.team(SaveManager.profile.franchise_team)
 	_row("RESET\nCAREER", "SURE? TAP" if _confirm_reset else "RESET", _reset, false)
