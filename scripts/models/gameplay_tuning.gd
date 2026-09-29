@@ -80,9 +80,13 @@ extends Resource
 @export var cpu_read_noise := 1.2      ## yards of openness misjudgment at awareness 60
 @export var cpu_open_threshold := 2.4  ## yards of projected separation to pull the trigger
 @export var cpu_min_throw_time := 0.75 ## earliest throw (plus 0.12 s per yard of drop)
-@export var cpu_max_hold := 2.6        ## after this the QB takes the best option or throws it away
+@export var cpu_max_hold := 3.2        ## after this the QB takes the best option or throws it away
 @export var cpu_checkdown_open := 0.6
-@export var cpu_deep_caution := 0.12   ## yards of openness the CPU QB wants per air yard beyond 15
+@export var cpu_deep_patience := 2.0   ## on a DEEP call the QB waits this long for a deep man before settling for a short one
+@export var cpu_deep_min_air := 12.0   ## yards downfield that count as "deep" for that wait
+@export var cpu_bail_time := 2.3       ## earliest a pressured QB throws it away / checks down
+@export var cpu_deep_call_bias := 0.5  ## (documentation only: PlayAdvisor.pick adds 0.5 to DEEP calls for CPU offenses)
+@export var cpu_deep_caution := 0.08   ## yards of openness the CPU QB wants per air yard beyond 15
 @export var cpu_zone_closing := 0.55   ## share of a defender's closing speed during the flight the CPU QB respects
 
 @export_group("Contact")
@@ -165,8 +169,8 @@ extends Resource
 @export var duel_edge_scale := 0.012   ## leverage-gain change per rating point of your rush over his block
 @export var duel_decay := 0.3          ## leverage lost per second while you don't push at the target
 @export var duel_help := 1.6           ## extra block-shed countdown per second at full leverage
-@export var duel_window_at := 0.68     ## leverage where the TAP! window opens
-@export var duel_window_time := 0.75   ## seconds the window stays open
+@export var duel_window_at := 0.6      ## leverage where the TAP! window opens
+@export var duel_window_time := 1.0    ## seconds the window stays open
 @export var duel_move_base := 0.7      ## chance the tapped move beats the block at equal ratings, dead-center timing
 @export var duel_move_per_point := 0.012 ## chance per rating point of rush over block
 @export var duel_timing_bonus := 0.25  ## max chance added for tapping right in the middle of the window

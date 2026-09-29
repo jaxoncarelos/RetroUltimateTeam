@@ -282,7 +282,7 @@ func _draw_duel_meter() -> void:
 	draw_rect(Rect2(o, Vector2(w, 4)), Color("#1c2c8e"))
 	draw_rect(Rect2(o, Vector2(w * clampf(duel_leverage, 0.0, 1.0), 4)), Color("#ffec27") if open else Color("#3fe071"))
 	if open:
-		UiSkin.draw_text_c(self, 0.0, o.y + 14.0, "TAP!", 8, Color("#ffec27") if flash else Color.WHITE)
+		UiSkin.draw_text_c(self, 0.0, o.y + 14.0, "SWIPE!", 8, Color("#ffec27") if flash else Color.WHITE)
 
 
 static func _star_points(outer: float, inner: float) -> PackedVector2Array:

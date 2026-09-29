@@ -46,10 +46,14 @@ func update(dt: float) -> Dictionary:
 		read_idx = (read_idx + 1) % progression.size()
 	ctx.qb_target_hint = progression[read_idx]
 	var look := QBReadLogic.evaluate(ctx, progression[read_idx])
-	if not look.is_empty() and float(look["openness"]) + rng.randfn(0.0, noise) > t.cpu_open_threshold:
+	# A deep call is a shot: he waits for the deep man instead of dumping it short right away.
+	var patient := ctx.off_play != null and ctx.off_play.category == "DEEP" and ctx.play_time < t.cpu_deep_patience
+	var too_short := not look.is_empty() and float(look["target"].x) - ctx.los_x < t.cpu_deep_min_air
+	if not look.is_empty() and not (patient and too_short) \
+			and float(look["openness"]) + rng.randfn(0.0, noise) > t.cpu_open_threshold:
 		return _throw(look)
 	var pressured := ctx.pressure_on_qb() > 0.85
-	if ctx.play_time > t.cpu_max_hold or (pressured and ctx.play_time > t.cpu_min_throw_time + 0.6):
+	if ctx.play_time > t.cpu_max_hold or (pressured and ctx.play_time > t.cpu_bail_time):
 		var best := QBReadLogic.best_throw(ctx)
 		if not best.is_empty() and float(best["openness"]) > t.cpu_checkdown_open:
 			return _throw(best)

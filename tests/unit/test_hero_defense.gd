@@ -204,3 +204,21 @@ func test_steering_turns_quicker_than_a_cpu_defender() -> void:
 	assert_almost_eq(hero.accel_mult, runner.tuning.human_accel_mult, 0.001)
 	dc.set_stick(Vector2.ZERO)
 	assert_eq(hero.accel_mult, 1.0)
+
+
+func test_a_swipe_or_second_finger_in_the_window_beats_the_block() -> void:
+	for gesture in ["swipe", "second_finger"]:
+		var wins := 0
+		for seed_value in 20:
+			runner.rng.seed = seed_value + 1
+			var pair := _engage_hero()
+			var hero: PlayerAgent = pair[0]
+			hero.duel_window = runner.tuning.duel_window_time * 0.5
+			hero.duel_leverage = 0.8
+			if gesture == "swipe":
+				touch.swiped.emit(Vector2(-1, 0))
+			else:
+				touch.extra_tapped.emit(Vector2(100, 100))
+			if hero.engaged_with == null:
+				wins += 1
+		assert_gt(wins, 8, "%s wins most of the time (%d/20)" % [gesture, wins])

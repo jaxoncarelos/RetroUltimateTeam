@@ -101,3 +101,42 @@ func test_a_human_qb_gets_time_even_against_a_blitz() -> void:
 						sacked_at = r.play_time
 					break
 			assert_gt(sacked_at, 2.3, "%s vs %s: sacked at %.1f s" % [off_id, def_id, sacked_at])
+
+
+func test_cpu_qb_waits_for_the_deep_man_on_a_deep_call() -> void:
+	# On a DEEP call the CPU QB should not dump it to a short man in the first two seconds.
+	var early_short := 0
+	var n := 0
+	for seed_value in 12:
+		var r := PlayRunner.new()
+		r.tuning = runner.tuning
+		r.rng.seed = seed_value + 1
+		r.human_team = -1
+		add_child_autofree(r)
+		r.setup_play(_play("four_verts"), _play("cover3"), 35.0, FieldGeo.CENTER_Y, {}, {})
+		r.snap()
+		var passer := CpuPasser.new(r, r.rng)
+		for i in int(2.0 / DT):
+			var made := passer.update(DT)
+			r._physics_process(DT)
+			if not made.is_empty():
+				n += 1
+				if float(made["target"].x) - r.los_x < r.tuning.cpu_deep_min_air:
+					early_short += 1
+				break
+	assert_eq(early_short, 0, "no short dump-offs in the first 2 s of a deep call (%d throws)" % n)
+
+
+func test_cpu_offense_calls_more_deep_shots() -> void:
+	var book: PlaybookDef = off_book
+	var sit := {"down": 1, "to_go": 10, "los_x": 40.0, "score_diff": 0, "seconds_left": 999.0}
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var deep_biased := 0
+	var deep_plain := 0
+	for i in 600:
+		if PlayAdvisor.pick(book.plays, sit, rng).category == "DEEP":
+			deep_biased += 1
+		if PlayAdvisor.pick(book.plays, sit, rng, null, 1.1, false).category == "DEEP":
+			deep_plain += 1
+	assert_gt(deep_biased, deep_plain, "the CPU bias adds deep calls (%d vs %d)" % [deep_biased, deep_plain])

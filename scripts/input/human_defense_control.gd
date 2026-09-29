@@ -43,6 +43,8 @@ func bind(p_runner: PlayRunner, input: TouchInput, p_tuning: GameplayTuning) -> 
 	input.tapped.connect(_on_tapped)
 	input.flicked.connect(_on_flicked)
 	input.double_tapped.connect(_on_double_tapped)
+	input.swiped.connect(func(_dir: Vector2) -> void: try_duel_move())   # a swipe mid-drag beats the block
+	input.extra_tapped.connect(func(_pos: Vector2) -> void: try_duel_move())   # so does a second finger
 	# An interception hands you the man who caught it.
 	runner.carrier_changed.connect(func(a: PlayerAgent) -> void:
 		if _active() and a == _me():

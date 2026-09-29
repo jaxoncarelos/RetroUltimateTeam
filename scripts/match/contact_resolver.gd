@@ -151,6 +151,7 @@ func _duel_tick(b: PlayerAgent, d: PlayerAgent, dt: float) -> void:
 		var toward := target.field_pos - d.field_pos
 		if toward.length() > 0.01:
 			align = clampf(d.desired_dir.dot(toward.normalized()), 0.0, 1.0) * clampf(d.throttle, 0.0, 1.0)
+		align = maxf(align, 0.35 * clampf(d.throttle, 0.0, 1.0))   # any steering works the blocker a little
 	if d.duel_stall <= 0.0 and align > 0.25:
 		d.duel_leverage += t.duel_gain * align * clampf(1.0 + edge * t.duel_edge_scale, 0.4, 1.8) * dt
 	else:

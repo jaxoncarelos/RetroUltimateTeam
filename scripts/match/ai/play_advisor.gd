@@ -89,8 +89,9 @@ static func rank(plays: Array[PlayDef], situation: Dictionary, memory: DefenseMe
 
 ## CPU offense: weighted pick favoring well-scored calls, with enough randomness to mix.
 static func pick(plays: Array[PlayDef], situation: Dictionary, rng: RandomNumberGenerator,
-		memory: DefenseMemory = null, sharpness := 1.1) -> PlayDef:
+		memory: DefenseMemory = null, sharpness := 1.1, deep_bias := true) -> PlayDef:
 	var w := PackedFloat32Array()
 	for p in plays:
-		w.append(exp(sharpness * score(p, situation, memory)))
+		var bias := 0.5 if p.category == "DEEP" and deep_bias else 0.0   # CPU offenses went short too much
+		w.append(exp(sharpness * (score(p, situation, memory) + bias)))
 	return plays[AIPlayCaller.weighted_index(w, rng)]

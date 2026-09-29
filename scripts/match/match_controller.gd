@@ -684,7 +684,7 @@ func _coach_tips() -> void:
 		text = "YOUR BALL. THE BEST CALL IS PRESELECTED (OR TAP ANOTHER / MORE). PRESS THE QB AND DRAG BACK TO AIM, RELEASE TO THROW. DRAG FORWARD TO RUN."
 	elif _human_defense() and not _tips_seen.has("defense"):
 		key = "defense"
-		text = "DEFENSE! THE CALL PICKS YOUR HERO (YELLOW TAG). DRAG FROM HIM TO DRAW HIS PATH, THEN TAP THE FIELD TO SNAP. DRAG TO MOVE: PUSH AT BLOCKERS AND TAP WHEN THE BAR FLASHES TO BEAT THEM, TAP FOR A BURST, TAP THE CARRIER TO DIVE, TAP THE BALL TO LEAP. SWITCH TAKES THE MAN NEAREST THE BALL."
+		text = "DEFENSE! THE CALL PICKS YOUR HERO (YELLOW TAG). DRAG FROM HIM TO DRAW HIS PATH, THEN TAP THE FIELD TO SNAP. DRAG TO MOVE: PUSH AT BLOCKERS AND SWIPE (OR TAP WITH A SECOND FINGER) WHEN THE BAR FLASHES TO BEAT THEM, TAP FOR A BURST, TAP THE CARRIER TO DIVE, TAP THE BALL TO LEAP. SWITCH TAKES THE MAN NEAREST THE BALL."
 	if key == "":
 		return
 	_tips_seen[key] = true
@@ -1341,9 +1341,9 @@ func _defense_live_hint(in_air: bool) -> String:
 	if in_air:
 		return DEFENSE_AIR_HINT
 	if me != null and me.engaged_with != null and runner.contact.is_hero_rusher(me):
-		return "TAP NOW TO BEAT THE BLOCK!" if me.duel_window > 0.0 else "PUSH AT THE PLAY  ·  THE BAR FILLS  ·  TAP WHEN IT FLASHES"
+		return "SWIPE NOW TO BEAT THE BLOCK!" if me.duel_window > 0.0 else "PUSH AT THE PLAY  ·  THE BAR FILLS  ·  SWIPE OR TAP WHEN IT FLASHES"
 	if me != null and runner.carrier == runner.qb and runner.hero_role(me) == "rush":
-		return "DRAG TO RUSH THE QB  ·  TAP = BURST  ·  WIN THE BLOCK TO GET HOME"
+		return "DRAG TO RUSH THE QB  ·  SWIPE TO BEAT THE BLOCK  ·  TAP = BURST"
 	return DEFENSE_LIVE_HINT
 
 

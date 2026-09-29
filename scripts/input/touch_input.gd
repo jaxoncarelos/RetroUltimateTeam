@@ -12,6 +12,8 @@ signal double_tapped(pos: Vector2)
 signal flicked(dir: Vector2)
 ## Three fingers down at once (toggles the debug overlay).
 signal three_finger_tap
+## A fast swipe of the tracked finger in any direction (used to beat a block mid-drag).
+signal swiped(dir: Vector2)
 ## A second finger touched down while the first is still on the screen (e.g. tap to switch the pass type mid-aim).
 signal extra_tapped(pos: Vector2)
 
@@ -34,6 +36,7 @@ var _dragging := false
 var _last_tap_t := -10.0
 var _last_tap_pos := Vector2.ZERO
 var _last_flick_t := -10.0
+var _last_swipe_t := -10.0
 var _fingers: Dictionary = {}
 
 
@@ -97,5 +100,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		if absf(v.y) > flick_speed and absf(v.y) > absf(v.x) * 1.2 and now - _last_flick_t > FLICK_COOLDOWN:
 			_last_flick_t = now
 			flicked.emit(Vector2(0.0, signf(v.y)))
+		if v.length() > flick_speed * 0.9 and now - _last_swipe_t > FLICK_COOLDOWN:
+			_last_swipe_t = now
+			swiped.emit(v.normalized())
 		_last = d.position
 		_last_t = now
