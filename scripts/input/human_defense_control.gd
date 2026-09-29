@@ -27,6 +27,10 @@ var _dragging := false
 var _anchor := Vector2.ZERO
 var _stick := Vector2.ZERO      ## field-space direction * throttle (0..1)
 var _steer := 0.0               ## return steering, -1..1
+var _drawing := false           ## pre-snap: drawing the hero's path
+var _path_pts := PackedVector2Array()
+const MAX_PATH_YARDS := 34.0
+const PATH_STEP := 1.1          ## yards between recorded points
 
 
 func bind(p_runner: PlayRunner, input: TouchInput, p_tuning: GameplayTuning) -> void:
@@ -75,10 +79,12 @@ func update(_dt: float) -> void:
 ## New play set up: give the human his remembered pre-snap pick (if the call has that slot).
 func on_play_setup() -> void:
 	_dragging = false
+	_drawing = false
 	_stick = Vector2.ZERO
 	_steer = 0.0
 	if _active():
 		switcher.apply_preferred()
+		_restore_path()
 
 
 ## The SWITCH button: pre-snap cycles LB/S; live jumps to the defender nearest the play.
@@ -125,6 +131,9 @@ func try_jump() -> bool:
 
 
 func _on_drag_started(start: Vector2, pos: Vector2) -> void:
+	if _active() and runner.phase == PlayRunner.Phase.PRE_SNAP:
+		_begin_path(start)
+		return
 	if not _live():
 		return
 	_dragging = true
@@ -133,6 +142,9 @@ func _on_drag_started(start: Vector2, pos: Vector2) -> void:
 
 
 func _on_dragged(_start: Vector2, pos: Vector2) -> void:
+	if _drawing:
+		_extend_path(pos)
+		return
 	if not _live() or not _dragging:
 		return
 	var d := pos - _anchor
@@ -150,12 +162,91 @@ func _on_dragged(_start: Vector2, pos: Vector2) -> void:
 
 
 func _on_released(_start: Vector2, _pos: Vector2, _was_drag: bool) -> void:
+	if _drawing:
+		_finish_path()
+		return
 	_dragging = false
 	_stick = Vector2.ZERO
 	_steer = 0.0
 	var me := _me()
 	if me != null and me != runner.carrier:
 		me.human = false   # hand the defender back to his brain
+		me.accel_mult = 1.0
+
+
+# ---------------------------------------------------------------- draw it up
+
+## Pre-snap drag that starts on a defender (or close to your hero): that man is your hero and
+## the drag draws his path. The path is what he runs at the snap (then his own assignment).
+func _begin_path(view_start: Vector2) -> void:
+	var p := to_field(view_start)
+	var pick := _defender_at(p)
+	var me := _me()
+	if pick == null and me != null and p.distance_to(me.field_pos) <= 4.0:
+		pick = me
+	if pick == null:
+		return
+	if pick != me:
+		switcher.manual(pick)
+		switched.emit(pick)
+	_drawing = true
+	_path_pts = PackedVector2Array([pick.field_pos])
+	runner.hero_path_preview = _path_pts
+	runner.hero_path = PackedVector2Array()
+
+
+func _extend_path(view_pos: Vector2) -> void:
+	var p := to_field(view_pos)
+	p = Vector2(clampf(p.x, 1.0, FieldGeo.LENGTH - 1.0), clampf(p.y, 1.0, FieldGeo.WIDTH - 1.0))
+	if _path_pts.is_empty() or p.distance_to(_path_pts[_path_pts.size() - 1]) < PATH_STEP:
+		return
+	if _path_length() + p.distance_to(_path_pts[_path_pts.size() - 1]) > MAX_PATH_YARDS:
+		return
+	_path_pts.append(p)
+	runner.hero_path_preview = _path_pts
+
+
+func _path_length() -> float:
+	var n := 0.0
+	for i in range(1, _path_pts.size()):
+		n += _path_pts[i].distance_to(_path_pts[i - 1])
+	return n
+
+
+## Lifting the finger keeps the path (a tiny scribble clears it) and remembers it for this call.
+func _finish_path() -> void:
+	_drawing = false
+	var me := _me()
+	runner.hero_path_preview = PackedVector2Array()
+	if me == null:
+		return
+	var key := switcher.path_key(me)
+	if _path_length() < 2.5:
+		runner.hero_path = PackedVector2Array()
+		switcher.paths.erase(key)
+		return
+	var pts := PackedVector2Array(_path_pts)
+	pts.remove_at(0)   # the start point is where he already stands
+	runner.hero_path = pts
+	var rel := PackedVector2Array()
+	for q in pts:
+		rel.append(q - me.start_pos)
+	switcher.paths[key] = rel
+	Sfx.play("tap")
+
+
+## A new play: bring back the path drawn for this call and slot last time.
+func _restore_path() -> void:
+	var me := _me()
+	if me == null:
+		return
+	var key := switcher.path_key(me)
+	if not switcher.paths.has(key):
+		return
+	var pts := PackedVector2Array()
+	for q in switcher.paths[key]:
+		pts.append(q + me.start_pos)
+	runner.hero_path = pts
 
 
 func _on_tapped(view_pos: Vector2) -> void:
@@ -168,6 +259,11 @@ func _on_tapped(view_pos: Vector2) -> void:
 		if pick == null:
 			ready_tapped.emit()
 			return
+		if pick == _me() and not runner.hero_path.is_empty():
+			# Tapping your hero again wipes his drawn path.
+			runner.hero_path = PackedVector2Array()
+			switcher.paths.erase(switcher.path_key(pick))
+			return
 		var changed := pick != _me()
 		switcher.manual(pick)
 		if changed:
@@ -179,6 +275,9 @@ func _on_tapped(view_pos: Vector2) -> void:
 	if me == null or _returning():
 		return
 	var t := tuning
+	# 0) The TAP! moment of a block duel (swim / spin / bull) beats everything else.
+	if try_duel_move():
+		return
 	# 1) Ball in the air: leap if the tap is near the landing marker and we can get there.
 	#    Too far to leap yet: sprint to the spot (tap again to jump).
 	if runner.ball.state == Ball.State.AIR and p.distance_to(runner.ball.to) <= t.tap_ball_radius:
@@ -194,6 +293,28 @@ func _on_tapped(view_pos: Vector2) -> void:
 	if best != null and best != me:
 		switcher.manual(best)
 		switched.emit(best)
+		return
+	# 4) Nothing else to tap: burst.
+	try_burst()
+
+
+## The TAP! moment of a block duel: true when the tap was spent on the move (win or lose).
+func try_duel_move() -> bool:
+	var me := _me()
+	if not _live() or me == null or _returning():
+		return false
+	return runner.contact.duel_move(me)
+
+
+## A short speed burst for the hero (cooldown in GameplayTuning). True when it fired.
+func try_burst() -> bool:
+	var me := _me()
+	if not _live() or me == null or _returning() or me.engaged_with != null:
+		return false
+	if me.start_burst(tuning):
+		runner.hero_event.emit("burst", me.field_pos)
+		return true
+	return false
 
 
 ## The defender under a tap (within tap_switch_radius), or null.
@@ -234,6 +355,7 @@ func apply(_dt: float) -> void:
 		return
 	if _dragging and _stick != Vector2.ZERO:
 		me.human = true
+		me.accel_mult = tuning.human_accel_mult
 		me.desired_dir = _stick.normalized()
 		me.throttle = _stick.length()
 		# Full pursuit speed (brains leave e.g. a backpedal multiplier behind).

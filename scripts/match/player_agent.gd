@@ -43,6 +43,14 @@ var dive_recover := -1.0
 var throw_anim := 0.0
 var tackled_speed := 0.0   ## x speed at the moment of the tackle (fall-forward spot)
 var jam_timer := 0.0   ## seconds of slowed release (press coverage)
+## Hero (human defender) extras: quicker direction changes, a short speed burst, and the state of
+## a block duel (leverage 0..1 built by pushing at the target; window > 0 = the TAP! moment).
+var accel_mult := 1.0
+var burst_timer := 0.0
+var burst_cd := 0.0
+var duel_leverage := 0.0
+var duel_window := 0.0
+var duel_stall := 0.0
 var jump_timer := 0.0
 var jump_target := Vector2.ZERO
 var jump_started_at := -1.0   ## play_time of the last jump at the ball (-1 = none)
@@ -139,6 +147,16 @@ func start_dive(t: GameplayTuning, dir: Vector2, recover := -1.0) -> void:
 
 
 ## Defender leaps at a thrown ball (swat / pick attempt).
+## A short surge of speed (the hero's tap with nothing else to do, or after beating a block).
+## Returns false while it is cooling down.
+func start_burst(t: GameplayTuning, duration := -1.0, ignore_cd := false) -> bool:
+	if (burst_cd > 0.0 and not ignore_cd) or not can_act():
+		return false
+	burst_timer = duration if duration > 0.0 else t.burst_time
+	burst_cd = t.burst_cooldown
+	return true
+
+
 func start_jump(t: GameplayTuning, toward: Vector2) -> void:
 	jump_timer = t.jump_time
 	jump_target = toward
@@ -177,7 +195,9 @@ func step(dt: float, t: GameplayTuning) -> void:
 		return
 	if engaged_with != null:
 		return
-	var target_v := desired_dir * max_speed * throttle * speed_mult
+	burst_timer = maxf(0.0, burst_timer - dt)
+	burst_cd = maxf(0.0, burst_cd - dt)
+	var target_v := desired_dir * max_speed * throttle * speed_mult * (t.burst_mult if burst_timer > 0.0 else 1.0)
 	if jump_timer > 0.0:
 		# The leap carries him toward the ball, ignoring his brain until he lands.
 		jump_timer -= dt
@@ -194,7 +214,7 @@ func step(dt: float, t: GameplayTuning) -> void:
 		juke_timer -= dt
 		target_v.y = juke_dir * t.juke_speed
 		velocity.y = target_v.y
-	velocity = velocity.move_toward(target_v, accel * dt)
+	velocity = velocity.move_toward(target_v, accel * accel_mult * dt)
 	field_pos += velocity * dt
 	if absf(velocity.x) > 0.4:
 		facing = signf(velocity.x)
@@ -224,8 +244,8 @@ func _process(_delta: float) -> void:
 	if sprite.animation != anim:
 		sprite.play(anim)
 	sprite.speed_scale = clampf(velocity.length() / 6.0, 0.6, 1.6) if anim == "run" else 1.0
-	if arrow.a > 0.0:
-		queue_redraw()   # the carrier arrow bobs
+	if arrow.a > 0.0 or duel_leverage > 0.02 or duel_window > 0.0:
+		queue_redraw()   # the carrier arrow bobs / the duel meter animates
 
 
 func _draw() -> void:
@@ -248,6 +268,21 @@ func _draw() -> void:
 			var d := Vector2.from_angle(i * PI / 2.0 + PI / 4.0)
 			draw_line(d * (r - 2.0), d * (r + 3.0), Color.WHITE, 1.5)
 	draw_set_transform(Vector2.ZERO)
+	if duel_leverage > 0.02 or duel_window > 0.0:
+		_draw_duel_meter()
+
+
+## Leverage bar over the hero while he fights a block; the TAP! moment flashes yellow.
+func _draw_duel_meter() -> void:
+	var w := 26.0
+	var o := Vector2(-w * 0.5, 9.0)   # under his feet (the name pill sits over his head)
+	var open := duel_window > 0.0
+	var flash := open and int(Time.get_ticks_msec() / 90) % 2 == 0
+	draw_rect(Rect2(o - Vector2(1, 1), Vector2(w + 2, 6)), Color("#070b2e"))
+	draw_rect(Rect2(o, Vector2(w, 4)), Color("#1c2c8e"))
+	draw_rect(Rect2(o, Vector2(w * clampf(duel_leverage, 0.0, 1.0), 4)), Color("#ffec27") if open else Color("#3fe071"))
+	if open:
+		UiSkin.draw_text_c(self, 0.0, o.y + 14.0, "TAP!", 8, Color("#ffec27") if flash else Color.WHITE)
 
 
 static func _star_points(outer: float, inner: float) -> PackedVector2Array:

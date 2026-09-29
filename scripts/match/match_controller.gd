@@ -16,8 +16,8 @@ enum PauseMenu { MAIN, CONFIRM_QUIT, CONFIRM_SIM }
 ## A halftime lead this big offers to sim the rest of the game (also in the pause menu).
 const SIM_OFFER_LEAD := 28
 
-const DEFENSE_PRESNAP_HINT := "TAP A DEFENDER TO PICK HIM  ·  TAP THE FIELD WHEN READY"
-const DEFENSE_LIVE_HINT := "DRAG TO MOVE  ·  RUN INTO THE CARRIER  ·  TAP HIM TO DIVE"
+const DEFENSE_PRESNAP_HINT := "DRAG FROM YOUR PLAYER TO DRAW HIS PATH  ·  TAP THE FIELD WHEN READY"
+const DEFENSE_LIVE_HINT := "DRAG TO MOVE  ·  TAP = BURST  ·  TAP THE CARRIER TO DIVE"
 const DEFENSE_AIR_HINT := "TAP THE BALL MARKER TO JUMP  ·  SWITCH = MAN NEAREST THE BALL"
 
 const DT := 1.0 / 60.0
@@ -175,6 +175,7 @@ func _build_scene(home_team: TeamData, away_team: TeamData) -> void:
 		if phase == Phase.PLAY_CALL and _human_defense():
 			_snap())
 	runner.play_ended.connect(_on_play_ended)
+	runner.hero_event.connect(_on_hero_event)
 	runner.big_hit.connect(func(_at: Vector2, speed: float) -> void:
 		if _sim():
 			return
@@ -496,7 +497,7 @@ var _tagged: PlayerAgent = null
 func _process(delta: float) -> void:
 	if phase == Phase.LIVE and _human_defense() and runner.human_team == PlayerAgent.Team.DEFENSE:
 		var in_air := runner.ball.state == Ball.State.AIR
-		hud.set_hint(DEFENSE_AIR_HINT if in_air else DEFENSE_LIVE_HINT)
+		hud.set_hint(_defense_live_hint(in_air))
 	# Name + number of the player you control.
 	var ctrl := runner.controlled if human != "" else null
 	if ctrl != _tagged:
@@ -675,7 +676,7 @@ func _coach_tips() -> void:
 		text = "YOUR BALL. THE BEST CALL IS PRESELECTED (OR TAP ANOTHER / MORE). PRESS THE QB AND DRAG BACK TO AIM, RELEASE TO THROW. DRAG FORWARD TO RUN."
 	elif _human_defense() and not _tips_seen.has("defense"):
 		key = "defense"
-		text = "DEFENSE! PICK A CALL, TAP A DEFENDER TO CONTROL HIM (YELLOW TAG), THEN TAP THE FIELD. DRAG TO MOVE HIM AND RUN INTO THE CARRIER TO TACKLE. YOU STAY ON HIM UNTIL YOU HIT SWITCH (NEAREST MAN TO THE BALL)."
+		text = "DEFENSE! THE CALL PICKS YOUR HERO (YELLOW TAG). DRAG FROM HIM TO DRAW HIS PATH, THEN TAP THE FIELD TO SNAP. DRAG TO MOVE: PUSH AT BLOCKERS AND TAP WHEN THE BAR FLASHES TO BEAT THEM, TAP FOR A BURST, TAP THE CARRIER TO DIVE, TAP THE BALL TO LEAP. SWITCH TAKES THE MAN NEAREST THE BALL."
 	if key == "":
 		return
 	_tips_seen[key] = true
@@ -1322,3 +1323,32 @@ func _offer_sim() -> void:
 	_half_offer = true
 	hud.show_choice("YOU LEAD BY %d" % gs.score_diff(human), "%s %d  %s %d  ·  SIM THE SECOND HALF?" % [gs.home, gs.score[gs.home], gs.away, gs.score[gs.away]],
 			["PLAY 2ND HALF", "SIM REST OF GAME"] as Array[String])
+
+
+# ---------------------------------------------------------------- hero (defense) feedback
+
+## The hint line for your defender: what to do right now.
+func _defense_live_hint(in_air: bool) -> String:
+	var me := runner.controlled
+	if in_air:
+		return DEFENSE_AIR_HINT
+	if me != null and me.engaged_with != null and runner.contact.is_hero_rusher(me):
+		return "TAP NOW TO BEAT THE BLOCK!" if me.duel_window > 0.0 else "PUSH AT THE PLAY  ·  THE BAR FILLS  ·  TAP WHEN IT FLASHES"
+	if me != null and runner.carrier == runner.qb and runner.hero_role(me) == "rush":
+		return "DRAG TO RUSH THE QB  ·  TAP = BURST  ·  WIN THE BLOCK TO GET HOME"
+	return DEFENSE_LIVE_HINT
+
+
+func _on_hero_event(kind: String, _at: Vector2) -> void:
+	if _sim():
+		return
+	match kind:
+		"beat":
+			Sfx.play("slam")
+			hud.flash(Color(1, 0.93, 0.15), 0.25)
+			if Settings.shake:
+				camera.add_trauma(0.3)
+		"fail":
+			Sfx.play("tap")
+		"burst":
+			Sfx.play("whoosh")

@@ -311,6 +311,11 @@ func _setup_formation() -> void:
 	field.down = downs.down
 	if dcontrol != null:
 		dcontrol.on_play_setup()
+		if OS.get_cmdline_user_args().has("--hero-demo") and runner.controlled != null:   # screenshots
+			var st := runner.controlled.start_pos
+			runner.hero_path = PackedVector2Array([st + Vector2(-0.5, -3.0), st + Vector2(-1.5, -6.5), st + Vector2(-4.5, -8.5)])
+			runner.controlled.duel_leverage = 0.8
+			runner.controlled.duel_window = 9.0
 
 
 func _update_scorebug() -> void:

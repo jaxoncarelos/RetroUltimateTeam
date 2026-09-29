@@ -58,7 +58,7 @@ func test_human_gets_a_defender_at_the_snap() -> void:
 	_setup("slants", "cover2")
 	assert_not_null(runner.controlled)
 	assert_eq(runner.controlled.team, PlayerAgent.Team.DEFENSE)
-	assert_eq(runner.controlled.pos_code, "LB")
+	assert_eq(runner.controlled.pos_code, "DL", "cover2: the hero is the best pass rusher up front")
 
 
 func test_switch_button_takes_the_defender_nearest_the_landing_spot() -> void:

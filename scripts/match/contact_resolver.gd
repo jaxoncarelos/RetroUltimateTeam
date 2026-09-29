@@ -83,10 +83,15 @@ func _blocks(dt: float) -> void:
 
 func _hold(b: PlayerAgent, d: PlayerAgent, dt: float) -> void:
 	var t := ctx.tuning
+	var hero := is_hero_rusher(d)
+	if hero:
+		_duel_tick(b, d, dt)
 	d.shed_timer -= dt
 	if d.shed_timer <= 0.0 or d.is_down or b.is_down or d == ctx.carrier:
 		b.engaged_with = null
 		d.engaged_with = null
+		d.duel_leverage = 0.0
+		d.duel_window = 0.0
 		var pro := _is_pass_pro()
 		d.block_cd = t.pass_rusher_cd if pro else 0.8
 		b.block_cd = t.pass_blocker_cd if pro else 0.6
@@ -103,8 +108,13 @@ func _hold(b: PlayerAgent, d: PlayerAgent, dt: float) -> void:
 			if side == 0.0:
 				side = 1.0
 			drift.y = side * t.run_seal_push * clampf(1.0 - edge * 0.03, 0.2, 1.5)
+		if hero and d.human:
+			# Your steering fights the wall: leverage cancels his push, your stick drives the pair.
+			drift = drift * (1.0 - d.duel_leverage) + d.desired_dir * d.throttle * t.duel_push_speed
 	else:
 		drift = d.desired_dir * clampf(0.6 + edge * 0.03, 0.2, 1.6)
+		if hero and d.human:
+			drift = d.desired_dir * d.throttle * t.duel_push_speed * clampf(0.7 + edge * 0.03, 0.3, 1.6)
 	d.field_pos += drift * dt
 	d.velocity = drift
 	b.velocity = drift
@@ -112,6 +122,79 @@ func _hold(b: PlayerAgent, d: PlayerAgent, dt: float) -> void:
 	if sep.length() < 0.01:
 		sep = Vector2(-1.0, 0.0)
 	b.field_pos = d.field_pos + sep.normalized() * 0.9
+
+
+## The defender the human steers, while he is the one fighting a block.
+func is_hero_rusher(d: PlayerAgent) -> bool:
+	return ctx.human_team == PlayerAgent.Team.DEFENSE and d == ctx.controlled \
+			and d.team == PlayerAgent.Team.DEFENSE and ctx.carrier != d
+
+
+## Who the hero is trying to get to: the QB while he still holds it, else the ball carrier.
+func _duel_target(d: PlayerAgent) -> PlayerAgent:
+	var c := ctx.carrier
+	if c != null and c.team != d.team:
+		return c
+	return ctx.qb
+
+
+## Block duel (hero only): pushing at the target builds leverage; at the threshold a TAP!
+## window opens (see duel_move); leverage also shortens the block's hold timer, so pushing
+## well pays off even without the tap. Ratings tilt the whole thing (rusher vs blocker).
+func _duel_tick(b: PlayerAgent, d: PlayerAgent, dt: float) -> void:
+	var t := ctx.tuning
+	d.duel_stall = maxf(0.0, d.duel_stall - dt)
+	var target := _duel_target(d)
+	var edge := rush_rating(d) - b.attr("blk")
+	var align := 0.0
+	if d.human and target != null and d.throttle > 0.05:
+		var toward := target.field_pos - d.field_pos
+		if toward.length() > 0.01:
+			align = clampf(d.desired_dir.dot(toward.normalized()), 0.0, 1.0) * clampf(d.throttle, 0.0, 1.0)
+	if d.duel_stall <= 0.0 and align > 0.25:
+		d.duel_leverage += t.duel_gain * align * clampf(1.0 + edge * t.duel_edge_scale, 0.4, 1.8) * dt
+	else:
+		d.duel_leverage -= t.duel_decay * dt
+	d.duel_leverage = clampf(d.duel_leverage, 0.0, 1.0)
+	if d.duel_window > 0.0:
+		d.duel_window -= dt
+		if d.duel_window <= 0.0:   # missed the moment: he re-sets his feet
+			d.duel_window = 0.0
+			d.duel_leverage = maxf(0.0, t.duel_window_at - 0.3)
+			d.duel_stall = t.duel_stall * 0.5
+	elif d.duel_leverage >= t.duel_window_at:
+		d.duel_window = t.duel_window_time
+	d.shed_timer -= dt * d.duel_leverage * t.duel_help
+
+
+## The hero's tap while his TAP! window is open: a swim/spin/bull move. Returns true when the
+## tap was used (win or lose). Timing near the middle of the window and a rating edge help.
+func duel_move(d: PlayerAgent) -> bool:
+	var b := d.engaged_with
+	if b == null or d.duel_window <= 0.0 or not is_hero_rusher(d):
+		return false
+	var t := ctx.tuning
+	var edge := rush_rating(d) - b.attr("blk")
+	var mid := 1.0 - absf(d.duel_window / t.duel_window_time - 0.5) * 2.0   # 1 in the middle, 0 at the ends
+	var p := clampf(t.duel_move_base + edge * t.duel_move_per_point + t.duel_timing_bonus * (mid - 0.5) * 2.0, 0.1, 0.97)
+	d.duel_window = 0.0
+	if ctx.rng.randf() < p:
+		var target := _duel_target(d)
+		b.engaged_with = null
+		d.engaged_with = null
+		b.knock_down(t.duel_beaten_stun)
+		b.block_cd = 1.0
+		d.block_cd = t.pass_rusher_cd
+		d.duel_leverage = 0.0
+		d.start_burst(t, t.duel_burst_time, true)
+		if target != null:
+			d.velocity = (target.field_pos - d.field_pos).normalized() * d.max_speed * 0.6
+		ctx.hero_event.emit("beat", d.field_pos)
+	else:
+		d.duel_leverage = maxf(0.0, d.duel_leverage - t.duel_fail_leverage)
+		d.duel_stall = t.duel_stall
+		ctx.hero_event.emit("fail", d.field_pos)
+	return true
 
 
 ## True for the defender the human controls (ring + name pill): he gets the human tackle

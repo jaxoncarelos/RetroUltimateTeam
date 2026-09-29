@@ -13,6 +13,8 @@ signal ball_thrown(target: Vector2)
 signal big_hit(at: Vector2, speed: float)
 ## A highlight moment for juice (slow-mo, camera punch): "deep_catch", "pick" or "td".
 signal big_moment(kind: String, at: Vector2)
+## Hero (your defender) moments: "beat" / "fail" a block duel, "burst", "hurry" (for sfx / juice).
+signal hero_event(kind: String, at: Vector2)
 
 enum Phase { IDLE, PRE_SNAP, LIVE, DEAD }
 
@@ -57,6 +59,9 @@ var handoff_delay := 0.0
 var handoff_range := HANDOFF_RANGE
 ## Remaining designed run lane for the current ball carrier (absolute field points).
 var carrier_lane := PackedVector2Array()
+## The hero defender's drawn path (absolute field points; empty = none) and the one being drawn.
+var hero_path := PackedVector2Array()
+var hero_path_preview := PackedVector2Array()
 var pass_thrown := false
 var scrambling := false
 var play_time := 0.0
@@ -133,6 +138,8 @@ func setup_play(p_off: PlayDef, p_def: PlayDef, p_los_x: float, p_ball_y: float,
 	key_level = 0.0
 	handoff_delay = 0.0
 	carrier_lane = PackedVector2Array()
+	hero_path = PackedVector2Array()
+	hero_path_preview = PackedVector2Array()
 	fumbled = false
 	qb_target_hint = null
 	aim_preview = Vector2.INF
@@ -212,6 +219,8 @@ func snap() -> void:
 		a.in_stance = false
 		a.brain = _brain_for(a)
 	_apply_presnap_reads()
+	if human_team == PlayerAgent.Team.DEFENSE and controlled != null and hero_path.size() >= 2:
+		controlled.brain = DrawnPathBrain.new(controlled, self, hero_path, controlled.brain)
 	if is_run_play():
 		contact.snap_engage()
 	if str(qb.assignment.get("type", "")) == "sneak":
@@ -559,6 +568,9 @@ func _fumble(runner: PlayerAgent) -> void:
 ## The human's defender at the snap: the best-placed second-level player — the linebacker
 ## nearest the ball (safeties next), else the nearest defender.
 func default_defender() -> PlayerAgent:
+	var hero := hero_for_call()
+	if hero != null:
+		return hero
 	var best: PlayerAgent = null
 	var best_d := INF
 	for d in defense:
@@ -568,6 +580,40 @@ func default_defender() -> PlayerAgent:
 			best_d = dist
 			best = d
 	return best
+
+
+## The "hero" the call hands you (one clear job per snap): the blitzer on a blitz, the corner
+## on your call's best receiver in man coverage, else the best pass rusher on the line.
+## null when the formation has none of them (the old linebacker default applies).
+func hero_for_call() -> PlayerAgent:
+	var best: PlayerAgent = null
+	var best_s := -1.0
+	for d in defense:   # blitz: a rusher who is not a lineman
+		if d.assignment.get("type", "") == "rush" and d.pos_code != "DL" and d.attr("prs") > best_s:
+			best_s = d.attr("prs")
+			best = d
+	if best != null:
+		return best
+	for d in defense:   # man coverage: the corner on the first receiver
+		if d.pos_code == "CB" and d.assignment.get("type", "") == "man" and d.assignment.get("target", "") == "WR1":
+			return d
+	best_s = -1.0
+	for d in defense:   # otherwise the best pass rusher up front
+		if d.pos_code == "DL" and d.attr("prs") > best_s:
+			best_s = d.attr("prs")
+			best = d
+	return best
+
+
+## Short role label for the hero's hint line: "rush", "cover" or "play".
+func hero_role(d: PlayerAgent) -> String:
+	if d == null:
+		return "play"
+	if d.pos_code == "DL" or d.assignment.get("type", "") == "rush":
+		return "rush"
+	if d.pos_code in ["CB", "S"]:
+		return "cover"
+	return "play"
 
 
 ## Hands the human a different defender (DefenseSwitcher / tap-to-switch).

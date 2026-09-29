@@ -149,6 +149,26 @@ extends Resource
 @export var human_shed_mult := 0.6     ## blocks on your defender hold this share as long
 @export var human_assist_range := 2.2  ## CPU teammates this close to your tackle attempt help wrap up…
 @export var human_assist_bonus := 0.1  ## …adding this each
+@export_subgroup("Hero moves")
+@export var human_accel_mult := 1.45   ## your defender changes direction this much faster while you steer him
+@export var burst_mult := 1.4          ## speed multiplier during a burst (tap with nothing else to do)
+@export var burst_time := 0.7          ## seconds a burst lasts
+@export var burst_cooldown := 4.0      ## seconds before the next burst
+@export_subgroup("Hero block duels")
+@export var duel_push_speed := 1.5     ## yards/s the blocked pair drifts when you push at full stick
+@export var duel_gain := 0.55          ## leverage per second pushing straight at the target (0..1 bar)
+@export var duel_edge_scale := 0.012   ## leverage-gain change per rating point of your rush over his block
+@export var duel_decay := 0.3          ## leverage lost per second while you don't push at the target
+@export var duel_help := 1.6           ## extra block-shed countdown per second at full leverage
+@export var duel_window_at := 0.68     ## leverage where the TAP! window opens
+@export var duel_window_time := 0.75   ## seconds the window stays open
+@export var duel_move_base := 0.7      ## chance the tapped move beats the block at equal ratings, dead-center timing
+@export var duel_move_per_point := 0.012 ## chance per rating point of rush over block
+@export var duel_timing_bonus := 0.25  ## max chance added for tapping right in the middle of the window
+@export var duel_fail_leverage := 0.4  ## leverage lost when the move fails
+@export var duel_stall := 0.45         ## seconds you can't build leverage after a failed move
+@export var duel_burst_time := 0.9     ## speed burst after beating the block
+@export var duel_beaten_stun := 0.6    ## seconds the beaten blocker stays out of it
 
 @export_group("Kicking")
 @export var touchback_yard := 25.0        ## kickoff touchback spot (yards from own goal)

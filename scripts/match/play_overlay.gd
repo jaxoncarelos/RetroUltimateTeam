@@ -35,6 +35,8 @@ func _draw() -> void:
 		# Only the offense's own player gets the route preview (no peeking on defense).
 		if runner.phase == PlayRunner.Phase.PRE_SNAP and runner.human_team != PlayerAgent.Team.DEFENSE:
 			_draw_routes()
+		if runner.human_team == PlayerAgent.Team.DEFENSE:
+			_draw_hero_path()
 	else:
 		if runner.phase == PlayRunner.Phase.PRE_SNAP and runner.human_team == PlayerAgent.Team.OFFENSE:
 			_draw_snap_hint()
@@ -42,6 +44,39 @@ func _draw() -> void:
 			_draw_aim()
 		if show_landing and runner.ball.state == Ball.State.AIR:
 			_draw_flight()
+
+
+## The hero's drawn path (or the one being drawn): dotted cyan line from him with an arrowhead,
+## and a pulsing dot on him pre-snap so it is clear where to start the drag.
+func _draw_hero_path() -> void:
+	var me := runner.controlled
+	if me == null:
+		return
+	var pts := PackedVector2Array()
+	if runner.phase == PlayRunner.Phase.PRE_SNAP:
+		if not runner.hero_path_preview.is_empty():
+			pts = runner.hero_path_preview
+		else:
+			pts.append(me.field_pos)
+			pts.append_array(runner.hero_path)
+	elif me.brain is DrawnPathBrain:
+		var b := me.brain as DrawnPathBrain
+		pts.append(me.field_pos)
+		for i in range(b.idx, b.points.size()):
+			pts.append(b.points[i])
+	if pts.size() < 2:
+		return
+	var col := Color("#29adff")
+	var prev := FieldProjection.to_screen(pts[0])
+	for i in range(1, pts.size()):
+		var cur := FieldProjection.to_screen(pts[i])
+		_dotted(prev, cur, col)
+		prev = cur
+	# Arrowhead at the end.
+	var back := FieldProjection.to_screen(pts[pts.size() - 2])
+	var dir := (prev - back).normalized() if prev.distance_to(back) > 0.1 else Vector2.RIGHT
+	var n := Vector2(-dir.y, dir.x)
+	draw_colored_polygon(PackedVector2Array([prev + dir * 4.0, prev - dir * 2.0 + n * 3.0, prev - dir * 2.0 - n * 3.0]), col)
 
 
 ## Pre-snap: a pulsing grab ring on the QB with a "pull back" chevron trail behind him.
@@ -137,6 +172,27 @@ func _draw_flight() -> void:
 	var land := FieldProjection.to_screen(b.to)
 	_dotted(FieldProjection.to_screen(b.field_pos), land, SHADOW_COLOR)
 	_draw_reticle(land, RETICLE_COLOR, 0.5 + 0.5 * sin(Time.get_ticks_msec() / 90.0))
+	if runner.human_team == PlayerAgent.Team.DEFENSE and runner.controlled != null:
+		_draw_jump_ring(land)
+
+
+## Ball-hawk timing ring (defense): a ring closes in on the landing marker; tap (the leap) as it
+## meets the marker for the best chance to pick it. Green = your man is close enough to leap.
+func _draw_jump_ring(land: Vector2) -> void:
+	var t := runner.tuning
+	var left := runner.ball.time_left()
+	var ideal := t.jump_time * 0.5
+	if left < ideal - t.jump_good:
+		return
+	var r := 8.0 + clampf((left - ideal) / 0.9, 0.0, 1.0) * 26.0
+	var in_range := runner.controlled.field_pos.distance_to(runner.ball.to) <= t.jump_start_range
+	var perfect := absf(left - ideal) <= t.jump_perfect
+	var col := (Color("#ffec27") if perfect else Color("#3fe071")) if in_range else Color("#93a6e8")
+	draw_set_transform(land.round(), 0.0, Vector2(1.0, 0.5))
+	draw_arc(Vector2.ZERO, r, 0.0, TAU, 28, Color(col, 0.9), 2.0)
+	draw_set_transform(Vector2.ZERO)
+	if in_range and perfect:
+		UiSkin.draw_text_c(self, land.x, land.y - 14.0, "NOW!", 8, Color("#ffec27"))
 
 
 func _draw_reticle(center: Vector2, color: Color, alpha: float) -> void:

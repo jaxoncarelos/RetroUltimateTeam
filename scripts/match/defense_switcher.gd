@@ -13,6 +13,10 @@ extends RefCounted
 var ctx: PlayRunner
 ## Slot the human last picked pre-snap; reused on the next play when the formation has it.
 var preferred_slot := ""
+## Play id the pick was made for: a different call hands you its own hero (see PlayRunner.hero_for_call).
+var preferred_play := ""
+## Drawn paths remembered per call and slot ("play|slot" -> points relative to his start).
+var paths: Dictionary = {}
 
 
 func _init(p_ctx: PlayRunner) -> void:
@@ -24,11 +28,12 @@ func manual(d: PlayerAgent) -> void:
 	ctx.set_controlled_defender(d)
 	if ctx.phase == PlayRunner.Phase.PRE_SNAP and ctx.controlled == d:
 		preferred_slot = d.slot
+		preferred_play = _play_id()
 
 
 ## Pre-snap default: your last pick's slot if the defense has it, else the runner's pick.
 func apply_preferred() -> void:
-	if preferred_slot != "" and ctx.def_slots.has(preferred_slot):
+	if preferred_slot != "" and preferred_play == _play_id() and ctx.def_slots.has(preferred_slot):
 		ctx.set_controlled_defender(ctx.def_slots[preferred_slot])
 
 
@@ -45,6 +50,7 @@ func switch_to_ball() -> PlayerAgent:
 		pick = _next_presnap(cur)
 		if pick != null:
 			preferred_slot = pick.slot
+			preferred_play = _play_id()
 	elif ctx.phase == PlayRunner.Phase.LIVE:
 		pick = best_defender(cur)
 	if pick != null:
@@ -110,3 +116,11 @@ func score(d: PlayerAgent) -> float:
 	if d.brain is RushBrain:
 		penalty += 3.0   # pre-throw the human covers; rushers rush on their own
 	return d.field_pos.distance_to(target.field_pos) / spd + penalty
+
+
+func _play_id() -> String:
+	return ctx.def_play.id if ctx.def_play != null else ""
+
+
+func path_key(d: PlayerAgent) -> String:
+	return "%s|%s" % [_play_id(), d.slot]

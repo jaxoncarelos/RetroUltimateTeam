@@ -21,7 +21,8 @@ var _jumped := false
 var _jump_err := 0.0
 var _will_jump := false
 ## Counters for the sim printout.
-var stats := {"switches": 0, "dives": 0, "jumps": 0}
+var stats := {"switches": 0, "dives": 0, "jumps": 0, "duels": 0, "bursts": 0}
+var _tapped_window := false
 
 
 func _init(p_ctl: HumanDefenseControl, p_runner: PlayRunner, p_skill := 0.5, p_seed := 0) -> void:
@@ -57,7 +58,7 @@ func step(dt: float) -> void:
 		return
 	match st:
 		"pre":
-			ctl.set_stick(Vector2.ZERO)
+			_rush(me)
 		"air":
 			_play_ball(me)
 		"carry":
@@ -116,3 +117,28 @@ func _pursue(me: PlayerAgent) -> void:
 	if dist > t.human_tackle_range and dist < t.human_dive_range * 0.75 and rng.randf() < 0.04:
 		if ctl.try_dive():
 			stats["dives"] += 1
+
+
+## QB still holding it and the bot's hero is a rusher: push at the QB, burst when free, and tap
+## in the TAP! window (skill tightens the timing around the middle of it).
+func _rush(me: PlayerAgent) -> void:
+	if runner.hero_role(me) != "rush" or runner.qb == null:
+		ctl.set_stick(Vector2.ZERO)
+		return
+	ctl.set_stick((runner.qb.field_pos - me.field_pos).normalized())
+	if me.engaged_with == null:
+		_tapped_window = false
+		if rng.randf() < 0.03 and ctl.try_burst():
+			stats["bursts"] += 1
+		return
+	if me.duel_window <= 0.0:
+		_tapped_window = false
+		return
+	if _tapped_window:
+		return
+	var frac := me.duel_window / runner.tuning.duel_window_time   # 1 = just opened, 0 = closing
+	var want := clampf(0.5 + rng.randfn(0.0, lerpf(0.3, 0.12, skill)), 0.05, 0.95)
+	if frac <= want:
+		_tapped_window = true
+		if ctl.try_duel_move():
+			stats["duels"] += 1
