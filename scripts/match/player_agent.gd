@@ -87,6 +87,7 @@ func setup(p_team: int, p_slot: String, p_pos: String, p_attrs: Dictionary, t: G
 	sprite.sprite_frames = PlayerSprites.frames()
 	sprite.centered = false
 	sprite.offset = PlayerSprites.OFFSET
+	sprite.scale = Vector2.ONE * PlayerSprites.SCALE
 	sprite.material = PlayerSprites.make_material(colors, hash(p_slot + p_name) + jersey, p_look)
 	sprite.play("idle")
 	add_child(sprite)

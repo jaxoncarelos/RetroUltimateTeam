@@ -13,6 +13,6 @@ Canvas: 480x270 viewport, `expand` aspect (phones get ~585x270). All colors live
   disabled = greyed panel. Minimum tap target 24 px.
 - **Match HUD:** top bar shows team-colored score chips (helmet color), quarter + clock, down &
   distance; bottom bar shows the controlled player and gesture hint. Bars are `BAR_H` = 14.
-- **Camera:** keep zoom 1.0. At 1.25 wide receivers at the sidelines fall off screen.
+- **Players:** on-field sprites are drawn at `PlayerSprites.SCALE` (1.25) for readability. Camera zoom stays 1.0: at 1.25 wide receivers at the sidelines fall off screen.
 - **Review loop:** `godot --path . --resolution 1170x540 --fixed-fps 60 -- --snap=out.png,120 <flags> --fake-notch`
   (flags: `--demo-profile --screen=X`, `--quick`, `--watch`, `--show=pause|pat|final|kick|tip`).

@@ -7,6 +7,8 @@ const SHEET := "res://art/players/player_template.png"
 const SHADER := "res://art/shaders/palette_swap.gdshader"
 const FRAME := Vector2i(28, 26)
 ## Sprite offset (centered = false) that puts the feet on the node's origin.
+## On-field size multiplier (feet stay planted): bigger, more readable players.
+const SCALE := 1.25
 const OFFSET := Vector2(-14, -24)
 ## name -> [frame indices, fps, loop]. "stance" is the pre-snap crouch (optional to use).
 const ANIMS := {
