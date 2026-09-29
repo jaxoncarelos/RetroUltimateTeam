@@ -336,8 +336,15 @@ class _Strip:
 		for i in n:
 			xs.append(size.x * (float(i) + 0.5) / 3.0)
 		var line_y := 56.0
-		draw_rect(Rect2(4, line_y, (size.x - 8) if pack_art == null else xs[n - 1] - 4.0, 2), Color(1, 1, 1, 0.85))
-		draw_rect(Rect2(4, line_y, xs[cur] - 4, 2), UiSkin.GREEN)
+		# Progress path *between* the helmets (a full-width line showed through the facemasks).
+		var x_from := 4.0
+		for i in n:
+			var x_to: float = xs[i] - 32.0
+			if x_to > x_from:
+				draw_rect(Rect2(x_from, line_y, x_to - x_from, 2), UiSkin.GREEN if i <= cur else Color(1, 1, 1, 0.85))
+			x_from = xs[i] + 32.0
+		if pack_art == null and size.x - 4.0 > x_from:
+			draw_rect(Rect2(x_from, line_y, size.x - 4.0 - x_from, 2), Color(1, 1, 1, 0.85))
 		for i in n:
 			var g: Dictionary = games[i]
 			var cx: float = xs[i]

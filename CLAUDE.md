@@ -13,7 +13,16 @@ Godot 4.7 + GDScript retro football game. Design/roadmap: `PLAN.md`. Status tabl
 - Debug a single matchup: a throwaway GUT test that builds a PlayRunner, steps `_physics_process`
   and prints positions is the fastest loop (see `tests/unit/test_play_runner.gd` for setup).
 - Visual check without a device: `godot --path . --write-movie out/f.png --fixed-fps 20 --quit-after 200 -- --autoplay`, then look at the PNG frames.
+- Phone-aspect screenshot (585x270 viewport, real aspect, no crop): `godot --path . --resolution 1170x540 --fixed-fps 60 -- --snap=out.png,120 --demo-profile --screen=store --fake-notch` (`--fake-notch` simulates iPhone insets; UI insets come from `SafeArea`).
 - After adding/renaming a `class_name` script, run `godot --headless --import` so the global class cache updates.
+
+## Shipping an iOS build to the owner's phone (AltStore)
+- Workflow `.github/workflows/ios-build.yml` (manual `workflow_dispatch`, ~15–20 min, macOS runner) builds an
+  unsigned IPA and publishes it to the rolling GitHub release tagged `latest` (stable URL, replaced each run).
+- To ship a fix: commit + push to `main`, then `gh workflow run ios-build.yml` (or `gh workflow run ios-build.yml --ref main`),
+  watch with `gh run watch`, and tell the owner the release is ready
+  (`gh release view latest --web` URL). The owner downloads the IPA in Safari and opens it in AltStore.
+- The owner is away from the PC while testing: push fixes, trigger the build, and report the release link. Don't wait to be asked.
 
 ## Conventions
 - **Field space is yards**: x 0–120 (own goal line x=10, opponent's x=110), y 0–53.33 (top sideline 0). Offense always attacks +x. Only `FieldProjection` converts to pixels.
