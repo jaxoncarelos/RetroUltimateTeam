@@ -57,7 +57,10 @@ func _ready() -> void:
 	_entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return Collection.card_ovr(GameData.db, a) > Collection.card_ovr(GameData.db, b))
 	_build()
-	_intro.call_deferred()
+	if OS.get_cmdline_user_args().has("--summary"):   # debug: skip to the card summary
+		_show_summary.call_deferred(true)
+	else:
+		_intro.call_deferred()
 
 
 func _build() -> void:

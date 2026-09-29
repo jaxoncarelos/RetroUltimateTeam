@@ -108,6 +108,9 @@ func _ready() -> void:
 		_run_sim_batch.call_deferred()
 	else:
 		_start_game()
+		for a in OS.get_cmdline_user_args():
+			if a.begins_with("--show="):
+				_debug_show.call_deferred(a.trim_prefix("--show="))
 
 
 # ---------------------------------------------------------------- scene
@@ -1232,3 +1235,19 @@ func _print_sim_totals() -> void:
 ## Home team in its colors, visitors in road whites, so the two sides never blend together.
 func _jersey(team: TeamData) -> Dictionary:
 	return team.uniform_colors() if team.abbr == gs.home else team.away_colors()
+
+
+## Debug: `-- --show=pause|pat|final|kick|tip` opens that HUD piece after ~6 s (screenshots).
+func _debug_show(kind: String) -> void:
+	await get_tree().create_timer(6.0).timeout
+	match kind:
+		"pause":
+			_show_pause_menu()
+		"pat":
+			hud.show_choice("EXTRA POINT", "KC 6  PHI 0", ["KICK PAT (1)", "GO FOR 2"] as Array[String])
+		"final":
+			hud.show_choice("YOU WIN!", "KC 31  PHI 17", ["PLAY AGAIN"] as Array[String])
+		"kick":
+			hud.kick_meter.start("FIELD GOAL  38 YD", 0.3, 0.12, 1.0)
+		"tip":
+			hud.show_tip("YOUR BALL. THE BEST CALL IS PRESELECTED (OR TAP ANOTHER / MORE). PRESS THE QB AND DRAG BACK TO AIM, RELEASE TO THROW. DRAG FORWARD TO RUN.")
