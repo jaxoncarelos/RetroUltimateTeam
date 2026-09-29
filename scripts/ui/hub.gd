@@ -177,20 +177,28 @@ func _row(n: String, w: String, l: String, t: String, col: Color, hi: bool) -> C
 
 func _coach_panel() -> Control:
 	var prog := ProgressionRules.level_progress(int(prof.coach.get("xp", 0)))
+	var pts := CoachPerks.available(prof)
 	var p := RetroPanel.new("COACH LEVEL %d" % int(prog["level"]), UiSkin.PANEL, 4)
+	p.mouse_filter = Control.MOUSE_FILTER_STOP
+	p.gui_input.connect(func(ev: InputEvent) -> void:
+		if (ev is InputEventMouseButton and ev.pressed) or (ev is InputEventScreenTouch and ev.pressed):
+			Sfx.play("tap")
+			SceneRouter.goto(SceneRouter.COACH))
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 6)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(h)
 	var bar := BarMeter.new(float(prog["frac"]), Vector2(0, 9))
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bar.segments = 5
 	h.add_child(bar)
-	var next := ProgressionRules.rewards_for_level(int(prog["level"]) + 1)
 	var txt := "MAX" if prog["max"] else "%d/%d XP" % [prog["into"], prog["needed"]]
 	h.add_child(MetaUI.label(txt, UiSkin.MUTED))
-	if not prog["max"] and str(next.get("pack", "")) != "":
-		p.tooltip_text = "NEXT LEVEL: %s PACK" % str(next["pack"]).to_upper()
+	if pts > 0:
+		var tip := MetaUI.label("%d PT%s!" % [pts, "" if pts == 1 else "S"], UiSkin.YELLOW)
+		h.add_child(tip)
+		Fx.pulse.call_deferred(tip, 1.05, 0.8)
 	return p
 
 

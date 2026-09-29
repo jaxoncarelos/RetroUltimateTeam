@@ -169,7 +169,7 @@ static func add_card_xp(db: RosterDB, entry: Dictionary, amount: int) -> int:
 ## cards XP_BENCH_SHARE of it. Returns level-ups [{uid, name, from, to}].
 static func award_xp(profile: Profile, db: RosterDB, won: bool) -> Array[Dictionary]:
 	var ups: Array[Dictionary] = []
-	var xp := XP_PER_GAME + (XP_WIN_BONUS if won else 0)
+	var xp := int(round((XP_PER_GAME + (XP_WIN_BONUS if won else 0)) * CoachPerks.card_xp_mult(profile)))
 	for e in profile.cards:
 		var amount := xp if profile.in_lineup(int(e["uid"])) else int(xp * XP_BENCH_SHARE)
 		var before := card_ovr(db, e)

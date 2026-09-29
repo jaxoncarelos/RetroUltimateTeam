@@ -483,6 +483,10 @@ static func postgame(profile: Profile, db: RosterDB, r: Dictionary, unix_time :=
 			items.append({"id": "objective", "label": label, "coins": int(c["coins"]), "pack": c["pack"]})
 	# Match coins (objective coins were already added by claim_details).
 	var match_coins := int(rw["total"])
+	var payday := int(round(match_coins * (CoachPerks.coin_mult(profile) - 1.0)))
+	if payday > 0:
+		items.append({"id": "payday", "label": "PAYDAY PERK", "coins": payday})
+		match_coins += payday
 	profile.coins += match_coins
 	profile.stats["coins_earned"] += match_coins
 	# Player development.

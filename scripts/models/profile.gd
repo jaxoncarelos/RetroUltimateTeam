@@ -21,7 +21,7 @@ var stats := {"games": 0, "wins": 0, "losses": 0, "ties": 0, "packs_opened": 0, 
 		"coins_earned": 0, "win_streak": 0, "best_streak": 0}
 var sets_done: Dictionary = {}
 var objectives: Dictionary = {}  ## ObjectiveRules state {day, week, progress, claimed, totals}
-var coach := {"xp": 0, "level": 1}   ## ProgressionRules (coach level 1..50)
+var coach := {"xp": 0, "level": 1, "perks": {}}   ## ProgressionRules (coach level 1..50) + CoachPerks ranks
 var login := {"day": 0, "streak": 0}   ## DailyRules (unix day of the last check-in)
 var pending_packs: Array = []    ## reward pack ids waiting to be opened (EconomyRules.open_pending)
 
@@ -96,7 +96,7 @@ static func from_dict(d: Dictionary) -> Profile:
 	p.sets_done = data.get("sets_done", {})
 	p.objectives = _ints_deep(data.get("objectives", {}))
 	var co: Dictionary = data.get("coach", {})
-	p.coach = {"xp": int(co.get("xp", 0)), "level": maxi(1, int(co.get("level", 1)))}
+	p.coach = {"xp": int(co.get("xp", 0)), "level": maxi(1, int(co.get("level", 1))), "perks": _ints_deep(co.get("perks", {}))}
 	var lg: Dictionary = data.get("login", {})
 	p.login = {"day": int(lg.get("day", 0)), "streak": int(lg.get("streak", 0))}
 	p.pending_packs = []

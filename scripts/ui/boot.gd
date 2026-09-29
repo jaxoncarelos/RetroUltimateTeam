@@ -44,6 +44,9 @@ func _demo_profile() -> void:
 	for id in ["gold", "silver", "silver", "bronze"]:
 		EconomyRules.grant_pack(prof, PackCatalog.get_pack(id), GameData.db, rng)
 	prof.coins = 6400
+	if OS.get_cmdline_user_args().has("--coach-demo"):
+		prof.coach["level"] = 9
+		prof.coach["perks"] = {"pocket": 2, "payday": 1, "breaker": 3}
 	if OS.get_cmdline_user_args().has("--champ"):
 		EconomyRules.champion_reward(prof, GameData.db)
 	if OS.get_cmdline_user_args().has("--season"):

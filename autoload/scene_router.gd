@@ -17,6 +17,7 @@ const PACK_OPEN := "res://scenes/meta/pack_open.tscn"
 const SEASON := "res://scenes/meta/season.tscn"
 const CHALLENGES := "res://scenes/meta/challenges.tscn"
 const SETTINGS := "res://scenes/meta/settings.tscn"
+const COACH := "res://scenes/meta/coach.tscn"
 
 const WIPE_TIME := 0.22
 

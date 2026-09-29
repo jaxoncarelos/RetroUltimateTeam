@@ -127,6 +127,8 @@ func _build_scene(home_team: TeamData, away_team: TeamData) -> void:
 	add_child(field)
 	runner = PlayRunner.new()
 	runner.aim_sens = Settings.aim_mult()
+	if human != "" and not (SaveManager.disabled):   # your coach perks tune the match
+		tuning = CoachPerks.apply_tuning(tuning, SaveManager.profile)
 	runner.tuning = tuning
 	runner.def_ai = def_ai
 	runner.rng = rng
