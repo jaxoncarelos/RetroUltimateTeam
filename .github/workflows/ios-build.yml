@@ -26,7 +26,8 @@ jobs:
           echo "GODOT=$PWD/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
 
       - name: Import project
-        run: "$GODOT" --headless --path . --import || true
+        run: |
+          "$GODOT" --headless --path . --import || true
 
       - name: Export Xcode project
         run: |
