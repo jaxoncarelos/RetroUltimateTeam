@@ -38,6 +38,7 @@ func _refresh() -> void:
 		s.sfx_volume = 0.4 if s.sfx_volume <= 0.0 else (0.8 if s.sfx_volume < 0.6 else 0.0))
 	_row("MUSIC", "OFF" if s.music_volume <= 0.0 else ("LOW" if s.music_volume < 0.5 else "HIGH"), func() -> void:
 		s.music_volume = 0.3 if s.music_volume <= 0.0 else (0.6 if s.music_volume < 0.5 else 0.0))
+	_row("INSTANT\nREPLAY", "ON" if s.replays else "OFF", func() -> void: s.replays = not s.replays)
 	_row("SCREEN\nSHAKE", "ON" if s.shake else "OFF", func() -> void: s.shake = not s.shake)
 	_row("THROW\nAIM", Settings.AIM_NAMES[s.aim_sens], func() -> void:
 		s.aim_sens = (s.aim_sens + 1) % Settings.AIM_NAMES.size())

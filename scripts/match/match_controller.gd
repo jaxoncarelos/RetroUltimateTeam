@@ -127,6 +127,7 @@ func _build_scene(home_team: TeamData, away_team: TeamData) -> void:
 	add_child(field)
 	runner = PlayRunner.new()
 	runner.aim_sens = Settings.aim_mult()
+	runner.record_replay = human != "" and Settings.replays and not _sim()
 	if human != "" and not (SaveManager.disabled):   # your coach perks tune the match
 		tuning = CoachPerks.apply_tuning(tuning, SaveManager.profile)
 	runner.tuning = tuning
@@ -269,6 +270,10 @@ func _after(delay: float, fn: Callable) -> void:
 	if _sim():
 		_queued = fn
 		return
+	if _replay_next:   # a big play just ended: show it again before moving on
+		_replay_next = false
+		get_tree().create_timer(delay).timeout.connect(func() -> void: _run_replay(fn))
+		return
 	get_tree().create_timer(delay).timeout.connect(fn)
 
 
@@ -318,6 +323,7 @@ func _situation() -> Dictionary:
 
 
 func _start_play_call() -> void:
+	_replay_next = false
 	camera.follow_play()
 	if phase == Phase.FINAL or _check_challenge():
 		return
@@ -482,6 +488,9 @@ func _on_play_selected(play: PlayDef) -> void:
 
 
 func _on_tap(_pos: Vector2) -> void:
+	if _replay != null:
+		_end_replay()   # tap to skip the replay
+		return
 	if phase == Phase.PLAY_CALL and _human_offense():
 		_snap()
 	elif phase == Phase.KICK_METER:
@@ -583,6 +592,11 @@ func _simulate_play() -> void:
 
 
 func _physics_process(dt: float) -> void:
+	if _replay != null:
+		camera.focus_override = _replay.focus
+		if _replay.step(dt):
+			_end_replay()
+		return
 	if _sim() or phase != Phase.LIVE:
 		return
 	# PlayRunner steps itself; we tick the clock and drive the CPU QB / switcher.
@@ -634,6 +648,7 @@ func _on_play_ended(r: Dictionary) -> void:
 		hud.show_banner(headline, sub, 1.5)
 		_play_juice(type, offense)
 	_update_scorebug()
+	_replay_next = runner.record_replay and not _sim() and _replay_worthy(type, r)
 	match next:
 		GameState.Next.PAT:
 			_after(1.6, _pat_phase)
@@ -1296,6 +1311,8 @@ func _debug_show(kind: String) -> void:
 			hud.show_choice("EXTRA POINT", "KC 6  PHI 0", ["KICK PAT (1)", "GO FOR 2"] as Array[String])
 		"final":
 			hud.show_choice("YOU WIN!", "KC 31  PHI 17", ["PLAY AGAIN"] as Array[String])
+		"snap":
+			_snap()
 		"simrest":
 			_sim_rest_of_game()
 		"half":
@@ -1415,3 +1432,39 @@ func _debug_drawtest() -> void:
 	Input.parse_input_event(r)
 	await get_tree().process_frame
 	print("DRAWTEST hero_path points=", runner.hero_path.size(), " preview=", runner.hero_path_preview.size(), " controlled=", runner.controlled.slot)
+
+
+# ---------------------------------------------------------------- instant replay
+
+var _replay: ReplayPlayer = null
+var _replay_next := false
+var _replay_cont := Callable()
+
+
+## Touchdowns, turnovers and long gains get an instant replay (slow-mo, tap to skip).
+func _replay_worthy(type: String, r: Dictionary) -> bool:
+	if OS.get_cmdline_user_args().has("--replay-any"):   # debug
+		return true
+	return type in ["td", "int", "int_td", "fumble"] or (type not in ["incomplete", "sack"] and int(r["yards"]) >= 25)
+
+
+func _run_replay(cont: Callable) -> void:
+	var n := runner.replay_frames.size()
+	if n < 40 or phase == Phase.FINAL:
+		cont.call()
+		return
+	_replay_cont = cont
+	_replay = ReplayPlayer.new(runner, maxi(0, n - 540), 0.6)   # the last ~9 s, at 0.6x
+	hud.show_replay(true)
+	camera.snap_to_target()
+
+
+func _end_replay() -> void:
+	if _replay == null:
+		return
+	_replay = null
+	camera.focus_override = Vector2.INF
+	hud.show_replay(false)
+	var c := _replay_cont
+	_replay_cont = Callable()
+	c.call()

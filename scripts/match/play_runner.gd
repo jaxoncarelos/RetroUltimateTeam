@@ -152,6 +152,7 @@ func setup_play(p_off: PlayDef, p_def: PlayDef, p_los_x: float, p_ball_y: float,
 	aim_assist_target = null
 	throw_plan = {}
 	pass_kind = -1
+	replay_frames = []
 	qb_immune_until = -1.0
 	intended = null
 	_human_throw = false
@@ -701,6 +702,8 @@ func _physics_process(dt: float) -> void:
 			a.stop()
 			a.step(dt, tuning)
 		ball.step(dt)
+		if record_replay:
+			_record_frame()
 		_dead_timer -= dt
 		if _dead_timer <= 0.0 and not _pending_result.is_empty():
 			if _spot_at_ball:
@@ -724,6 +727,8 @@ func _physics_process(dt: float) -> void:
 		a.step(dt, tuning)
 	contact.resolve(dt)
 	_check_handoff()
+	if record_replay:
+		_record_frame()
 	if ball.step(dt):
 		_resolve_arrival()
 	elif ball.state == Ball.State.AIR:
@@ -989,3 +994,45 @@ func cycle_pass_kind() -> int:
 ## Name shown for the current pass type choice.
 func pass_kind_name() -> String:
 	return "AUTO" if pass_kind < 0 else PassModel.KIND_NAMES[pass_kind]
+
+
+## Replay recording (see ReplayPlayer): one frame per physics tick while the play is live or
+## the ball is dead, every agent's position / motion / pose flags, then the ball.
+const REPLAY_STRIDE := 7
+var record_replay := false
+var replay_frames: Array[PackedFloat32Array] = []
+
+
+func _record_frame() -> void:
+	var f := PackedFloat32Array()
+	f.resize(agents.size() * REPLAY_STRIDE + 4)
+	var i := 0
+	for a in agents:
+		var flags := 0
+		if a.is_down:
+			flags |= 1
+		if a.dive_timer > 0.0:
+			flags |= 2
+		if a.jump_timer > 0.0:
+			flags |= 4
+		if a.engaged_with != null:
+			flags |= 8
+		if a.celebrating:
+			flags |= 16
+		if a.throw_anim > 0.0:
+			flags |= 32
+		if a.stun > 0.3:
+			flags |= 64
+		f[i] = a.field_pos.x
+		f[i + 1] = a.field_pos.y
+		f[i + 2] = a.velocity.x
+		f[i + 3] = a.velocity.y
+		f[i + 4] = a.z_height
+		f[i + 5] = a.facing
+		f[i + 6] = float(flags)
+		i += REPLAY_STRIDE
+	f[i] = ball.field_pos.x
+	f[i + 1] = ball.field_pos.y
+	f[i + 2] = ball.z
+	f[i + 3] = float(ball.state)
+	replay_frames.append(f)

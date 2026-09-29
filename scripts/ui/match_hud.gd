@@ -40,6 +40,7 @@ var _root: Control
 var _top: _TopBar
 var _bottom: _BottomBar
 var _tags: _NameTags
+var _replay_fx: _ReplayFx
 var _change: Button
 var _specials: VBoxContainer
 var _pause: Button
@@ -89,6 +90,10 @@ func _ready() -> void:
 	_banner = _Banner.new()
 	_banner.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.add_child(_banner)
+
+	_replay_fx = _ReplayFx.new()
+	_replay_fx.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_root.add_child(_replay_fx)
 
 	_flash = ColorRect.new()
 	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -537,6 +542,10 @@ func set_hint(text: String) -> void:
 	_bottom.queue_redraw()
 
 
+func show_replay(on: bool) -> void:
+	_replay_fx.visible = on
+
+
 func show_banner(text: String, sub := "", seconds := 1.6) -> void:
 	_banner.show_text(text, sub, seconds)
 
@@ -765,3 +774,30 @@ class _Banner:
 		if sub != "":
 			UiSkin.draw_text_c(self, size.x * 0.5 - slide, y + 9, sub, 8, Color(1, 1, 1, a), Color(0, 0, 0, 0),
 					Color(0, 0, 0, 0.6 * a))
+
+
+## INSTANT REPLAY overlay: warm tint, letterbox bars, a blinking tag and a skip hint.
+class _ReplayFx:
+	extends Control
+	var _t := 0.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		visible = false
+
+	func _process(delta: float) -> void:
+		if visible:
+			_t += delta
+			queue_redraw()
+
+	func _draw() -> void:
+		draw_rect(Rect2(Vector2.ZERO, size), Color(1.0, 0.85, 0.55, 0.10))
+		draw_rect(Rect2(0, 0, size.x, 16), Color(0, 0, 0, 0.85))
+		draw_rect(Rect2(0, size.y - 16, size.x, 16), Color(0, 0, 0, 0.85))
+		var on := int(_t * 2.0) % 2 == 0
+		if on:
+			draw_circle(Vector2(8 + SafeArea.left(), 8), 3.0, Color("#ff2e57"))
+		UiSkin.draw_text(self, Vector2(16 + SafeArea.left(), 11), "INSTANT REPLAY", 8, Color.WHITE)
+		var hint := "TAP TO SKIP"
+		UiSkin.draw_text(self, Vector2(size.x - 8 - SafeArea.right() - PixelFont.text_width(hint), size.y - 5), hint, 8,
+				Color(1, 1, 1, 0.75))

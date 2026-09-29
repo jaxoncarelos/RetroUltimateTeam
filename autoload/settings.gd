@@ -15,6 +15,7 @@ var shake := true                    ## screen shake on big hits
 var tutorial_done := false
 var season_games := 8                ## 8 (short) or 17
 var aim_sens := 1                   ## throw aim sensitivity index into AIM_NAMES / AIM_MULT (default MEDIUM)
+var replays := true                  ## instant replay after touchdowns, turnovers and long gains
 
 
 const AIM_NAMES := ["LOW", "MEDIUM", "HIGH"]
@@ -47,6 +48,7 @@ func load_settings() -> void:
 	tutorial_done = bool(cfg.get_value("game", "tutorial_done", tutorial_done))
 	season_games = int(cfg.get_value("game", "season_games", season_games))
 	aim_sens = clampi(int(cfg.get_value("controls", "aim_sens", aim_sens)), 0, AIM_MULT.size() - 1)
+	replays = bool(cfg.get_value("game", "replays", replays))
 
 
 func save_settings() -> void:
@@ -61,5 +63,6 @@ func save_settings() -> void:
 	cfg.set_value("game", "tutorial_done", tutorial_done)
 	cfg.set_value("game", "season_games", season_games)
 	cfg.set_value("controls", "aim_sens", aim_sens)
+	cfg.set_value("game", "replays", replays)
 	cfg.save(PATH)
 	changed.emit()

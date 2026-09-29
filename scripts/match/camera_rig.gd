@@ -17,6 +17,8 @@ var runner: PlayRunner:
 		_hook()
 ## Debug: when set (field yards), the camera stays on this point (--look=X,Y).
 var pinned := Vector2(-1, -1)
+## Instant replay: the camera looks here (field yards) instead of following the play (INF = off).
+var focus_override := Vector2.INF
 
 ## Screen shake: trauma 0..1 decays; offset = trauma² × max shake (whole pixels).
 var trauma := 0.0
@@ -52,6 +54,8 @@ func _hook() -> void:
 
 
 func target_position() -> Vector2:
+	if focus_override != Vector2.INF:
+		return FieldProjection.to_screen(focus_override) + Vector2(LOOK_AHEAD_PX * 0.5, 0.0)
 	if pinned.x >= 0.0:
 		return FieldProjection.to_screen(pinned)
 	if runner == null:
