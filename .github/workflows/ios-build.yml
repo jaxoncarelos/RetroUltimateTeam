@@ -1,0 +1,53 @@
+name: iOS build (unsigned IPA for Sideloadly)
+
+on:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot + export templates
+        run: |
+          B="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -sSL -o godot.zip "$B/Godot_v${GODOT_VERSION}-stable_macos.universal.zip"
+          curl -sSL -o templates.tpz "$B/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q godot.zip
+          T="$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$T"
+          unzip -q templates.tpz -d tpl
+          cp -R tpl/templates/. "$T/"
+          echo "GODOT=$PWD/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
+
+      - name: Import project
+        run: "$GODOT" --headless --path . --import || true
+
+      - name: Export Xcode project
+        run: |
+          mkdir -p export/ios
+          "$GODOT" --headless --path . --export-release iOS export/ios/PocketGridiron.ipa
+          ls -R export/ios | head -50
+
+      - name: Build unsigned app
+        run: |
+          xcodebuild -project export/ios/PocketGridiron.xcodeproj -scheme PocketGridiron \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" build
+
+      - name: Package IPA
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -qry PocketGridiron.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PocketGridiron-ipa
+          path: PocketGridiron.ipa
