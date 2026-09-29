@@ -53,14 +53,14 @@ func _ready() -> void:
 	_tap.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	_tap.offset_left = -80
 	_tap.offset_right = 80
-	_tap.offset_top = -22
-	_tap.offset_bottom = -12
+	_tap.offset_top = -22 - SafeArea.bottom()
+	_tap.offset_bottom = -12 - SafeArea.bottom()
 	_tap.add_theme_color_override("font_shadow_color", UiSkin.SHADOW)
 	add_child(_tap)
 	var ver := MetaUI.label("V0.7", Color(1, 1, 1, 0.6))
 	ver.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	ver.offset_left = -30
-	ver.offset_top = -12
+	ver.offset_left = -30 - SafeArea.right()
+	ver.offset_top = -12 - SafeArea.bottom()
 	add_child(ver)
 	_intro.call_deferred()
 

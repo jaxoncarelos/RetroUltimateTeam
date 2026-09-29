@@ -12,7 +12,7 @@ func _ready() -> void:
 	info.pressed.connect(func() -> void: HowToEarn.show(self))
 	_ui["top_right"].add_child(info)
 	var root: VBoxContainer = _ui["root"]
-	root.add_theme_constant_override("separation", 4)
+	root.add_theme_constant_override("separation", 2)
 	var shelf := HBoxContainer.new()
 	shelf.alignment = BoxContainer.ALIGNMENT_CENTER
 	shelf.add_theme_constant_override("separation", 14)
@@ -53,7 +53,7 @@ func _ready() -> void:
 func _pack_tile(pack: PackDef) -> Control:
 	var prof := SaveManager.profile
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 3)
+	box.add_theme_constant_override("separation", 2)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	var art := PackArt.for_pack(pack, 2.0)
 	art.mouse_filter = Control.MOUSE_FILTER_STOP

@@ -84,7 +84,7 @@ func _build() -> void:
 	head.offset_bottom = 26
 	_content.add_child(head)
 	_coins = CoinPill.new(_prof.coins)
-	_coins.position = Vector2(6, 6)
+	_coins.position = Vector2(6 + SafeArea.left(), 6 + SafeArea.top())
 	add_child(_coins)
 	var pc := _pack.color if _pack != null else CardView.tier_color(_best_tier())
 	_pack_art = PackArt.new(pc, _title.replace(" PACK", ""), 3.0)
@@ -94,16 +94,16 @@ func _build() -> void:
 	_prompt.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	_prompt.offset_left = -100
 	_prompt.offset_right = 100
-	_prompt.offset_top = -18
-	_prompt.offset_bottom = -8
+	_prompt.offset_top = -18 - SafeArea.bottom()
+	_prompt.offset_bottom = -8 - SafeArea.bottom()
 	add_child(_prompt)
 	_skip_btn = MetaUI.button("SKIP ▶", Vector2(56, 20), _flip_all)
 	_skip_btn.theme_type_variation = "PillButton"
 	_skip_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_skip_btn.offset_left = -62
-	_skip_btn.offset_right = -6
-	_skip_btn.offset_top = 5
-	_skip_btn.offset_bottom = 25
+	_skip_btn.offset_left = -62 - SafeArea.right()
+	_skip_btn.offset_right = -6 - SafeArea.right()
+	_skip_btn.offset_top = 5 + SafeArea.top()
+	_skip_btn.offset_bottom = 25 + SafeArea.top()
 	add_child(_skip_btn)
 
 
@@ -436,7 +436,7 @@ func _show_summary(instant := false) -> void:
 	_summary = VBoxContainer.new()
 	_summary.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_summary.offset_top = 32
-	_summary.offset_bottom = -6
+	_summary.offset_bottom = -6 - SafeArea.bottom()
 	_summary.add_theme_constant_override("separation", 6)
 	_summary.alignment = BoxContainer.ALIGNMENT_CENTER
 	add_child(_summary)

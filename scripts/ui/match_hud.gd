@@ -76,10 +76,14 @@ func _ready() -> void:
 	_top = _TopBar.new()
 	_top.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_top.offset_bottom = BAR_H
+	_top.pad_l = SafeArea.left()
+	_top.pad_r = SafeArea.right()
 	_root.add_child(_top)
 	_bottom = _BottomBar.new()
 	_bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	_bottom.offset_top = -BAR_H
+	_bottom.pad_l = SafeArea.left()
+	_bottom.pad_r = SafeArea.right()
 	_root.add_child(_bottom)
 
 	_banner = _Banner.new()
@@ -110,13 +114,13 @@ func _ready() -> void:
 	_change = Button.new()
 	_change.theme_type_variation = "PillButton"
 	_change.focus_mode = Control.FOCUS_NONE
-	_anchor(_change, Vector2(1.0, 0.0), Rect2(-104, BAR_H + 3, 100, 26))
+	_anchor(_change, Vector2(1.0, 0.0), Rect2(-104 - SafeArea.right(), BAR_H + 3, 100, 26))
 	_change.pressed.connect(func() -> void: _grid.visible = not _grid.visible)
 	_change.visible = false
 	_root.add_child(_change)
 	_specials = VBoxContainer.new()
 	_specials.add_theme_constant_override("separation", 3)
-	_anchor(_specials, Vector2(1.0, 0.0), Rect2(-104, BAR_H + 33, 100, 80))
+	_anchor(_specials, Vector2(1.0, 0.0), Rect2(-104 - SafeArea.right(), BAR_H + 33, 100, 80))
 	_root.add_child(_specials)
 
 	_play_bar = HBoxContainer.new()
@@ -233,7 +237,7 @@ func _ready() -> void:
 	var sw_press := sw_box.duplicate() as StyleBoxFlat
 	sw_press.bg_color = Color(UiSkin.YELLOW, 0.35)
 	_switch.add_theme_stylebox_override("pressed", sw_press)
-	_anchor(_switch, Vector2(1.0, 1.0), Rect2(-SWITCH_SIZE.x - 6, -SWITCH_SIZE.y - BAR_H - 6, SWITCH_SIZE.x, SWITCH_SIZE.y))
+	_anchor(_switch, Vector2(1.0, 1.0), Rect2(-SWITCH_SIZE.x - 6 - SafeArea.right(), -SWITCH_SIZE.y - BAR_H - 6, SWITCH_SIZE.x, SWITCH_SIZE.y))
 	_switch.pressed.connect(func() -> void:
 		Sfx.play("tap")
 		switch_pressed.emit())
@@ -584,6 +588,8 @@ class _TopBar:
 	var center := ""
 	var right := ""
 	var show_pause := false
+	var pad_l := 0.0   ## safe-area insets: text stays clear of rounded corners
+	var pad_r := 0.0
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -593,7 +599,7 @@ class _TopBar:
 		draw_rect(Rect2(0, size.y, size.x, 1), Color(0, 0, 0, 0.35))
 		var y := 9.0
 		if not data.is_empty():
-			var x := 4.0
+			var x := 4.0 + pad_l
 			for side in ["home", "away"]:
 				var abbr: String = data.get(side, "")
 				var sc := str(data.get(side + "_score", 0))
@@ -613,10 +619,10 @@ class _TopBar:
 			UiSkin.draw_text(self, Vector2(cx, y), q, 8, Color.WHITE)
 			UiSkin.draw_text(self, Vector2(cx + qw, y), clk, 8, UiSkin.YELLOW)
 			var dn: String = data.get("down", "")
-			UiSkin.draw_text(self, Vector2(size.x - 5 - PixelFont.text_width(dn), y), dn, 8, Color.WHITE)
+			UiSkin.draw_text(self, Vector2(size.x - 5 - pad_r - PixelFont.text_width(dn), y), dn, 8, Color.WHITE)
 		else:
-			UiSkin.draw_text(self, Vector2(4, y), left, 8, Color.WHITE)
-			UiSkin.draw_text(self, Vector2(size.x - 5 - PixelFont.text_width(right), y), right, 8, UiSkin.YELLOW)
+			UiSkin.draw_text(self, Vector2(4 + pad_l, y), left, 8, Color.WHITE)
+			UiSkin.draw_text(self, Vector2(size.x - 5 - pad_r - PixelFont.text_width(right), y), right, 8, UiSkin.YELLOW)
 		if show_pause:
 			var px := size.x * 0.5 + 44
 			draw_rect(Rect2(px, 2, 2, 7), Color.WHITE)
@@ -628,6 +634,8 @@ class _BottomBar:
 	extends Control
 	var tag := ""
 	var hint := ""
+	var pad_l := 0.0
+	var pad_r := 0.0
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -636,16 +644,16 @@ class _BottomBar:
 		if tag == "" and hint == "":
 			return
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.8))
-		var x := 4.0
+		var x := 4.0 + pad_l
 		if tag != "":
 			UiSkin.draw_icon(self, "face", Vector2(x, 2), UiSkin.YELLOW, 1.0, false)
 			x += 11.0
 			UiSkin.draw_text(self, Vector2(x, 9), tag, 8, Color.WHITE)
 			x += PixelFont.text_width(tag) + 12
 		if hint != "":
-			var h := fit_hint(hint, size.x - 5 - x)
+			var h := fit_hint(hint, size.x - 5 - pad_r - x)
 			var w := PixelFont.text_width(h)
-			UiSkin.draw_text(self, Vector2(maxf(x, size.x - 5 - w), 9), h, 8, Color(1, 1, 1, 0.6))
+			UiSkin.draw_text(self, Vector2(maxf(x, size.x - 5 - pad_r - w), 9), h, 8, Color(1, 1, 1, 0.6))
 
 	## Drops trailing "  ·  " parts of a hint until it fits `room` px (never runs off screen).
 	static func fit_hint(text: String, room: float) -> String:

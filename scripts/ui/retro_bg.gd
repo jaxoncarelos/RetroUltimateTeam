@@ -6,10 +6,14 @@ extends Control
 var header_line := 28.0       ## y of the line under the title (<= 0: none)
 var footer_line := 38.0       ## distance of the footer line from the bottom (<= 0: none)
 var tint := Color(1, 1, 1, 1)
+var bleed := false            ## parent is inset to the safe area: cover the margins too
 
 
 func _ready() -> void:
-	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	if bleed:
+		SafeArea.bleed(self)
+	else:
+		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	resized.connect(queue_redraw)
 

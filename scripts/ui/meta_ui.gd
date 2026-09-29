@@ -13,10 +13,12 @@ const FOOTER_H := 38
 ## "top_right": HBoxContainer, "top_left": HBoxContainer, "bg": RetroBg, "layer": Control}.
 ## back_to = "" hides the Home button. opts: "coins" (bool), "nav" (bool), "home_icon" (String).
 static func screen(owner: Control, title: String, back_to := "res://scenes/meta/hub.tscn", opts: Dictionary = {}) -> Dictionary:
-	owner.set_anchors_preset(Control.PRESET_FULL_RECT)
+	SafeArea.apply(owner)   # keep clear of rounded corners / home indicator; the bg bleeds out
 	var has_nav: bool = opts.get("nav", true)
 	var bg := RetroBg.new()
-	bg.footer_line = FOOTER_H if has_nav else 0.0
+	bg.bleed = true
+	bg.header_line = HEADER_H + SafeArea.top()
+	bg.footer_line = (FOOTER_H + SafeArea.bottom()) if has_nav else 0.0
 	owner.add_child(bg)
 	var tb := TitleBar.new(title)
 	tb.set_anchors_preset(Control.PRESET_TOP_WIDE)
@@ -168,7 +170,7 @@ static func badge(target: Control, count: int, text := "") -> Control:
 static func popup(owner: Control, title: String, body: Control, buttons: Array = []) -> Control:
 	var dim := ColorRect.new()
 	dim.color = Color(0.01, 0.02, 0.08, 0.72)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	SafeArea.bleed(dim)
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	dim.z_index = 40
 	owner.add_child(dim)

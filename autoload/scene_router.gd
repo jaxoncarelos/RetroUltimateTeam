@@ -54,6 +54,10 @@ class _Wipe:
 
 func _ready() -> void:
 	layer = 100
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--snap="):
+			var parts := a.trim_prefix("--snap=").split(",")
+			_snap_after.call_deferred(parts[0], int(parts[1]) if parts.size() > 1 else 60)
 	_wipe = _Wipe.new()
 	_wipe.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_wipe.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -88,3 +92,14 @@ func take_config() -> Dictionary:
 	var c := pending_config
 	pending_config = {}
 	return c
+
+
+## Debug: `-- --snap=out.png[,frames]` saves the viewport (at the window's real aspect, unlike
+## --write-movie which crops to 480x270) after N frames and quits.
+func _snap_after(path: String, frames: int) -> void:
+	for i in frames:
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(path)
+	get_tree().quit()
