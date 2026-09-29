@@ -2,6 +2,27 @@ extends Control
 ## Title screen: stadium backdrop (ArtGen), the POCKET GRIDIRON logo dropping in, a
 ## blinking TAP TO START. Tapping goes to the team picker on the first run, else the hub.
 
+## Backdrop fitted to the height; on wider screens the side margins repeat the edge columns
+## (the picture is horizontal bands, so it just looks like more stadium).
+class _Backdrop:
+	extends Control
+	var texture: Texture2D
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		resized.connect(queue_redraw)
+
+	func _draw() -> void:
+		var th := float(texture.get_height())
+		var s := size.y / th
+		var w := texture.get_width() * s
+		var x0 := (size.x - w) * 0.5
+		draw_texture_rect(texture, Rect2(x0, 0, w, size.y), false)
+		if x0 > 0.0:
+			draw_texture_rect_region(texture, Rect2(0, 0, x0 + 1, size.y), Rect2(0, 0, 1, th))
+			draw_texture_rect_region(texture, Rect2(x0 + w - 1, 0, x0 + 1, size.y), Rect2(texture.get_width() - 1, 0, 1, th))
+
+
 var _logo: TextureRect
 var _tap: Label
 var _t := 0.0
@@ -10,12 +31,9 @@ var _leaving := false
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	var bg := TextureRect.new()
+	var bg := _Backdrop.new()
 	bg.texture = ArtGen.title_backdrop()
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 	# Soft vignette so the logo pops.
 	var shade := ColorRect.new()

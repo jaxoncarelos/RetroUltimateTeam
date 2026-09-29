@@ -111,8 +111,9 @@ func _layout() -> void:
 		return
 	var pitch := CardView.W + GAP
 	var x0 := roundf((_field.size.x - (7 * CardView.W + 6 * GAP)) * 0.5)
-	var top := roundf((_field.size.y - (2 * CardView.H + ROW_GAP)) * 0.5)
-	var bot := top + CardView.H + ROW_GAP
+	var top := maxf(roundf((_field.size.y - (2 * CardView.H + ROW_GAP)) * 0.5), 7.0)   # room for the ▲ badges
+	var gap := clampf(_field.size.y - top - 2 * CardView.H - 2.0, 3.0, ROW_GAP)
+	var bot := top + CardView.H + gap
 	var pos := {}
 	if _side == 0:
 		for i in OFF_LINE.size():
@@ -132,7 +133,7 @@ func _layout() -> void:
 		pos["LB2"] = Vector2(x0 + 3.5 * pitch, bot)
 		pos["S2"] = Vector2(x0 + 5.5 * pitch, bot)
 		_field.divider_x = -1.0
-	_field.line_y = top + CardView.H + ROW_GAP * 0.5
+	_field.line_y = top + CardView.H + gap * 0.5
 	for slot in _slots:
 		(_slots[slot] as _Slot).position = (pos.get(slot, Vector2.ZERO) as Vector2).round()
 	_field.queue_redraw()
@@ -461,7 +462,7 @@ class _UpBadge:
 	func reset() -> void:
 		var w := PixelFont.text_width(text) + 5
 		size = Vector2(w, 11)
-		position = Vector2(CardView.W - w + 3, -9)
+		position = Vector2(CardView.W - w + 3, -6)
 		queue_redraw()
 
 	func _process(delta: float) -> void:

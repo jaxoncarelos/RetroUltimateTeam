@@ -79,6 +79,15 @@ func snap_to_target() -> void:
 	reset_smoothing()
 
 
+## Between plays (kickoffs, punts) there are no players to follow: glide to the spot.
+func show_spot(x: float) -> void:
+	pinned = Vector2(x, FieldGeo.CENTER_Y)
+
+
+func follow_play() -> void:
+	pinned = Vector2(-1, -1)
+
+
 func add_trauma(amount: float) -> void:
 	trauma = clampf(trauma + amount, 0.0, 1.0)
 

@@ -273,6 +273,8 @@ func _start_game() -> void:
 	var h: TeamData = teams[gs.home]
 	var a: TeamData = teams[gs.away]
 	if not _sim():
+		camera.show_spot(FieldGeo.OWN_GOAL + 50.0)
+		camera.snap_to_target()
 		hud.show_banner("%s  VS  %s" % [h.team_name.to_upper(), a.team_name.to_upper()], "KICKOFF", 1.8)
 	_after(1.8, func() -> void: _kickoff(gs.away))
 
@@ -287,6 +289,7 @@ func _kickoff(kicker: String) -> void:
 	gs.clock.stopped = true
 	if not _sim():
 		var ret := "TOUCHBACK" if is_equal_approx(x, FieldGeo.OWN_GOAL + tuning.touchback_yard) else "RETURNED TO THE %s" % FieldGeo.spot_text(x)
+		camera.show_spot(x)
 		hud.show_banner("KICKOFF", "%s  ·  %s BALL" % [ret, receiver], 1.4)
 	_after(1.4, _start_play_call)
 
@@ -296,6 +299,7 @@ func _situation() -> Dictionary:
 
 
 func _start_play_call() -> void:
+	camera.follow_play()
 	if phase == Phase.FINAL or _check_challenge():
 		return
 	if gs.clock.expired():
@@ -690,6 +694,7 @@ func _punt() -> void:
 	gs.start_possession(gs.other(kicker), x)
 	_spot_y = FieldGeo.CENTER_Y
 	if not _sim():
+		camera.show_spot(x)
 		hud.show_banner("PUNT", "%s BALL AT THE %s" % [gs.possession, FieldGeo.spot_text(x)], 1.5)
 	_update_scorebug()
 	if gs.clock.expired():
@@ -844,6 +849,7 @@ func _free_kick(kicker: String) -> void:
 	var x := KickModel.free_kick(rng)
 	gs.start_possession(gs.other(kicker), x)
 	if not _sim():
+		camera.show_spot(x)
 		hud.show_banner("FREE KICK", "%s BALL" % gs.possession, 1.3)
 	_after(1.3, _start_play_call)
 
