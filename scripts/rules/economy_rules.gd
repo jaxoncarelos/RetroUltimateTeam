@@ -356,6 +356,26 @@ static func franchise_elite(profile: Profile, db: RosterDB, rng: RandomNumberGen
 	return "" if options.is_empty() else options[rng.randi() % options.size()]
 
 
+
+const CHAMP_REPEAT_COINS := 5000
+
+## Super Bowl trophy: a 99-OVR CHAMP card of your franchise's best player, locked so it can't be
+## sold by accident. A second title (you already own it) pays coins instead.
+## Returns {"card": def id ("" if none), "name": player name, "coins": repeat coins}.
+static func champion_reward(profile: Profile, db: RosterDB) -> Dictionary:
+	var star := db.franchise_star(profile.franchise_team)
+	if star == null or not db.cards.has(CardRules.champ_id(star.id)):
+		return {"card": "", "name": "", "coins": 0}
+	var id := CardRules.champ_id(star.id)
+	for e in profile.cards:
+		if str(e["def"]) == id:
+			profile.coins += CHAMP_REPEAT_COINS
+			return {"card": "", "name": star.short_name(), "coins": CHAMP_REPEAT_COINS}
+	var uid := profile.add_card(id)
+	profile.find(uid)["locked"] = true
+	return {"card": id, "name": star.short_name(), "coins": 0}
+
+
 ## Postgame coins (PLAN.md §5), itemized. r: MatchController.match_result() keys
 ## (pf, pa, tds, def_ints, def_sacks, difficulty, came_back, forfeit).
 ## win_streak = consecutive wins including this one; career_wins = wins including this one.

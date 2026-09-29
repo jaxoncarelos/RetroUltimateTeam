@@ -24,8 +24,11 @@ const COLORS := [Color("#b86f3c"), Color("#c2c3c7"), Color("#ffcf40"), Color("#b
 ## Programs (card versions). "base" = the real player; "prime" = rare chase version.
 const PROGRAM_BASE := "base"
 const PROGRAM_PRIME := "prime"
-const PROGRAM_NAMES := {"base": "", "prime": "PRIME"}
-const PROGRAM_COLORS := {"base": Color(1, 1, 1, 0), "prime": Color("#29adff")}
+const PROGRAM_CHAMP := "champ"       ## Super Bowl trophy: a flat 99 of your franchise star
+const PROGRAM_NAMES := {"base": "", "prime": "PRIME", "champ": "CHAMP"}
+const PROGRAM_COLORS := {"base": Color(1, 1, 1, 0), "prime": Color("#29adff"), "champ": Color("#ffb000")}
+const CHAMP_OVR := 99
+const CHAMP_QUICKSELL_MULT := 6
 const PRIME_MIN_OVR := 86         ## players at or above this get a Prime card
 const PRIME_BONUS := 4
 const PRIME_QUICKSELL_MULT := 2
@@ -53,6 +56,8 @@ static func eligible(tier: int, real_ovr: int) -> bool:
 
 ## Card OVR of a program version of a player with real OVR `real_ovr`.
 static func program_ovr(program: String, real_ovr: int) -> int:
+	if program == PROGRAM_CHAMP:
+		return CHAMP_OVR
 	return mini(real_ovr + (PRIME_BONUS if program == PROGRAM_PRIME else 0), 99)
 
 
@@ -75,7 +80,8 @@ static func card_attrs(real_attrs: Dictionary, real_ovr: int, c_ovr: int, boost 
 
 
 static func quicksell(tier: int, program := PROGRAM_BASE) -> int:
-	return int(TABLE[tier][3]) * (PRIME_QUICKSELL_MULT if program == PROGRAM_PRIME else 1)
+	var mult := PRIME_QUICKSELL_MULT if program == PROGRAM_PRIME else (CHAMP_QUICKSELL_MULT if program == PROGRAM_CHAMP else 1)
+	return int(TABLE[tier][3]) * mult
 
 
 ## Card id of a player's base card. The int `_tier` is legacy and ignored (one base card per
@@ -84,12 +90,18 @@ static func card_id(player_id: String, _tier := -1) -> String:
 	return player_id
 
 
+static func champ_id(player_id: String) -> String:
+	return player_id + "_champ"
+
+
 static func prime_id(player_id: String) -> String:
 	return player_id + "_prime"
 
 
 ## "mahomes_patrick_prime" -> ["mahomes_patrick", "prime"]; "mahomes_patrick" -> [.., "base"].
 static func split_card_id(card: String) -> Array:
+	if card.ends_with("_champ"):
+		return [card.left(card.length() - 6), PROGRAM_CHAMP]
 	if card.ends_with("_prime"):
 		return [card.left(card.length() - 6), PROGRAM_PRIME]
 	return [card, PROGRAM_BASE]

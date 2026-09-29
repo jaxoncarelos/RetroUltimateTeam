@@ -6,6 +6,7 @@ extends RefCounted
 
 const PLAYOFF_BERTH_COINS := 500
 const PLAYOFF_WIN_COINS := 1000
+const SUPER_BOWL_COINS := 3000
 
 
 static func apply(r: Dictionary, profile: Profile, db: RosterDB) -> String:
@@ -62,7 +63,13 @@ static func _season(r: Dictionary, profile: Profile, db: RosterDB) -> String:
 			ObjectiveRules.record_event(profile, "titles")
 			var pack := PackCatalog.get_pack("elite")
 			EconomyRules.grant_pack(profile, pack, db, rng)
-			msg = "SUPER BOWL CHAMPIONS! ELITE PACK ADDED TO YOUR COLLECTION"
+			profile.coins += SUPER_BOWL_COINS
+			var champ := EconomyRules.champion_reward(profile, db)
+			msg = "SUPER BOWL CHAMPIONS! +%d COINS + ELITE PACK" % SUPER_BOWL_COINS
+			if champ["card"] != "":
+				msg += " + 99 CHAMP %s" % str(champ["name"]).to_upper()
+			elif int(champ["coins"]) > 0:
+				msg += " + %d BONUS COINS (CHAMP CARD ALREADY OWNED)" % int(champ["coins"])
 		return msg
 	return ""
 

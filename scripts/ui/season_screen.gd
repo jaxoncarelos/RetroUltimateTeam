@@ -152,7 +152,8 @@ func _new_season_view() -> Control:
 	rw.add_child(grid)
 	for line in [["EVERY GAME", "MATCH COINS", UiSkin.WHITE], ["MAKE THE PLAYOFFS", "+%s" % CoinPill.fmt(ModeResults.PLAYOFF_BERTH_COINS), UiSkin.YELLOW],
 			["EACH PLAYOFF WIN", "+%s" % CoinPill.fmt(ModeResults.PLAYOFF_WIN_COINS), UiSkin.YELLOW],
-			["WIN IT ALL", "ELITE PACK", CardRules.COLORS[CardRules.Tier.ELITE].lightened(0.3)]]:
+			["WIN THE SUPER BOWL", "+%s + ELITE PACK" % CoinPill.fmt(ModeResults.SUPER_BOWL_COINS), CardRules.COLORS[CardRules.Tier.ELITE].lightened(0.3)],
+			["", "+ 99 CHAMP CARD OF YOUR STAR", UiSkin.YELLOW]]:
 		grid.add_child(MetaUI.label(line[0], UiSkin.WHITE))
 		grid.add_child(MetaUI.label(line[1], line[2], 8, HORIZONTAL_ALIGNMENT_RIGHT))
 	col.add_child(MetaUI.label("SEASON LENGTH CAN BE CHANGED IN OPTIONS", UiSkin.GREY, 8, HORIZONTAL_ALIGNMENT_CENTER))

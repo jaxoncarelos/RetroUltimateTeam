@@ -25,7 +25,7 @@ static func build_program(p: PlayerData, program: String) -> CardDef:
 	var c := CardDef.new()
 	c.player_id = p.id
 	c.program = program
-	c.id = CardRules.prime_id(p.id) if program == CardRules.PROGRAM_PRIME else CardRules.card_id(p.id)
+	c.id = CardRules.prime_id(p.id) if program == CardRules.PROGRAM_PRIME else (CardRules.champ_id(p.id) if program == CardRules.PROGRAM_CHAMP else CardRules.card_id(p.id))
 	c.ovr = CardRules.program_ovr(program, p.ovr)
 	c.tier = CardRules.tier_for_ovr(c.ovr)
 	c.attrs = CardRules.card_attrs(p.attrs, p.ovr, c.ovr)
@@ -33,6 +33,10 @@ static func build_program(p: PlayerData, program: String) -> CardDef:
 	c.pot = maxi(c.ovr, p.pot + (c.ovr - p.ovr))
 	c.age = p.age
 	return c
+
+
+func is_champ() -> bool:
+	return program == CardRules.PROGRAM_CHAMP
 
 
 func is_prime() -> bool:

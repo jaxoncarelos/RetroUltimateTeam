@@ -134,6 +134,12 @@ func build_catalog() -> void:
 		if not p.generated and CardRules.has_prime(p.ovr):
 			var pr := CardDef.build_program(p, CardRules.PROGRAM_PRIME)
 			cards[pr.id] = pr
+	# One CHAMP (99) card per team: the Super Bowl reward for that franchise's star.
+	for abbr in by_team:
+		var star := franchise_star(abbr)
+		if star != null:
+			var ch := CardDef.build_program(star, CardRules.PROGRAM_CHAMP)
+			cards[ch.id] = ch
 
 
 ## Card ids at `tier` (derived from card OVR), real players only.
@@ -141,7 +147,7 @@ func card_ids_of_tier(tier: int) -> Array[String]:
 	var out: Array[String] = []
 	for cid in cards:
 		var c: CardDef = cards[cid]
-		if c.tier == tier and not players[c.player_id].generated:
+		if c.tier == tier and not c.is_champ() and not players[c.player_id].generated:
 			out.append(cid)
 	return out
 

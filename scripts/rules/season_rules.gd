@@ -99,6 +99,11 @@ static func sim_score(ovr_home: int, ovr_away: int, rng: RandomNumberGenerator) 
 	return [h, a]
 
 
+## Points from `expected` (TD/FG mix drawn around it); used to sim the rest of a game.
+static func sim_points(expected: float, rng: RandomNumberGenerator) -> int:
+	return _points(expected, rng)
+
+
 static func _points(expected: float, rng: RandomNumberGenerator) -> int:
 	var tds := _poisson(expected * 0.72 / 7.0, rng)
 	var fgs := _poisson(expected * 0.28 / 3.0, rng)

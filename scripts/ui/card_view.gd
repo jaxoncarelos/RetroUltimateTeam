@@ -201,7 +201,10 @@ func _draw_front(tc: Color) -> void:
 	var ow := PixelFont.text_width(o)
 	UiSkin.draw_text(self, Vector2(W - 4 - ow, 11), o, 8, Color.WHITE, UiSkin.SHADOW)
 	var boost := int(entry.get("boost", 0)) + int(entry.get("dev", 0))
-	if is_prime():
+	if card != null and card.has_method("is_champ") and card.is_champ():
+		draw_rect(Rect2(3, 14, 31, 9), Color("#ffb000"))
+		draw_string(font, Vector2(5, 21), "CHAMP", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UiSkin.SHADOW)
+	elif is_prime():
 		draw_rect(Rect2(3, 14, 29, 9), Color("#29adff"))
 		draw_string(font, Vector2(5, 21), "PRIME", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color.WHITE)
 	if boost > 0:

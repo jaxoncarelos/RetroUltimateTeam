@@ -12,7 +12,9 @@ extends Node2D
 
 enum Phase { PREGAME, PLAY_CALL, LIVE, RESULT, PAT_CHOICE, KICK_METER, BREAK, FINAL, PAUSED }
 ## What the choice panel is showing while PAUSED: the pause menu or the leave-game confirm.
-enum PauseMenu { MAIN, CONFIRM_QUIT }
+enum PauseMenu { MAIN, CONFIRM_QUIT, CONFIRM_SIM }
+## A halftime lead this big offers to sim the rest of the game (also in the pause menu).
+const SIM_OFFER_LEAD := 28
 
 const DEFENSE_PRESNAP_HINT := "TAP A DEFENDER TO PICK HIM  ·  TAP THE FIELD WHEN READY"
 const DEFENSE_LIVE_HINT := "DRAG TO MOVE  ·  RUN INTO THE CARRIER  ·  TAP HIM TO DIVE"
@@ -775,6 +777,14 @@ func _on_choice(index: int) -> void:
 				_start_kick_meter("pat")
 			else:
 				_begin_two_point()
+		Phase.BREAK:
+			if _half_offer:
+				_half_offer = false
+				if index == 1:
+					_sim_rest_of_game()
+				else:
+					hud.hide_choice()
+					_kickoff(gs.opening_receiver)
 		Phase.PAUSED:
 			_on_pause_choice(index)
 		Phase.FINAL:
@@ -886,8 +896,12 @@ func _end_period() -> void:
 			gs.reset_timeouts()
 			if not _sim():
 				hud.show_banner("HALFTIME", "%s %d  %s %d" % [gs.home, gs.score[gs.home], gs.away, gs.score[gs.away]], 2.2)
-			# The team that received the opening kick kicks off the second half.
-			_after(2.2, func() -> void: _kickoff(gs.opening_receiver))
+			# The team that received the opening kick kicks off the second half (a huge lead
+			# first offers to sim the rest of the game).
+			if human != "" and not _sim() and not _is_challenge() and gs.score_diff(human) >= SIM_OFFER_LEAD:
+				_after(2.2, _offer_sim)
+			else:
+				_after(2.2, func() -> void: _kickoff(gs.opening_receiver))
 		"regulation_over":
 			_kickoff_pending = ""
 			if gs.score[gs.home] == gs.score[gs.away]:
@@ -1061,6 +1075,8 @@ func pause_options() -> Array[String]:
 			"QUARTER: %.1f MIN (NEXT GAME)" % Settings.quarter_minutes]
 	if not config.get("from_hub", false):
 		opts.append("RESTART GAME")
+	if not _is_challenge():
+		opts.append("SIM REST OF GAME")
 	opts.append("QUIT TO MENU")
 	return opts
 
@@ -1073,6 +1089,12 @@ func _on_pause_choice(index: int) -> void:
 	if _pause_menu == PauseMenu.CONFIRM_QUIT:
 		if index == 1:
 			_quit_to_menu()
+		else:
+			_show_pause_menu()
+		return
+	if _pause_menu == PauseMenu.CONFIRM_SIM:
+		if index == 1:
+			_sim_rest_of_game()
 		else:
 			_show_pause_menu()
 		return
@@ -1090,6 +1112,10 @@ func _on_pause_choice(index: int) -> void:
 			Settings.quarter_minutes = lengths[(i + 1) % lengths.size()]
 			Settings.save_settings()
 			_show_pause_menu()
+		"SIM REST OF GAME":
+			_pause_menu = PauseMenu.CONFIRM_SIM
+			hud.show_choice("SIM THE REST?", "%s %d  %s %d  ·  FINISHES THE GAME NOW" % [gs.home, gs.score[gs.home], gs.away, gs.score[gs.away]],
+					["KEEP PLAYING", "SIM IT"] as Array[String])
 		"RESTART GAME":
 			Engine.time_scale = 1.0
 			get_tree().reload_current_scene()
@@ -1247,7 +1273,58 @@ func _debug_show(kind: String) -> void:
 			hud.show_choice("EXTRA POINT", "KC 6  PHI 0", ["KICK PAT (1)", "GO FOR 2"] as Array[String])
 		"final":
 			hud.show_choice("YOU WIN!", "KC 31  PHI 17", ["PLAY AGAIN"] as Array[String])
+		"simrest":
+			_sim_rest_of_game()
+		"half":
+			gs.score[gs.home] = 35
+			phase = Phase.BREAK
+			_offer_sim()
 		"kick":
 			hud.kick_meter.start("FIELD GOAL  38 YD", 0.3, 0.12, 1.0)
 		"tip":
 			hud.show_tip("YOUR BALL. THE BEST CALL IS PRESELECTED (OR TAP ANOTHER / MORE). PRESS THE QB AND DRAG BACK TO AIM, RELEASE TO THROW. DRAG FORWARD TO RUN.")
+
+
+# ---------------------------------------------------------------- sim the rest
+
+var _half_offer := false
+
+
+## Team strength for the quick sim: your lineup (with its cards) or the real team's rating.
+func _sim_strength(abbr: String) -> int:
+	var prof := SaveManager.profile
+	if abbr == human and prof != null and prof.has_team() and prof.franchise_team == abbr:
+		return Collection.team_ovr(prof, GameData.db)
+	return GameData.db.team_ovr(abbr)
+
+
+## Finishes the game from the current score: the remaining share of a normal game's scoring
+## is drawn with the same model as SIM GAME, never ending tied; then the final screen.
+func _sim_rest_of_game() -> void:
+	var q := gs.clock.quarter
+	var frac := 0.08 if q > 4 else clampf(((4 - q) * GameClock.QUARTER + gs.clock.seconds_left) / (4.0 * GameClock.QUARTER), 0.0, 1.0)
+	var gap := float(_sim_strength(gs.home) - _sim_strength(gs.away)) + 1.5
+	gs.score[gs.home] += SeasonRules.sim_points(clampf(22.0 + gap * 0.7, 6.0, 45.0) * frac, rng)
+	gs.score[gs.away] += SeasonRules.sim_points(clampf(22.0 - gap * 0.7, 6.0, 45.0) * frac, rng)
+	if gs.score[gs.home] == gs.score[gs.away]:
+		gs.score[gs.home if rng.randf() < 0.5 + gap * 0.02 else gs.away] += 3
+	_half_offer = false
+	_pause_menu = PauseMenu.MAIN
+	Engine.time_scale = 1.0
+	runner.set_physics_process(false)
+	hud.hide_choice()
+	hud.show_switch(false)
+	gs.clock.seconds_left = 0.0
+	gs.clock.stopped = true
+	_update_scorebug()
+	phase = Phase.BREAK
+	_final()
+
+
+## Halftime with a big lead: offer to skip the second half.
+func _offer_sim() -> void:
+	if phase != Phase.BREAK:
+		return
+	_half_offer = true
+	hud.show_choice("YOU LEAD BY %d" % gs.score_diff(human), "%s %d  %s %d  ·  SIM THE SECOND HALF?" % [gs.home, gs.score[gs.home], gs.away, gs.score[gs.away]],
+			["PLAY 2ND HALF", "SIM REST OF GAME"] as Array[String])
