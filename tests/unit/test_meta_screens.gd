@@ -116,6 +116,7 @@ func test_results_screen_applies_match() -> void:
 
 
 func test_next_game_is_quick_without_season() -> void:
+	SaveManager.profile.season = {}   # the hub starts a season on its own; this is the no-season fallback
 	var cfg := GameFlow.next_game_config(SaveManager.profile)
 	assert_eq(cfg.get("mode", ""), "quick")
 	assert_ne(cfg.get("away", ""), SaveManager.profile.franchise_team)

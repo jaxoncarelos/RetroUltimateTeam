@@ -85,5 +85,6 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    shake, TD/turnover flash, synthesized SFX); first-game coach tips (Settings.tutorial_done).
    Not done: left-handed mode, iOS export, on-device perf pass, music.
 11. [x] Playtest round 2 (docs/ART_AND_PROTECTION_PLAN.md): slimmer helmet/longer-body sprites, Madden-style feet ring on the ball carrier (incl. QB), pass-pro blocks hold longer (`pass_shed_mult` etc.; base coverages ~5 s to sack, blitzes ~1.7 s).
+13. [x] A league always runs: the hub starts a season if none exists (`GameFlow.needs_season/start_season`), so PLAY plays league games and the other teams are simmed (fixes division standings staying 0-0).
 12. [x] Sim the rest of a game (pause menu, or offered at halftime when up 28+: `MatchController._sim_rest_of_game`); Super Bowl title now also pays 3,000 coins + a locked 99 CHAMP card of the franchise star (`EconomyRules.champion_reward`, `CardRules.PROGRAM_CHAMP`). Playoffs/Super Bowl already existed in `SeasonRules`. Debug: `--show=half|simrest`, `-- --demo-profile --champ`.
 Next ideas (after the owner's playtest): see MORNING_NOTES.md.

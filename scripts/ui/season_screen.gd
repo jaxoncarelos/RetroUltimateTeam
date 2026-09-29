@@ -226,14 +226,7 @@ func _standings_view(table: Dictionary, you: String) -> Control:
 
 func _new_season() -> void:
 	var prof := SaveManager.profile
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
-	var strengths := {}
-	for a in GameData.teams:
-		strengths[a] = GameData.db.team_ovr(a)
-	strengths[prof.franchise_team] = Collection.team_ovr(prof, GameData.db)
-	var year := int(prof.season.get("year", 0)) + 1
-	prof.season = SeasonRules.new_season(GameData.teams, prof.franchise_team, Settings.season_games, strengths, rng, year)
+	GameFlow.start_season(prof)
 	SaveManager.save()
 	_week = 0
 	Sfx.play("claim")

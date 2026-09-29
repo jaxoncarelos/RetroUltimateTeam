@@ -13,6 +13,9 @@ var _obj_btn: Button
 func _ready() -> void:
 	prof = SaveManager.profile
 	var cfg := SceneRouter.take_config()
+	if GameFlow.needs_season(prof):   # a league always runs, so the other teams play their games too
+		GameFlow.start_season(prof)
+		SaveManager.save()
 	_ui = MetaUI.screen(self, "POCKET GRIDIRON", "")
 	if cfg.has("last_result"):
 		var res := GameFlow.apply_result(prof, cfg["last_result"])
