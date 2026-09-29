@@ -103,15 +103,15 @@ static func sim_result(prof: Profile, cfg: Dictionary) -> Dictionary:
 	rng.randomize()
 	var you := prof.franchise_team
 	var opp: String = cfg.get("away", "PHI")
-	var mine := Collection.team_ovr(prof, GameData.db)
-	var theirs := GameData.db.team_ovr(opp)
-	var sc := SeasonRules.sim_score(mine, theirs, rng)
-	var tds := int(sc[0]) / 7
-	return {"team": you, "opponent": opp, "pf": int(sc[0]), "pa": int(sc[1]), "forfeit": false, "tds": tds,
-			"def_ints": 0, "def_sacks": 0, "difficulty": int(cfg.get("difficulty", Settings.difficulty)),
+	var gs := GameState.new(you, opp)
+	gs.start_possession(opp, 25.0)   # your team receives the opening kickoff
+	GameSim.finish(gs, {you: Collection.team_ovr(prof, GameData.db), opp: GameData.db.team_ovr(opp)}, rng)
+	var b := gs.box_score(you)
+	return {"team": you, "opponent": opp, "pf": int(b["pf"]), "pa": int(b["pa"]), "forfeit": false, "tds": int(b["tds"]),
+			"def_ints": int(b["def_ints"]), "def_sacks": int(b["def_sacks"]),
+			"difficulty": int(cfg.get("difficulty", Settings.difficulty)),
 			"mode": str(cfg.get("mode", "quick")), "extra": cfg.get("extra", {}), "came_back": false,
-			"challenge_won": false, "simulated": true,
-			"box": {"pass_td": tds, "rush_td": 0, "tds": tds, "pf": int(sc[0]), "pa": int(sc[1])}}
+			"challenge_won": false, "simulated": true, "box": b}
 
 
 ## First reward pack waiting to be opened, as a pack-opening config ({} if none).

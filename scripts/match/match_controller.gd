@@ -1301,13 +1301,7 @@ func _sim_strength(abbr: String) -> int:
 ## Finishes the game from the current score: the remaining share of a normal game's scoring
 ## is drawn with the same model as SIM GAME, never ending tied; then the final screen.
 func _sim_rest_of_game() -> void:
-	var q := gs.clock.quarter
-	var frac := 0.08 if q > 4 else clampf(((4 - q) * GameClock.QUARTER + gs.clock.seconds_left) / (4.0 * GameClock.QUARTER), 0.0, 1.0)
-	var gap := float(_sim_strength(gs.home) - _sim_strength(gs.away)) + 1.5
-	gs.score[gs.home] += SeasonRules.sim_points(clampf(22.0 + gap * 0.7, 6.0, 45.0) * frac, rng)
-	gs.score[gs.away] += SeasonRules.sim_points(clampf(22.0 - gap * 0.7, 6.0, 45.0) * frac, rng)
-	if gs.score[gs.home] == gs.score[gs.away]:
-		gs.score[gs.home if rng.randf() < 0.5 + gap * 0.02 else gs.away] += 3
+	GameSim.finish(gs, {gs.home: _sim_strength(gs.home), gs.away: _sim_strength(gs.away)}, rng)
 	_half_offer = false
 	_pause_menu = PauseMenu.MAIN
 	Engine.time_scale = 1.0
