@@ -57,6 +57,8 @@ extends Resource
 @export var catch_base_low := 0.72     ## uncontested catch % at catching 50
 @export var catch_base_high := 0.98    ## … at catching 99
 @export var contest_penalty := 0.7
+@export var easy_catch_contest := 0.3  ## contest below this is a clean catch: the chance rises toward the floor
+@export var easy_catch_floor := 0.95   ## catch chance of a fully uncontested ball, whatever the rating or loft
 @export var int_base := 0.07
 @export var int_cov_scale := 0.26
 @export var tip_int_chance := 0.05     ## a contested ball the receiver fails to catch pops to the defender

@@ -851,6 +851,9 @@ func _resolve_arrival() -> void:
 				+ def_ai.catch_contest_bonus * key_level, 0.0, 1.0)
 	var def_cov := d.attr("cov") if d != null else 50.0
 	var p_catch := RatingModel.catch_prob(t, o.attr("cth"), contest, def_cov) * (1.0 - t.lob_catch_penalty * loft)
+	# A ball nobody is near is caught: the floor fades out as a defender gets involved.
+	var easy := clampf(1.0 - contest / t.easy_catch_contest, 0.0, 1.0)
+	p_catch = lerpf(p_catch, maxf(p_catch, t.easy_catch_floor), easy)
 	if rng.randf() < p_catch:
 		_log_pass(true, false)
 		_set_carrier(o)
