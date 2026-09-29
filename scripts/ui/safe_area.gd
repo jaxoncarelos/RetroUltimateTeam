@@ -31,12 +31,19 @@ static func insets() -> Dictionary:
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null or win.x <= 0 or win.y <= 0:
 		return out
-	var vp := tree.root.get_visible_rect().size
-	var sc := Vector2(vp.x / win.x, vp.y / win.y)
-	var safe := DisplayServer.get_display_safe_area()
-	var scr := DisplayServer.screen_get_size()
-	if safe.size.x <= 0 or scr.x <= 0:
+	return compute(Vector2(win), tree.root.get_visible_rect().size, Rect2(DisplayServer.get_display_safe_area()),
+			Vector2(DisplayServer.screen_get_size()))
+
+
+## Pure conversion (testable): OS safe area in screen pixels -> insets in viewport units, never
+## below the mobile minimums; bottom is capped (the home indicator is thin).
+static func compute(win: Vector2, vp: Vector2, safe: Rect2, scr: Vector2) -> Dictionary:
+	var out := MIN_MOBILE.duplicate()
+	if win.x <= 0.0 or win.y <= 0.0 or safe.size.x <= 0.0 or scr.x <= 0.0:
 		return out
+	# The window may be smaller than the screen (desktop) or equal to it (phones): scale the
+	# safe-area margins by viewport-units per *screen* pixel along each axis.
+	var sc := Vector2(vp.x / scr.x, vp.y / scr.y)
 	out["left"] = maxf(out["left"], safe.position.x * sc.x)
 	out["top"] = maxf(out["top"], safe.position.y * sc.y)
 	out["right"] = maxf(out["right"], (scr.x - safe.end.x) * sc.x)
