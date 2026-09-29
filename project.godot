@@ -18,6 +18,7 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [autoload]
 
+Updater="*res://autoload/updater.gd"
 Events="*res://autoload/events.gd"
 UiTheme="*res://autoload/ui_theme.gd"
 Settings="*res://autoload/settings.gd"
@@ -26,6 +27,11 @@ SaveManager="*res://autoload/save_manager.gd"
 SceneRouter="*res://autoload/scene_router.gd"
 Sfx="*res://autoload/sfx.gd"
 Music="*res://autoload/music.gd"
+
+[pocket_gridiron]
+
+engine_epoch=1
+base_build="dev"
 
 [display]
 

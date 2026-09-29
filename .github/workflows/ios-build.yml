@@ -28,12 +28,22 @@ jobs:
           cp -R tpl/templates/. "$T/"
           echo "GODOT=$PWD/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
 
-      - name: Stamp build id
+      - name: Stamp build id and OTA update config
+        env:
+          UPDATE_TOKEN: ${{ secrets.UPDATE_TOKEN }}
         run: |
-          echo 'class_name BuildInfo' > scripts/build_info.gd
-          echo 'extends RefCounted' >> scripts/build_info.gd
-          echo "const ID := \"${GITHUB_SHA::7}\"" >> scripts/build_info.gd
-          cat scripts/build_info.gd
+          {
+            echo 'class_name BuildInfo'
+            echo 'extends RefCounted'
+            echo "const ID := \"${GITHUB_SHA::7}\""
+            echo "const REPO := \"${GITHUB_REPOSITORY}\""
+            echo "const TOKEN := \"${UPDATE_TOKEN}\""
+          } > scripts/build_info.gd
+          # Base build lives in project.godot: a runtime pack can't override it, so the game can tell
+          # that an update pack belongs to an older IPA.
+          sed -i '' "s/^base_build=.*/base_build=\"${GITHUB_SHA::7}\"/" project.godot
+          grep -n "base_build\|engine_epoch" project.godot
+          echo "EPOCH=$(sed -n 's/^engine_epoch=//p' project.godot)" >> "$GITHUB_ENV"
 
       - name: Import project
         run: |
@@ -44,6 +54,11 @@ jobs:
           mkdir -p export/ios
           "$GODOT" --headless --path . --export-release iOS export/ios/PocketGridiron.ipa
           ls -R export/ios | head -50
+
+      - name: Export OTA update pack
+        run: |
+          "$GODOT" --headless --path . --export-pack iOS "update-e${EPOCH}-${GITHUB_SHA::7}.pck"
+          ls -l update-*.pck
 
       - name: Build unsigned app
         run: |
@@ -69,7 +84,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest PocketGridiron.ipa \
+          gh release create latest PocketGridiron.ipa update-e*.pck \
             --title "Latest build (${GITHUB_SHA::7})" \
             --notes "Unsigned IPA built from ${GITHUB_SHA} on $(date -u +%F). Open in AltStore/Sideloadly to install." \
             --target "$GITHUB_SHA"

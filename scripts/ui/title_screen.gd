@@ -30,6 +30,7 @@ var _leaving := false
 
 
 func _ready() -> void:
+	Updater.mark_good()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var bg := _Backdrop.new()
 	bg.texture = ArtGen.title_backdrop()

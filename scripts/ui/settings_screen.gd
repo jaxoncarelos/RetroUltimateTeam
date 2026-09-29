@@ -19,6 +19,7 @@ func _ready() -> void:
 	_grid.add_theme_constant_override("h_separation", 8)
 	_grid.add_theme_constant_override("v_separation", 8)
 	center.add_child(_grid)
+	Updater.status_changed.connect(_refresh)
 	_refresh()
 
 
@@ -44,6 +45,8 @@ func _refresh() -> void:
 		s.aim_sens = (s.aim_sens + 1) % Settings.AIM_NAMES.size())
 	_row("COACH\nTIPS", "REPLAY" if s.tutorial_done else "ON", func() -> void: s.tutorial_done = false)
 	var team: TeamData = GameData.team(SaveManager.profile.franchise_team)
+	_row("UPDATES", Updater.detail.to_upper() if Updater.state != Updater.State.IDLE else "CHECK", func() -> void:
+		Updater.check(), false)
 	_row("RESET\nCAREER", "SURE? TAP" if _confirm_reset else "RESET", _reset, false)
 	if team != null:
 		var l := MetaUI.label("FAVORITE TEAM", UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_RIGHT)

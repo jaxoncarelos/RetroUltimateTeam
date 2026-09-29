@@ -22,6 +22,12 @@ Godot 4.7 + GDScript retro football game. Design/roadmap: `PLAN.md`. Status tabl
 - To ship a fix: commit + push to `main`, then `gh workflow run ios-build.yml` (or `gh workflow run ios-build.yml --ref main`),
   watch with `gh run watch`, and tell the owner the release is ready
   (`gh release view latest --web` URL). The owner downloads the IPA in Safari and opens it in AltStore.
+- OTA updates (`autoload/updater.gd`, must stay the FIRST autoload): each build also attaches `update-e<epoch>-<sha>.pck`
+  to `latest`. The game downloads it on launch (needs repo secret `UPDATE_TOKEN`, a fine-grained read-only PAT for
+  this repo's contents) and mounts it on the next launch, so most fixes reach the phone with no IPA reinstall.
+  A new IPA is only needed when `autoload/updater.gd`, `project.godot` or the engine change — then bump
+  `pocket_gridiron/engine_epoch` in project.godot. Never reference `BuildInfo` from `updater.gd`. A pack that
+  doesn't reach the title screen is auto-discarded. CI stamps `scripts/build_info.gd` and `base_build`; don't commit those stamps.
 - The owner is away from the PC while testing: push fixes, trigger the build, and report the release link. Don't wait to be asked.
 
 ## Conventions
