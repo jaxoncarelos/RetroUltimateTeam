@@ -21,7 +21,7 @@ signal tip_closed
 
 const WARN_COLOR := Color("#ff004d")
 const BAR_SIZE := 4
-const BAR_H := 11
+const BAR_H := 14
 const SWITCH_SIZE := Vector2(78, 46)
 
 ## Set by the match: name tags read the agents' positions from it (optional).
@@ -597,20 +597,27 @@ class _TopBar:
 	func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.88))
 		draw_rect(Rect2(0, size.y, size.x, 1), Color(0, 0, 0, 0.35))
-		var y := 9.0
+		var y := 11.0
 		if not data.is_empty():
-			var x := 4.0 + pad_l
+			var x := 3.0 + pad_l
 			for side in ["home", "away"]:
 				var abbr: String = data.get(side, "")
 				var sc := str(data.get(side + "_score", 0))
 				var has_ball: bool = data.get("possession", "") == abbr
+				# Score chip in the team's color so both sides read at a glance.
+				var col: Color = data.get(side + "_color", Color("#30364a"))
+				var chip_w := PixelFont.text_width(abbr) + PixelFont.text_width(sc) + 15.0 + (11.0 if has_ball else 0.0)
+				draw_rect(Rect2(x - 1, 1, chip_w + 2, size.y - 2), Color(0, 0, 0, 0.9))
+				draw_rect(Rect2(x, 2, chip_w, size.y - 4), col.darkened(0.15))
+				draw_rect(Rect2(x, 2, chip_w, 1), col.lightened(0.3))
+				var tx := x + 3.0
 				if has_ball:
-					UiSkin.draw_icon(self, "ball", Vector2(x, 2), Color("#c8793a"), 1.0, false)
-					x += 13.0
-				UiSkin.draw_text(self, Vector2(x, y), abbr, 8, UiSkin.YELLOW if has_ball else Color.WHITE)
-				x += PixelFont.text_width(abbr) + 5
-				UiSkin.draw_text(self, Vector2(x, y), sc, 8, Color.WHITE)
-				x += PixelFont.text_width(sc) + 10
+					UiSkin.draw_icon(self, "ball", Vector2(tx, 3), Color("#c8793a"), 1.0, false)
+					tx += 11.0
+				UiSkin.draw_text(self, Vector2(tx, y), abbr, 8, UiSkin.YELLOW if has_ball else Color.WHITE)
+				tx += PixelFont.text_width(abbr) + 5
+				UiSkin.draw_text(self, Vector2(tx, y), sc, 8, Color.WHITE)
+				x += chip_w + 6.0
 			var q: String = data.get("quarter", "")
 			var clk: String = data.get("clock", "")
 			var qw := PixelFont.text_width(q + " ")
@@ -625,8 +632,8 @@ class _TopBar:
 			UiSkin.draw_text(self, Vector2(size.x - 5 - pad_r - PixelFont.text_width(right), y), right, 8, UiSkin.YELLOW)
 		if show_pause:
 			var px := size.x * 0.5 + 44
-			draw_rect(Rect2(px, 2, 2, 7), Color.WHITE)
-			draw_rect(Rect2(px + 4, 2, 2, 7), Color.WHITE)
+			draw_rect(Rect2(px, 3, 2, 8), Color.WHITE)
+			draw_rect(Rect2(px + 4, 3, 2, 8), Color.WHITE)
 
 
 ## Slim black bottom bar: controlled player "P.MAHOMES [QB]" left, gesture hint right.
@@ -646,14 +653,14 @@ class _BottomBar:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.8))
 		var x := 4.0 + pad_l
 		if tag != "":
-			UiSkin.draw_icon(self, "face", Vector2(x, 2), UiSkin.YELLOW, 1.0, false)
+			UiSkin.draw_icon(self, "face", Vector2(x, 3), UiSkin.YELLOW, 1.0, false)
 			x += 11.0
-			UiSkin.draw_text(self, Vector2(x, 9), tag, 8, Color.WHITE)
+			UiSkin.draw_text(self, Vector2(x, 11), tag, 8, Color.WHITE)
 			x += PixelFont.text_width(tag) + 12
 		if hint != "":
 			var h := fit_hint(hint, size.x - 5 - pad_r - x)
 			var w := PixelFont.text_width(h)
-			UiSkin.draw_text(self, Vector2(maxf(x, size.x - 5 - pad_r - w), 9), h, 8, Color(1, 1, 1, 0.6))
+			UiSkin.draw_text(self, Vector2(maxf(x, size.x - 5 - pad_r - w), 11), h, 8, Color(1, 1, 1, 0.78))
 
 	## Drops trailing "  ·  " parts of a hint until it fits `room` px (never runs off screen).
 	static func fit_hint(text: String, room: float) -> String:

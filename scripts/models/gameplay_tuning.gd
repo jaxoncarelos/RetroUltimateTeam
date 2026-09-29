@@ -183,7 +183,8 @@ extends Resource
 @export var slowmo_time := 0.45        ## real seconds of slow-mo (0 = off)
 @export var slowmo_deep_yards := 20.0  ## air yards for a catch to count as a highlight
 @export var slowmo_hit_speed := 8.5    ## carrier speed (yd/s) for a tackle to count as a big hit
-@export var camera_punch := 0.07       ## zoom kick on a highlight (0.07 = 7 %)
+@export var camera_zoom := 1.0        ## base zoom; 1.25 clips wide receivers at the sidelines (tested), so keep 1.0
+@export var camera_punch := 0.07      ## zoom kick on a highlight (0.07 = 7 %)
 @export var aim_camera_lead := 130.0   ## px: while aiming, the camera keeps the reticle this far right of center
 
 @export_group("Runner controls")

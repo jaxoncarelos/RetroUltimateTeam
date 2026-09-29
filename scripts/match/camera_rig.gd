@@ -120,7 +120,8 @@ func _process(delta: float) -> void:
 	global_position = global_position.lerp(target_position(), 1.0 - exp(-rate * real))
 	if _punch > 0.0:
 		_punch = maxf(0.0, _punch - real * 0.35)
-	zoom = Vector2.ONE * (1.0 + _punch)
+	var base := runner.tuning.camera_zoom if runner != null and runner.tuning != null else 1.0
+	zoom = Vector2.ONE * (base + _punch)
 	if trauma > 0.0:
 		trauma = maxf(0.0, trauma - real * 1.8)
 		var mag := trauma * trauma * SHAKE_PX

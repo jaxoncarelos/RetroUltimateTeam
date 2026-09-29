@@ -439,7 +439,7 @@ func _update_scorebug() -> void:
 	var q: String = "OT" if gs.clock.is_overtime() else ["1ST", "2ND", "3RD", "4TH"][clampi(gs.clock.quarter - 1, 0, 3)] + " QTR"
 	hud.set_score_bar({"home": gs.home, "away": gs.away, "home_score": int(gs.score[gs.home]),
 			"away_score": int(gs.score[gs.away]), "possession": gs.possession, "quarter": q,
-			"clock": GameClock.format_time(gs.clock.seconds_left),
+			"clock": GameClock.format_time(gs.clock.seconds_left), "home_color": teams[gs.home].helmet, "away_color": teams[gs.away].helmet,
 			"down": "2-PT TRY" if _two_point else gs.downs.down_text()})
 
 
