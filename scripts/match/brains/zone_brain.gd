@@ -28,7 +28,10 @@ func think() -> void:
 	for o in ctx.offense:
 		if not o.is_eligible() or o.is_down or not watch.has_point(o.field_pos):
 			continue
+		# Deep to short: a receiver level with or behind you outranks one underneath.
 		var d := o.field_pos.distance_to(agent.field_pos)
+		if o.field_pos.x < agent.field_pos.x - 1.0:
+			d += ctx.tuning.zone_underneath_penalty
 		if d < best_d:
 			best_d = d
 			best = o
@@ -36,8 +39,19 @@ func think() -> void:
 		var p := ctx.anticipate(best) + Vector2(1.5, 0.0)
 		var lim := zone.grow(3.0 + reach)
 		aim = Vector2(clampf(p.x, lim.position.x, lim.end.x), clampf(p.y, lim.position.y, lim.end.y))
+		# Against a vertical stem, keep your depth and let him come to you: stepping downhill
+		# is how he gets behind you.
+		if best.velocity.x > 2.0 and best.field_pos.x < agent.field_pos.x:
+			aim.x = maxf(aim.x, agent.field_pos.x)
 	else:
 		aim = zone.get_center()
+	# A receiver who ran past you (or past the back of the zone) is still your problem:
+	# never drift back up toward the line while he is behind you.
+	for o in ctx.offense:
+		if o.is_eligible() and not o.is_down and o.field_pos.x > agent.field_pos.x \
+				and absf(o.field_pos.y - agent.field_pos.y) < zone.size.y * 0.5 + 4.0:
+			aim.x = maxf(aim.x, agent.field_pos.x)
+			break
 
 
 func act(dt: float) -> void:

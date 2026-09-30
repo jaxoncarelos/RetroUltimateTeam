@@ -524,6 +524,10 @@ func throw_ball(target: Vector2) -> void:
 				d.brain = BallHawkBrain.new(d, self, landing, maxf(react, dur - tuning.man_look_back), d.brain)
 		elif dd < tuning.ball_react_radius + def_ai.ball_react_extra * key_level:
 			d.brain = BallHawkBrain.new(d, self, landing, react, d.brain)
+		elif d.brain is ZoneBrain:
+			# Everyone else in zone rallies to the ball a beat later instead of sinking back
+			# to an empty zone (on a deep shot that zone is behind them, toward the QB).
+			d.brain = BallHawkBrain.new(d, self, landing, react + tuning.ball_rally_delay, d.brain)
 	ball_thrown.emit(landing)
 
 

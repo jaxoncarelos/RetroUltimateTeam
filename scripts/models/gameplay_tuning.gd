@@ -51,6 +51,8 @@ extends Resource
 @export var undercut_int_mult := 1.2   ## INT chance multiplier when a defender settles under a lob
 @export var man_look_back := 0.6       ## s before the ball lands that man defenders turn to find it
 @export var ball_react_radius := 11.0  ## yards: zone defenders this close to the landing spot break on it
+@export var zone_underneath_penalty := 6.0 ## yards added to an underneath receiver's distance when a zone picks whom to shade
+@export var ball_rally_delay := 0.35   ## extra s before zone defenders farther away turn and run to the ball
 @export var catch_radius := 1.4        ## yards
 @export var human_catch_bonus := 0.35  ## extra catch radius when the human threw it (forgiving)
 @export var contest_radius := 1.6

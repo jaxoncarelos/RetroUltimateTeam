@@ -168,3 +168,26 @@ func test_pocket_holds_against_base_coverage() -> void:
 			assert_false(ended.is_empty(), "%s vs %s never ended" % [off_id, def_id])
 			if not ended.is_empty() and ended[0]["type"] == "sack":
 				assert_gt(float(ended[0]["time"]), 3.5, "%s vs %s sacked too fast" % [off_id, def_id])
+
+
+func test_deep_zone_defenders_do_not_retreat_toward_the_qb_on_a_deep_ball() -> void:
+	for def_id in ["cover2", "cover3", "cover4"]:
+		var off := _find(off_book, "deep_shot")
+		var def := _find(def_book, def_id)
+		runner.setup_play(off, def, 35.0, FieldGeo.CENTER_Y, _lineup(off.formation, 80), _lineup(def.formation, 78))
+		runner.snap()
+		var wr: PlayerAgent = runner.off_slots["WR2"]
+		var at_throw := {}
+		for i in int(6.0 / DT):
+			if at_throw.is_empty() and runner.play_time > 1.6 and runner.qb_is_passer():
+				runner.throw_ball(wr.field_pos + Vector2(14.0, 0.0))
+				for d in runner.defense:
+					if d.field_pos.x > runner.los_x + 10.0:
+						at_throw[d] = d.field_pos.x
+			runner._physics_process(DT)
+			if not at_throw.is_empty() and runner.ball.state != Ball.State.AIR:
+				break
+		assert_false(at_throw.is_empty(), def_id + ": the ball should have been thrown")
+		for d in at_throw:
+			assert_gt(d.field_pos.x, at_throw[d] - 0.5,
+					"%s %s came back toward the line on a deep ball" % [def_id, d.slot])
