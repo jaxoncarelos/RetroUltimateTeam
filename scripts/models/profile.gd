@@ -18,7 +18,7 @@ var lineup: Dictionary = {}      ## slot -> uid
 var season: Dictionary = {}
 var challenges: Dictionary = {}
 var stats := {"games": 0, "wins": 0, "losses": 0, "ties": 0, "packs_opened": 0, "last_win_day": 0,
-		"coins_earned": 0, "win_streak": 0, "best_streak": 0}
+		"coins_earned": 0, "win_streak": 0, "best_streak": 0, "tester_coins": 0}
 var sets_done: Dictionary = {}
 var objectives: Dictionary = {}  ## ObjectiveRules state {day, week, progress, claimed, totals}
 var coach := {"xp": 0, "level": 1, "perks": {}}   ## ProgressionRules (coach level 1..50) + CoachPerks ranks

@@ -1,7 +1,7 @@
 extends Control
 ## OPTIONS (Retro Bowl settings layout): label + value button pairs in a grid - quarter
 ## length, defense pace, difficulty, season length, sound, screen shake, coach tips,
-## favorite team, and a two-tap career reset.
+## favorite team, a one-time 50,000 tester coin grant and a two-tap career reset.
 
 var _grid: GridContainer
 var _confirm_reset := false
@@ -47,6 +47,14 @@ func _refresh() -> void:
 	var team: TeamData = GameData.team(SaveManager.profile.franchise_team)
 	_row("UPDATES", Updater.detail.to_upper() if Updater.state != Updater.State.IDLE else "CHECK", func() -> void:
 		Updater.check(), false)
+	var prof := SaveManager.profile
+	if prof.has_team():
+		var can := EconomyRules.can_claim_tester_coins(prof)
+		_row("TESTER\nCOINS", "+%s" % CoinPill.fmt(EconomyRules.TESTER_COINS) if can else "CLAIMED", func() -> void:
+			if EconomyRules.claim_tester_coins(prof) > 0:
+				SaveManager.save()
+				Sfx.play("claim")
+				MetaUI.toast(self, "+%s COINS" % CoinPill.fmt(EconomyRules.TESTER_COINS)), false)
 	_row("RESET\nCAREER", "SURE? TAP" if _confirm_reset else "RESET", _reset, false)
 	if team != null:
 		var l := MetaUI.label("FAVORITE TEAM", UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_RIGHT)

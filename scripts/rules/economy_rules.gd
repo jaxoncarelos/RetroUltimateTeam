@@ -432,6 +432,23 @@ static func franchise_elite(profile: Profile, db: RosterDB, rng: RandomNumberGen
 
 
 
+## One-time tester grant (Settings → TESTER COINS) to try new packs on an existing save.
+const TESTER_COINS := 50000
+
+
+static func can_claim_tester_coins(profile: Profile) -> bool:
+	return int(profile.stats.get("tester_coins", 0)) == 0
+
+
+## Adds TESTER_COINS once per save. Returns coins added (0 = already claimed).
+static func claim_tester_coins(profile: Profile) -> int:
+	if not can_claim_tester_coins(profile):
+		return 0
+	profile.stats["tester_coins"] = 1
+	profile.coins += TESTER_COINS
+	return TESTER_COINS
+
+
 const CHAMP_REPEAT_COINS := 5000
 
 ## Super Bowl trophy: a 99-OVR CHAMP card of your franchise's best player, locked so it can't be

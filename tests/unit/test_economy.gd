@@ -320,3 +320,14 @@ func test_progression_curve() -> void:
 	assert_between(at[50], 78, 87, "low-mid 80s after 50 games")
 	assert_between(at[100], 82, 91, "mid 80s after 100 games: high 90s are the long grind")
 	assert_gt(income["objectives"], 0, "objectives are a real income source")
+
+
+func test_tester_coins_are_one_time_and_saved() -> void:
+	var prof := _starter()
+	var before := prof.coins
+	assert_eq(EconomyRules.claim_tester_coins(prof), EconomyRules.TESTER_COINS)
+	assert_eq(prof.coins, before + 50000)
+	assert_eq(EconomyRules.claim_tester_coins(prof), 0, "only once")
+	var loaded := Profile.from_dict(JSON.parse_string(JSON.stringify(prof.to_dict())))
+	assert_false(EconomyRules.can_claim_tester_coins(loaded), "still claimed after a save/load")
+	assert_true(EconomyRules.can_claim_tester_coins(Profile.from_dict({})), "old saves can claim it")
