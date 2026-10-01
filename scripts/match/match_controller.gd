@@ -368,7 +368,7 @@ func _start_play_call() -> void:
 			return
 	if _human_offense():
 		def_play = AIPlayCaller.pick_defense(defense_book.plays, memory, situation, rng, last_def_call)
-		var ranked := PlayAdvisor.rank(offense_book.plays, situation, memory)
+		var ranked := PlayAdvisor.suggest(offense_book.plays, situation, rng, memory)
 		off_play = ranked[0]
 		hud.set_play_options(ranked, offense_book.plays)
 		hud.set_selected(off_play)

@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_shotgun.tres" id="1_wbwdo"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_pofav"]
+
+[resource]
+script = ExtResource("2_pofav")
+id = "sluggo"
+display_name = "Slant & Go"
+category = "DEEP"
+formation = ExtResource("1_wbwdo")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"drop": 3.5,
+"type": "pass"
+},
+"RB": {
+"type": "block"
+},
+"TE": {
+"end": "continue",
+"path": PackedVector2Array(7, 0, 7, 6),
+"type": "route"
+},
+"WR1": {
+"end": "continue",
+"path": PackedVector2Array(3, 0, 5, 3, 32, 2),
+"type": "route"
+},
+"WR2": {
+"end": "sit",
+"path": PackedVector2Array(6, 0, 5, 0),
+"type": "route"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray("deep")

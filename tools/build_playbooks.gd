@@ -216,6 +216,91 @@ func _init() -> void:
 		"TE": _route(_v([Vector2(4, 0), Vector2(4, -5)]), "sit"),
 		"RB": _b(),
 	}), [], ["goal_line", "red_zone"]))
+	# Pass concepts that spread the ball: every eligible runs a route on most of them.
+	off_plays.append(_play("inside_zone", "Inside Zone", "offense", "RUN", shotgun, _merge(blockers, {
+		"QB": {"type": "handoff", "to": "RB", "mesh": Vector2(-4.4, 0.6)},
+		"RB": {"type": "carry", "path": _v([Vector2(2.5, -1.4), Vector2(5, -2), Vector2(16, -2.5)])},
+		"TE": _b(),
+		"WR1": _route(_v([Vector2(12, 0)])),
+		"WR2": _route(_v([Vector2(12, 0)])),
+	})))
+	off_plays.append(_play("stick", "Stick", "offense", "SHORT", single, _merge(blockers, {
+		"QB": {"type": "pass", "drop": 2.0},
+		"WR1": _route(_v([Vector2(6, 0), Vector2(6, -5)])),
+		"TE": _route(_v([Vector2(6, 0), Vector2(5, -1)]), "sit"),
+		"WR2": _route(_v([Vector2(35, 0)])),
+		"RB": _route(_v([Vector2(1, 4), Vector2(3, 10)])),
+	}), [], ["quick", "red_zone"]))
+	off_plays.append(_play("levels", "Levels", "offense", "SHORT", trips, _merge(blockers, {
+		"QB": {"type": "pass", "drop": 2.5},
+		"WR2": _route(_v([Vector2(5, 0), Vector2(5, -12)])),
+		"TE": _route(_v([Vector2(12, 0), Vector2(12, -14)])),
+		"WR1": _route(_v([Vector2(35, 0)])),
+		"RB": _route(_v([Vector2(0, -4), Vector2(2, -10)])),
+	})))
+	off_plays.append(_play("drive", "Drive", "offense", "SHORT", shotgun, _merge(blockers, {
+		"QB": {"type": "pass", "drop": 2.5},
+		"WR1": _route(_v([Vector2(3, 0), Vector2(4, 26)])),
+		"TE": _route(_v([Vector2(12, 0), Vector2(12, -14)])),
+		"WR2": _route(_v([Vector2(35, 0)])),
+		"RB": _route(_v([Vector2(2, -2), Vector2(4, -4)]), "sit"),
+	}), [], ["red_zone"]))
+	off_plays.append(_play("comebacks", "Comebacks", "offense", "SHORT", shotgun, _merge(blockers, {
+		"QB": {"type": "pass", "drop": 3.0},
+		"WR1": _route(_v([Vector2(14, 0), Vector2(12, -2)]), "sit"),
+		"WR2": _route(_v([Vector2(14, 0), Vector2(12, 2)]), "sit"),
+		"TE": _route(_v([Vector2(25, 0)])),
+		"RB": _route(_v([Vector2(2, -3), Vector2(4, -5)]), "sit"),
+	})))
+	off_plays.append(_play("hb_angle", "HB Angle", "offense", "SHORT", shotgun, _merge(blockers, {
+		"QB": {"type": "pass", "drop": 2.0},
+		"RB": _route(_v([Vector2(2, 3), Vector2(4, 1), Vector2(6, -4)])),
+		"WR1": _route(_v([Vector2(30, 0)])),
+		"WR2": _route(_v([Vector2(2, 0), Vector2(7, -5)])),
+		"TE": _route(_v([Vector2(2, 0), Vector2(4, -14)])),
+	}), [], ["quick"]))
+	off_plays.append(_play("bubble", "WR Bubble", "offense", "SHORT", trips, _merge(blockers, {
+		"QB": {"type": "pass", "drop": 1.0},
+		"WR2": _route(_v([Vector2(-1.5, -2), Vector2(-1, -5)]), "sit"),
+		"TE": _b(),
+		"WR1": _route(_v([Vector2(30, 0)])),
+		"RB": _route(_v([Vector2(2, -3), Vector2(4, -6)]), "sit"),
+	}), [], ["screen", "quick"]))
+	off_plays.append(_play("dagger", "Dagger", "offense", "DEEP", single, _merge(blockers, {
+		"QB": {"type": "pass", "drop": 3.0},
+		"TE": _route(_v([Vector2(28, 0)])),
+		"WR2": _route(_v([Vector2(14, 0), Vector2(14, -14)])),
+		"WR1": _route(_v([Vector2(13, 0), Vector2(11, 1)]), "sit"),
+		"RB": _route(_v([Vector2(2, 3), Vector2(4, 6)]), "sit"),
+	}), [], ["deep"]))
+	off_plays.append(_play("y_cross", "Y Cross", "offense", "DEEP", trips, _merge(blockers, {
+		"QB": {"type": "pass", "drop": 3.0},
+		"TE": _route(_v([Vector2(6, 0), Vector2(16, -20), Vector2(18, -34)])),
+		"WR1": _route(_v([Vector2(12, 0), Vector2(26, 10)])),
+		"WR2": _route(_v([Vector2(10, 0), Vector2(8, -1)]), "sit"),
+		"RB": _route(_v([Vector2(1, 4), Vector2(3, 9)])),
+	})))
+	off_plays.append(_play("sail", "Sail", "offense", "DEEP", trips, _merge(blockers, {
+		"QB": {"type": "pass", "drop": 3.0},
+		"WR2": _route(_v([Vector2(35, 0)])),
+		"TE": _route(_v([Vector2(10, 0), Vector2(18, 8)])),
+		"RB": _route(_v([Vector2(1, 5), Vector2(3, 14)])),
+		"WR1": _route(_v([Vector2(12, 0), Vector2(12, 14)])),
+	})))
+	off_plays.append(_play("sluggo", "Slant & Go", "offense", "DEEP", shotgun, _merge(blockers, {
+		"QB": {"type": "pass", "drop": 3.5},
+		"WR1": _route(_v([Vector2(3, 0), Vector2(5, 3), Vector2(32, 2)])),
+		"WR2": _route(_v([Vector2(6, 0), Vector2(5, 0)]), "sit"),
+		"TE": _route(_v([Vector2(7, 0), Vector2(7, 6)])),
+		"RB": _b(),
+	}), [], ["deep"]))
+	off_plays.append(_play("pa_seam", "PA TE Seam", "offense", "DEEP", single, _merge(blockers, {
+		"QB": {"type": "pass", "drop": 4.0, "fake": true},
+		"TE": _route(_v([Vector2(30, -1)])),
+		"WR1": _route(_v([Vector2(15, 0), Vector2(15, 14)])),
+		"WR2": _route(_v([Vector2(35, 0)])),
+		"RB": _b(),
+	}), [], ["play_action", "deep"]))
 
 	# ---------------------------------------------------------------- defense plays
 	var rush := {"DL1": _r(), "DL2": _r(), "DL3": _r()}

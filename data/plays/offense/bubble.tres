@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_trips.tres" id="1_xgapd"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_eqa26"]
+
+[resource]
+script = ExtResource("2_eqa26")
+id = "bubble"
+display_name = "WR Bubble"
+formation = ExtResource("1_xgapd")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"drop": 1.0,
+"type": "pass"
+},
+"RB": {
+"end": "sit",
+"path": PackedVector2Array(2, -3, 4, -6),
+"type": "route"
+},
+"TE": {
+"type": "block"
+},
+"WR1": {
+"end": "continue",
+"path": PackedVector2Array(30, 0),
+"type": "route"
+},
+"WR2": {
+"end": "sit",
+"path": PackedVector2Array(-1.5, -2, -1, -5),
+"type": "route"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray("screen", "quick")

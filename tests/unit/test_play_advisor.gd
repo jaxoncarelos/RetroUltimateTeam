@@ -63,3 +63,50 @@ func test_keyed_play_is_demoted() -> void:
 
 func test_rank_keeps_every_play() -> void:
 	assert_eq(PlayAdvisor.rank(book.plays, {}).size(), book.plays.size())
+
+
+func _rng(seed: int) -> RandomNumberGenerator:
+	var r := RandomNumberGenerator.new()
+	r.seed = seed
+	return r
+
+
+func test_suggest_gives_four_distinct_calls_led_by_the_best() -> void:
+	var situation := {"down": 1, "to_go": 10, "los_x": 40.0}
+	var bar := PlayAdvisor.suggest(book.plays, situation, _rng(1))
+	assert_eq(bar.size(), 4)
+	assert_eq(bar[0], _best(situation))
+	var ids := {}
+	for p in bar:
+		ids[p.id] = true
+	assert_eq(ids.size(), 4)
+
+
+func test_suggest_varies_across_snaps() -> void:
+	var seen := {}
+	for i in 40:
+		for p in PlayAdvisor.suggest(book.plays, {"down": 1, "to_go": 10, "los_x": 40.0}, _rng(i)):
+			seen[p.id] = true
+	assert_gte(seen.size(), 10, "the bar should rotate through many concepts")
+
+
+func test_suggest_stays_situational() -> void:
+	for i in 30:
+		for q in PlayAdvisor.suggest(book.plays, {"down": 3, "to_go": 12, "los_x": 50.0}, _rng(i)):
+			assert_ne(q.category, "RUN", "no runs on 3rd & 12")
+
+
+func test_suggest_mixes_categories_on_first_down() -> void:
+	var cats := {}
+	for q in PlayAdvisor.suggest(book.plays, {"down": 1, "to_go": 10, "los_x": 40.0}, _rng(3)):
+		cats[q.category] = true
+	assert_gte(cats.size(), 2)
+
+
+func test_suggest_pushes_the_play_you_just_ran_off_the_top() -> void:
+	var situation := {"down": 2, "to_go": 6, "los_x": 45.0}
+	var first := PlayAdvisor.suggest(book.plays, situation, _rng(1))[0]
+	var mem := DefenseMemory.new(load("res://data/tuning/defense_ai_tuning.tres"))
+	mem.record(first.id, first.formation.id, first.category, 0)
+	mem.record(first.id, first.formation.id, first.category, 0)
+	assert_ne(PlayAdvisor.suggest(book.plays, situation, _rng(1), mem)[0], first)

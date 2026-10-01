@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_singleback.tres" id="1_tt51q"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_eodjw"]
+
+[resource]
+script = ExtResource("2_eodjw")
+id = "dagger"
+display_name = "Dagger"
+category = "DEEP"
+formation = ExtResource("1_tt51q")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"drop": 3.0,
+"type": "pass"
+},
+"RB": {
+"end": "sit",
+"path": PackedVector2Array(2, 3, 4, 6),
+"type": "route"
+},
+"TE": {
+"end": "continue",
+"path": PackedVector2Array(28, 0),
+"type": "route"
+},
+"WR1": {
+"end": "sit",
+"path": PackedVector2Array(13, 0, 11, 1),
+"type": "route"
+},
+"WR2": {
+"end": "continue",
+"path": PackedVector2Array(14, 0, 14, -14),
+"type": "route"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray("deep")

@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_shotgun.tres" id="1_am0cs"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_om3m0"]
+
+[resource]
+script = ExtResource("2_om3m0")
+id = "comebacks"
+display_name = "Comebacks"
+formation = ExtResource("1_am0cs")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"drop": 3.0,
+"type": "pass"
+},
+"RB": {
+"end": "sit",
+"path": PackedVector2Array(2, -3, 4, -5),
+"type": "route"
+},
+"TE": {
+"end": "continue",
+"path": PackedVector2Array(25, 0),
+"type": "route"
+},
+"WR1": {
+"end": "sit",
+"path": PackedVector2Array(14, 0, 12, -2),
+"type": "route"
+},
+"WR2": {
+"end": "sit",
+"path": PackedVector2Array(14, 0, 12, 2),
+"type": "route"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray()

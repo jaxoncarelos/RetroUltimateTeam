@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_singleback.tres" id="1_nyp18"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_67iqc"]
+
+[resource]
+script = ExtResource("2_67iqc")
+id = "stick"
+display_name = "Stick"
+formation = ExtResource("1_nyp18")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"drop": 2.0,
+"type": "pass"
+},
+"RB": {
+"end": "continue",
+"path": PackedVector2Array(1, 4, 3, 10),
+"type": "route"
+},
+"TE": {
+"end": "sit",
+"path": PackedVector2Array(6, 0, 5, -1),
+"type": "route"
+},
+"WR1": {
+"end": "continue",
+"path": PackedVector2Array(6, 0, 6, -5),
+"type": "route"
+},
+"WR2": {
+"end": "continue",
+"path": PackedVector2Array(35, 0),
+"type": "route"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray("quick", "red_zone")

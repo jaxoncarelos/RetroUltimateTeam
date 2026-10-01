@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="PlayDef" format=3]
+
+[ext_resource type="Resource" path="res://data/formations/off_trips.tres" id="1_v4g8m"]
+[ext_resource type="Script" path="res://scripts/models/play_def.gd" id="2_uhsg1"]
+
+[resource]
+script = ExtResource("2_uhsg1")
+id = "levels"
+display_name = "Levels"
+formation = ExtResource("1_v4g8m")
+assignments = {
+"OL1": {
+"type": "block"
+},
+"OL2": {
+"type": "block"
+},
+"OL3": {
+"type": "block"
+},
+"OL4": {
+"type": "block"
+},
+"QB": {
+"drop": 2.5,
+"type": "pass"
+},
+"RB": {
+"end": "continue",
+"path": PackedVector2Array(0, -4, 2, -10),
+"type": "route"
+},
+"TE": {
+"end": "continue",
+"path": PackedVector2Array(12, 0, 12, -14),
+"type": "route"
+},
+"WR1": {
+"end": "continue",
+"path": PackedVector2Array(35, 0),
+"type": "route"
+},
+"WR2": {
+"end": "continue",
+"path": PackedVector2Array(5, 0, 5, -12),
+"type": "route"
+}
+}
+counters = PackedStringArray()
+tags = PackedStringArray()
