@@ -1,5 +1,5 @@
 extends Control
-## Draft-style packs (DRAFT PACK, QB / RECEIVER / DEFENSE / TRENCHES DRAFT): face-down
+## Draft-style packs (DRAFT PACK, QB / SKILL / DEFENSE / TRENCHES DRAFT): face-down
 ## prospects you only get hints about (each card glows in its tier color and shows its
 ## position, or its team when they all play the same position; X-Factor cards crackle pink). Tap one, KEEP IT, and
 ## it flips with the usual celebration; then the other two flip over to show what you

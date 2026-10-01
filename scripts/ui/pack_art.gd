@@ -76,7 +76,7 @@ func _draw() -> void:
 	draw_texture_rect(em, Rect2(W * 0.5 - 7.5, 12, 15, 16), false)
 	draw_rect(Rect2(1, 33, W - 2, 11), UiSkin.SHADOW)
 	draw_rect(Rect2(1, 34, W - 2, 9), UiSkin.NAVY)
-	# Long names ("RECEIVER", "FRANCHISE") switch to the condensed face instead of cutting.
+	# Long names ("FRANCHISE", "TRENCHES") switch to the condensed face instead of cutting.
 	UiSkin.draw_text_fit(self, W * 0.5, 42, label, W - 4, color.lightened(0.3))
 	# Sheen sweep.
 	var ph := fmod(_t, 2.2) / 2.2
