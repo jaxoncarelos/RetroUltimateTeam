@@ -127,8 +127,8 @@ static func drive_rate(off_ovr: float, def_ovr: float, home: bool, start_x: floa
 ## One simulated possession for `off` from field x `start_x` (Retro Bowl-style CPU drives):
 ## points, stats and box score like finish(); yards fit the field.
 ## Returns {"outcome": td|fg|miss|punt|turnover|downs, "plays", "yards", "end_x", "int": bool}.
-static func sim_drive(gs: GameState, off: String, r: float, start_x: float, rng: RandomNumberGenerator) -> Dictionary:
-	return _drive(gs, off, r, rng, start_x)
+static func sim_drive(gs: GameState, off: String, r: float, start_x: float, rng: RandomNumberGenerator, dlog: Array = []) -> Dictionary:
+	return _drive(gs, off, r, rng, start_x, dlog)
 
 
 ## One possession for `off`: picks an outcome from the team's rate, then writes plays and yards

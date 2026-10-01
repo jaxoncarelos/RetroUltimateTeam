@@ -146,7 +146,7 @@ func _to_carrier() -> PlayerAgent:
 	_setup("hb_dive")
 	var start := _qb_view()
 	touch.drag_started.emit(start, start + Vector2(-30, 0))
-	_step(60)
+	_step(30)
 	return runner.carrier
 
 

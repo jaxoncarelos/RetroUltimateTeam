@@ -302,7 +302,11 @@ func _sim_cpu_drive() -> void:
 	var cpu := gs.possession
 	var start_x := gs.downs.los_x
 	var rate := GameSim.drive_rate(_team_strength(cpu), _team_strength(human), cpu == gs.home, start_x)
-	var d := GameSim.sim_drive(gs, cpu, rate, start_x, rng)
+	var dlog: Array = []
+	var d := GameSim.sim_drive(gs, cpu, rate, start_x, rng, dlog)
+	if not _sim() and not dlog.is_empty():
+		dlog[0]["start_x"] = clampf(start_x - FieldGeo.OWN_GOAL, 1.0, 99.0)
+		play_log.append_array(PlayByPlay.synthesize(dlog[0], rng.randi()))
 	var secs := minf(float(d["plays"]) * rng.randf_range(24.0, 34.0), gs.clock.seconds_left)
 	gs.clock.seconds_left -= secs
 	gs.clock.stopped = true
