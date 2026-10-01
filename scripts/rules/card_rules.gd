@@ -113,9 +113,10 @@ static func card_attrs(real_attrs: Dictionary, real_ovr: int, c_ovr: int, boost 
 
 ## What a card is worth (coins) by card OVR: log-linear between these anchors, with a big
 ## jump into the 90s (Elite). Selling pays SELL_SHARE of it, so a normal pack sells back for
-## roughly half its price while a banger is a payday (a 99 ≈ 1.5 Elite packs).
-const VALUE_CURVE := [[50, 15], [60, 25], [65, 45], [69, 90], [70, 300], [75, 1000], [79, 1300], [80, 1600],
-		[85, 2800], [89, 5000], [90, 16000], [92, 27000], [95, 46000], [99, 86000]]
+## roughly a third of its price (selling must not fund the grind) while a banger is a payday
+## (a 99 ≈ 1.5 Elite packs).
+const VALUE_CURVE := [[50, 10], [60, 20], [65, 30], [69, 50], [70, 120], [75, 350], [79, 500], [80, 600],
+		[85, 1000], [89, 1800], [90, 9000], [92, 18000], [95, 40000], [99, 86000]]
 const SELL_SHARE := 0.7
 ## Program premium on the value (X-Factor ability, Prime).
 const PROGRAM_VALUE := {"xf": 1.4, "prime": 1.2}

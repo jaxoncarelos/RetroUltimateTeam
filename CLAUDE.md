@@ -139,5 +139,10 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    (`POCKET` angles/radii around the QB) + `PlayRunner.pocket_assignments()` (closest threats -> nearest free
    blocker) + RB blitz pickup. Blitz first pressure 1.2 s -> 2.75 s; CPU-vs-CPU sacks now ~0.8/team (CPU QBs throw
    before base pressure arrives; engine AI-vs-AI only matters for balance tests now). Debug: `--quick --show=cpudrive`.
+22. [x] Selling (owner: "sell cards I don't want, ~70% of value; a 99 Allen should pay ~1.5 Elite packs"):
+   `CardRules.card_value(ovr, program)` (log-linear `VALUE_CURVE`, big jump at 90; X-Factor x1.4, Prime x1.2),
+   `sell_price` = 70% of it (CardDef.quicksell, by the card's own OVR so training doesn't inflate it). Mid
+   tiers are kept low (75: 250, 85: 700, 90: 6,300, 99: 60,200) so selling doesn't fund the grind
+   (test_progression_pace/test_economy curves unchanged). Pack summary: SELL button under every card.
 Next ideas (after the owner's playtest): see MORNING_NOTES.md. Card revamp follow-ups: CPU star
 abilities, ability UI on the lineup screen, ability-themed sets/objectives, balance pass on ability boosts.
