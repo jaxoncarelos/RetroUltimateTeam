@@ -19,3 +19,10 @@ extends Resource
 @export var xf_weight := 0.2
 ## At least this many cards are X-Factor versions (when the filters allow one).
 @export var xf_guarantee := 0
+## Draft pack: the cards are shown face-down with hints and you keep ONE of them.
+@export var pick := false
+## Mystery pack: it is secretly one of these packs (weights sum to 1), revealed on opening.
+@export var mystery: PackedStringArray = []
+@export var mystery_weights := PackedFloat32Array()
+## One-line store pitch ("" = the card count / guarantee summary).
+@export var blurb := ""

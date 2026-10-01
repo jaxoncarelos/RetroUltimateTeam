@@ -77,9 +77,24 @@ func _demo_config(screen: String) -> Dictionary:
 		"pack_open":
 			var rng := RandomNumberGenerator.new()
 			rng.seed = 7
-			var pack := PackCatalog.get_pack("elite" if OS.get_cmdline_user_args().has("--elite") else "gold")
-			var uids := EconomyRules.grant_pack(prof, pack, GameData.db, rng)
-			return {"uids": uids, "title": pack.display_name, "pack": pack.id}
+			var pid := "gold"
+			for a in OS.get_cmdline_user_args():
+				if a.begins_with("--pack="):
+					pid = a.get_slice("=", 1)
+			if OS.get_cmdline_user_args().has("--elite"):
+				pid = "elite"
+			var pack := PackCatalog.get_pack(pid)
+			var real := EconomyRules.resolve_mystery(pack, rng)
+			var uids := EconomyRules.grant_pack(prof, real, GameData.db, rng)
+			var cfg := {"uids": uids, "title": real.display_name, "pack": real.id}
+			if real != pack:
+				cfg["mystery"] = pack.id
+			return cfg
+		"draft":
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 11
+			EconomyRules.start_draft(prof, PackCatalog.get_pack("draft"), GameData.db, rng)
+			return {}
 		"prematch":
 			var opp := "PHI" if prof.franchise_team != "PHI" else "KC"
 			return {"home": prof.franchise_team, "away": opp, "mode": "quick", "from_hub": true}

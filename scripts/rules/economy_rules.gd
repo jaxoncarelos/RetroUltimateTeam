@@ -77,17 +77,24 @@ static func weak_positions(profile: Profile, db: RosterDB) -> Array[String]:
 	return out
 
 
-## Card ids a pack contains (not yet added to the profile).
+## Card ids a pack contains (not yet added to the profile). The best `xf_guarantee` cards
+## are X-Factor versions when the pack's filters allow one.
 static func open_pack(pack: PackDef, profile: Profile, db: RosterDB, rng: RandomNumberGenerator) -> Array[String]:
 	var weak := weak_positions(profile, db)
 	var out: Array[String] = []
-	for tier in roll_pack_tiers(pack, rng):
+	var tiers := roll_pack_tiers(pack, rng)
+	for i in tiers.size():
+		var tier := tiers[i]
+		var xf_only := i >= tiers.size() - pack.xf_guarantee
 		var id := ""
 		# Filtered packs (a team's roster) may lack a tier: try lower tiers, then higher.
-		for t in [tier, tier - 1, tier - 2, tier - 3, tier + 1, tier + 2]:
-			if t < 0 or t >= CardRules.TABLE.size():
-				continue
-			id = pick_card(t, pack, profile, db, rng, weak)
+		for want_xf in ([true, false] if xf_only else [false]):
+			for t in [tier, tier - 1, tier - 2, tier - 3, tier + 1, tier + 2]:
+				if t < 0 or t >= CardRules.TABLE.size():
+					continue
+				id = pick_card(t, pack, profile, db, rng, weak, want_xf)
+				if id != "":
+					break
 			if id != "":
 				break
 		if id != "":
@@ -95,10 +102,19 @@ static func open_pack(pack: PackDef, profile: Profile, db: RosterDB, rng: Random
 	return out
 
 
+## Mystery pack: which pack it really is (by mystery_weights). Other packs: itself.
+static func resolve_mystery(pack: PackDef, rng: RandomNumberGenerator) -> PackDef:
+	if pack.mystery.is_empty():
+		return pack
+	var i := AIPlayCaller.weighted_index(pack.mystery_weights, rng)
+	var real := PackCatalog.get_pack(pack.mystery[clampi(i, 0, pack.mystery.size() - 1)])
+	return real if real != null else pack
+
+
 ## A random real player's card of `tier` (derived from card OVR) that fits the pack's
 ## filters. Prime cards are rare; higher OVRs inside a tier are rarer; weak positions likelier.
 static func pick_card(tier: int, pack: PackDef, profile: Profile, db: RosterDB, rng: RandomNumberGenerator,
-		weak: Array[String] = []) -> String:
+		weak: Array[String] = [], xf_only := false) -> String:
 	var ids: Array[String] = []
 	var weights := PackedFloat32Array()
 	var team := profile.franchise_team if pack.team == "FRANCHISE" else pack.team
@@ -109,6 +125,8 @@ static func pick_card(tier: int, pack: PackDef, profile: Profile, db: RosterDB, 
 		if not pack.positions.is_empty() and p.pos not in pack.positions:
 			continue
 		if team != "" and p.team != team:
+			continue
+		if xf_only and not c.is_xfactor():
 			continue
 		var w := 1.0 / (1.0 + IN_TIER_FALLOFF * maxi(0, c.ovr - maxi(tier_min, 60)))
 		if c.is_prime():
@@ -130,32 +148,82 @@ static func can_buy(profile: Profile, pack: PackDef) -> bool:
 
 ## Buys and opens a pack: coins are spent and cards added in one step (so quitting midway
 ## never loses coins or duplicates cards). Returns the new uids ([] if unaffordable).
+## Mystery packs open as the pack they turn out to be; use buy() to learn which, and for
+## draft packs (which add nothing until you pick).
 static func buy_and_open(profile: Profile, pack: PackDef, db: RosterDB, rng: RandomNumberGenerator,
 		unix_time := 0) -> Array[int]:
-	if not can_buy(profile, pack):
-		return []
+	var r := buy(profile, pack, db, rng, unix_time)
+	return r.get("uids", [] as Array[int])
+
+
+## Buys any store pack in one saved step. Returns {} if unaffordable, else
+## {"pack": PackDef actually opened (a mystery pack's reveal), "mystery": bool,
+##  "uids": Array[int] (new cards), "draft": bool (options are waiting in
+##  Profile.pending_pick: choose with pick_draft)}.
+static func buy(profile: Profile, pack: PackDef, db: RosterDB, rng: RandomNumberGenerator,
+		unix_time := 0) -> Dictionary:
+	if not can_buy(profile, pack) or has_pending_draft(profile):
+		return {}
 	profile.coins -= pack.price
-	return grant_pack(profile, pack, db, rng, unix_time)
+	if pack.pick:
+		start_draft(profile, pack, db, rng)
+		return {"pack": pack, "mystery": false, "uids": [] as Array[int], "draft": true}
+	var real := resolve_mystery(pack, rng)
+	return {"pack": real, "mystery": real != pack, "uids": grant_pack(profile, real, db, rng, unix_time),
+			"draft": false}
+
+
+## Draft pack: rolls the options (saved in Profile.pending_pick so quitting keeps them).
+static func start_draft(profile: Profile, pack: PackDef, db: RosterDB, rng: RandomNumberGenerator) -> Array[String]:
+	var ids := open_pack(pack, profile, db, rng)
+	profile.pending_pick = {"pack": pack.id, "options": ids}
+	return ids
+
+
+static func has_pending_draft(profile: Profile) -> bool:
+	return not profile.pending_pick.is_empty()
+
+
+## Keeps option `index` of the waiting draft. Returns the new uid (-1 if no draft / bad index).
+static func pick_draft(profile: Profile, db: RosterDB, index: int, unix_time := 0) -> int:
+	if not has_pending_draft(profile):
+		return -1
+	var opts: Array = profile.pending_pick.get("options", [])
+	if index < 0 or index >= opts.size() or not db.cards.has(str(opts[index])):
+		return -1
+	var pack := PackCatalog.get_pack(str(profile.pending_pick.get("pack", "")))
+	var uid := profile.add_card(str(opts[index]), unix_time)
+	profile.pending_pick = {}
+	_record_opened(profile, pack, [str(opts[index])] as Array[String], db, unix_time)
+	return uid
 
 
 ## Adds a pack's cards to the collection, counts it for objectives and coach XP.
 static func grant_pack(profile: Profile, pack: PackDef, db: RosterDB, rng: RandomNumberGenerator,
 		unix_time := 0) -> Array[int]:
 	var uids: Array[int] = []
-	var elite := 0
-	for id in open_pack(pack, profile, db, rng):
+	var ids := open_pack(pack, profile, db, rng)
+	for id in ids:
 		uids.append(profile.add_card(id, unix_time))
+	_record_opened(profile, pack, ids, db, unix_time)
+	return uids
+
+
+## Stats, objectives and coach XP for an opened pack.
+static func _record_opened(profile: Profile, pack: PackDef, ids: Array[String], db: RosterDB, unix_time: int) -> void:
+	var elite := 0
+	for id in ids:
 		var c: CardDef = db.cards[id]
 		if c.tier >= CardRules.Tier.ELITE:
 			elite += 1
 	profile.stats["packs_opened"] += 1
 	var obj_t := unix_time if unix_time > 0 else -1
 	ObjectiveRules.record_event(profile, "packs_opened", 1, obj_t)
-	ObjectiveRules.record_event(profile, "packs_" + pack.id, 1, obj_t)
+	if pack != null:
+		ObjectiveRules.record_event(profile, "packs_" + pack.id, 1, obj_t)
 	if elite > 0:
 		ObjectiveRules.record_event(profile, "pulls_elite", elite, obj_t)
 	ProgressionRules.add_xp(profile, ProgressionRules.XP_PACK)
-	return uids
 
 
 ## Opens the first reward pack waiting in Profile.pending_packs (starter pack, level-up,

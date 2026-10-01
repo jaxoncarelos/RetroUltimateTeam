@@ -1,9 +1,15 @@
 extends Control
-## STORE: a shelf of foil packs (Bronze / Silver / Gold / Elite). Tap a pack for its odds;
-## BUY spends the coins and adds the cards in one saved step, then the pack opening plays.
+## STORE: shelves of foil packs behind tabs: CLASSIC (Bronze / Silver / Gold / Elite),
+## SPECIAL (Mystery, Draft pick-1-of-3, X-Factor) and POSITION packs. Tap a pack for its
+## odds; BUY spends the coins and adds the cards in one saved step, then the pack opening
+## plays (a Draft pack goes to the pick screen; an unfinished pick blocks new purchases).
 ## Unaffordable packs say how many coins are missing and point to objectives.
 
+static var _tab := 0
+
 var _ui: Dictionary
+var _shelf: HBoxContainer
+var _tabs: Array[Button] = []
 
 
 func _ready() -> void:
@@ -13,26 +19,40 @@ func _ready() -> void:
 	_ui["top_right"].add_child(info)
 	var root: VBoxContainer = _ui["root"]
 	root.add_theme_constant_override("separation", 2)
-	var shelf := HBoxContainer.new()
-	shelf.alignment = BoxContainer.ALIGNMENT_CENTER
-	shelf.add_theme_constant_override("separation", 14)
-	shelf.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(shelf)
-	var i := 0
-	for pack in PackCatalog.store_packs():
-		var tile := _pack_tile(pack)
-		shelf.add_child(tile)
-		tile.modulate.a = 0.0
-		var tw := tile.create_tween()
-		tw.tween_interval(0.06 * i)
-		tw.tween_property(tile, "modulate:a", 1.0, 0.2)
-		i += 1
+	var tab_row := HBoxContainer.new()
+	tab_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	tab_row.add_theme_constant_override("separation", 4)
+	root.add_child(tab_row)
+	for t in PackCatalog.SHELVES.size():
+		var b := Button.new()
+		b.text = str(PackCatalog.SHELVES[t][0])
+		b.theme_type_variation = "PillButton"
+		b.toggle_mode = true
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(78, 18)
+		b.pressed.connect(_show_shelf.bind(t))
+		tab_row.add_child(b)
+		_tabs.append(b)
+	_shelf = HBoxContainer.new()
+	_shelf.alignment = BoxContainer.ALIGNMENT_CENTER
+	_shelf.add_theme_constant_override("separation", 14)
+	_shelf.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(_shelf)
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--tab="):   # debug screenshots
+			_tab = int(a.get_slice("=", 1))
+	_show_shelf(_tab)
 	var hint := HBoxContainer.new()
 	hint.alignment = BoxContainer.ALIGNMENT_CENTER
 	hint.add_theme_constant_override("separation", 6)
 	root.add_child(hint)
 	var prof := SaveManager.profile
-	if not prof.pending_packs.is_empty():
+	if EconomyRules.has_pending_draft(prof):
+		var finish := MetaUI.yellow("FINISH YOUR DRAFT PICK", Vector2(170, 22), func() -> void:
+			SceneRouter.goto(DRAFT, {"back": SceneRouter.STORE}))
+		hint.add_child(finish)
+		Fx.pulse.call_deferred(finish, 1.06, 0.8)
+	elif not prof.pending_packs.is_empty():
 		var open_free := func() -> void:
 			var cfg := GameFlow.open_pending_config(prof, SceneRouter.STORE)
 			if not cfg.is_empty():
@@ -50,6 +70,25 @@ func _ready() -> void:
 	MetaUI.badge.call_deferred(ob, ObjectiveRules.claimable_count(prof))
 
 
+const DRAFT := "res://scenes/meta/draft.tscn"
+
+
+func _show_shelf(index: int) -> void:
+	_tab = index
+	for t in _tabs.size():
+		_tabs[t].set_pressed_no_signal(t == index)
+	MetaUI.clear(_shelf)
+	var i := 0
+	for pack in PackCatalog.shelf(index):
+		var tile := _pack_tile(pack)
+		_shelf.add_child(tile)
+		tile.modulate.a = 0.0
+		var tw := tile.create_tween()
+		tw.tween_interval(0.06 * i)
+		tw.tween_property(tile, "modulate:a", 1.0, 0.2)
+		i += 1
+
+
 func _pack_tile(pack: PackDef) -> Control:
 	var prof := SaveManager.profile
 	var box := VBoxContainer.new()
@@ -61,11 +100,20 @@ func _pack_tile(pack: PackDef) -> Control:
 	box.add_child(art)
 	box.add_child(MetaUI.label(pack.display_name, pack.color.lightened(0.3), 8, HORIZONTAL_ALIGNMENT_CENTER))
 	var g := "%d CARDS" % pack.card_count
-	if pack.guarantee_tier >= 0:
+	if pack.pick:
+		g = "KEEP 1 OF %d" % pack.card_count
+	elif not pack.mystery.is_empty():
+		g = "??? CARDS"
+	elif pack.xf_guarantee > 0:
+		g += " - %d X-FACTOR" % pack.xf_guarantee
+	elif pack.guarantee_tier >= 0:
 		g += " - 1 %s+" % CardRules.NAMES[pack.guarantee_tier]
 	box.add_child(MetaUI.label(g, UiSkin.MUTED, 8, HORIZONTAL_ALIGNMENT_CENTER))
 	var buy: Button
-	if EconomyRules.can_buy(prof, pack):
+	if EconomyRules.has_pending_draft(prof):
+		buy = MetaUI.button("PICK FIRST", Vector2(96, 24), func() -> void:
+			SceneRouter.goto(DRAFT, {"back": SceneRouter.STORE}))
+	elif EconomyRules.can_buy(prof, pack):
 		buy = MetaUI.yellow("%s ●" % CoinPill.fmt(pack.price), Vector2(96, 24), func() -> void: _buy(pack))
 	else:
 		buy = MetaUI.button("NEED %s" % CoinPill.fmt(pack.price - prof.coins), Vector2(96, 24),
@@ -84,8 +132,17 @@ func _pack_input(ev: InputEvent, pack: PackDef) -> void:
 func _show_odds(pack: PackDef) -> void:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 2)
+	if pack.blurb != "":
+		col.add_child(MetaUI.label(pack.blurb, UiSkin.YELLOW))
 	col.add_child(MetaUI.label(PackCatalog.summary(pack), UiSkin.MUTED))
-	for l in PackCatalog.odds_lines(pack):
+	var lines := PackCatalog.odds_lines(pack)
+	if not pack.mystery.is_empty():
+		# Mystery: odds of which pack it turns out to be.
+		lines = []
+		for i in pack.mystery.size():
+			var mp := PackCatalog.get_pack(pack.mystery[i])
+			lines.append([mp.display_name if mp != null else pack.mystery[i], int(round(pack.mystery_weights[i] * 100.0))])
+	for l in lines:
 		var h := HBoxContainer.new()
 		var t: int = CardRules.NAMES.find(l[0])
 		var a := MetaUI.label(str(l[0]), CardView.tier_color(maxi(t, 0)).lightened(0.2))
@@ -99,17 +156,22 @@ func _show_odds(pack: PackDef) -> void:
 	var btns: Array = [["CLOSE", Callable()]]
 	if EconomyRules.can_buy(SaveManager.profile, pack):
 		btns.append(["BUY %s" % CoinPill.fmt(pack.price), func() -> void: _buy(pack), true])
-	MetaUI.popup(self, pack.display_name + " ODDS PER CARD", col, btns)
+	MetaUI.popup(self, pack.display_name + (" - WHICH PACK?" if not pack.mystery.is_empty() else " ODDS PER CARD"), col, btns)
 
 
 func _buy(pack: PackDef) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var uids := EconomyRules.buy_and_open(SaveManager.profile, pack, GameData.db, rng,
-			int(Time.get_unix_time_from_system()))
-	if uids.is_empty():
+	var r := EconomyRules.buy(SaveManager.profile, pack, GameData.db, rng, int(Time.get_unix_time_from_system()))
+	if r.is_empty():
 		return
 	SaveManager.save()
 	Sfx.play("coin")
-	SceneRouter.goto(SceneRouter.PACK_OPEN, {"uids": uids, "title": pack.display_name, "pack": pack.id,
-			"back": SceneRouter.STORE})
+	if r["draft"]:
+		SceneRouter.goto(DRAFT, {"back": SceneRouter.STORE})
+		return
+	var real: PackDef = r["pack"]
+	var cfg := {"uids": r["uids"], "title": real.display_name, "pack": real.id, "back": SceneRouter.STORE}
+	if r["mystery"]:
+		cfg["mystery"] = pack.id
+	SceneRouter.goto(SceneRouter.PACK_OPEN, cfg)

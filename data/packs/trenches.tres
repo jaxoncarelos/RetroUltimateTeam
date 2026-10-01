@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="PackDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/pack_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "trenches"
+display_name = "TRENCHES PACK"
+blurb = "LINEMEN ONLY: OL + DL"
+price = 4000
+card_count = 3
+odds = PackedFloat32Array(0.1, 0.5, 0.35, 0.05)
+guarantee_tier = 1
+positions = PackedStringArray("OL", "DL")
+team = ""
+color = Color(0.6706, 0.3216, 0.2118, 1)

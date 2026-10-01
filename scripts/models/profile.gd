@@ -24,6 +24,7 @@ var objectives: Dictionary = {}  ## ObjectiveRules state {day, week, progress, c
 var coach := {"xp": 0, "level": 1, "perks": {}}   ## ProgressionRules (coach level 1..50) + CoachPerks ranks
 var login := {"day": 0, "streak": 0}   ## DailyRules (unix day of the last check-in)
 var pending_packs: Array = []    ## reward pack ids waiting to be opened (EconomyRules.open_pending)
+var pending_pick: Dictionary = {}  ## a bought draft pack waiting for your pick: {pack, options: [card ids]}
 
 
 func has_team() -> bool:
@@ -68,7 +69,7 @@ func to_dict() -> Dictionary:
 		"cards": cards.duplicate(true), "lineup": lineup.duplicate(), "season": season.duplicate(true),
 		"challenges": challenges.duplicate(true), "stats": stats.duplicate(), "sets_done": sets_done.duplicate(),
 		"objectives": objectives.duplicate(true), "coach": coach.duplicate(), "login": login.duplicate(),
-		"pending_packs": pending_packs.duplicate(),
+		"pending_packs": pending_packs.duplicate(), "pending_pick": pending_pick.duplicate(true),
 	}
 
 
@@ -102,6 +103,12 @@ static func from_dict(d: Dictionary) -> Profile:
 	p.pending_packs = []
 	for id in data.get("pending_packs", []):
 		p.pending_packs.append(str(id))
+	var pk: Dictionary = data.get("pending_pick", {})
+	if pk.has("options"):
+		var opts: Array = []
+		for o in pk["options"]:
+			opts.append(str(o))
+		p.pending_pick = {"pack": str(pk.get("pack", "")), "options": opts}
 	return p
 
 

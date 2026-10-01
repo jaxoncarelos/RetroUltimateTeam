@@ -6,7 +6,7 @@
 script = ExtResource("1")
 id = "receiver"
 display_name = "RECEIVER PACK"
-price = 0
+price = 5000
 card_count = 3
 odds = PackedFloat32Array(0.1, 0.5, 0.35, 0.05)
 guarantee_tier = 1
