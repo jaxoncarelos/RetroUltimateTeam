@@ -55,6 +55,14 @@ func _ready() -> void:
 		"elite": [["square", 523, 523, 0.09, 0.32], ["square", 659, 659, 0.09, 0.32], ["square", 784, 784, 0.09, 0.32],
 				["square", 1047, 1047, 0.09, 0.32], ["square", 1319, 1319, 0.09, 0.32], ["square", 1568, 1568, 0.09, 0.32],
 				["square", 2093, 2093, 0.4, 0.32]],
+		# Pack tier climb: one rising step per tier, a deflating fake-out and the X-Factor zap.
+		"climb0": [["square", 262, 294, 0.14, 0.3]],
+		"climb1": [["square", 330, 392, 0.14, 0.32]],
+		"climb2": [["square", 440, 523, 0.16, 0.34], ["square", 659, 659, 0.08, 0.3]],
+		"climb3": [["square", 587, 784, 0.16, 0.36], ["square", 1047, 1047, 0.1, 0.32]],
+		"fizzle": [["triangle", 400, 180, 0.35, 0.3]],
+		"xf": [["noise", 0, 0, 0.05, 0.4], ["square", 1500, 300, 0.12, 0.3], ["square", 300, 1800, 0.18, 0.32]],
+		"spin": [["square", 1200, 1200, 0.02, 0.15]],
 	}
 	for n in defs:
 		_streams[n] = _build(defs[n])

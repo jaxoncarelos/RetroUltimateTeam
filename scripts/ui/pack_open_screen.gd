@@ -1,12 +1,19 @@
 extends Control
 ## Pack opening, FIFA style. The pack slides in and waits; a tap makes it rattle, tear
-## open with a flash and a burst of light. The best card gets a "walkout": the screen
-## darkens, spotlights sweep in the tier color, then its position, team (helmet + colors)
-## and OVR are revealed one by one before the card flips in with particles, glow and a
-## screen shake scaled to its rarity (90+ = fireworks). Then every card is dealt into a
-## summary grid (NEW / duplicate + quick-sell value) with QUICK SELL DUPES, OPEN ANOTHER
-## and CONTINUE. SKIP jumps to the summary at any time. The cards were already saved when
-## the pack was granted, so leaving early loses nothing.
+## open with a flash and a burst of light. A Mystery pack first spins like a slot machine
+## through the packs it could be before landing on the real one. Then the TIER CLIMB: the
+## stage lights up BRONZE... SILVER... GOLD... one step at a time up to the best card's
+## tier, sometimes stalling a step short ("...") before bursting through (the fake-out).
+## The best card gets a "walkout": spotlights sweep in the tier color, then its position,
+## team (helmet + colors), OVR and, for X-Factor cards, the ability are revealed one by one
+## before the card flips in with particles, glow and a screen shake scaled to its rarity.
+## The rest wait face-down in the summary grid: tap each to flip it (or FLIP ALL), with
+## NEW / duplicate + quick-sell value, QUICK SELL DUPES, OPEN ANOTHER and CONTINUE. SKIP
+## jumps to the summary at any time. The cards were already saved when the pack was
+## granted, so leaving early loses nothing.
+
+## Chance the tier climb stalls one tier short before bursting through.
+const FAKE_OUT_CHANCE := 0.4
 
 enum Step { INTRO, TEARING, WALKOUT, REVEALED, SUMMARY }
 
@@ -14,6 +21,9 @@ var step := Step.INTRO
 var _next := 0                     ## cards revealed so far (summary)
 var _back := SceneRouter.HUB
 var _pack: PackDef
+var _mystery: PackDef              ## the Mystery pack this really was (null = a normal pack)
+var _hero_seen := false            ## the best card was revealed by the walkout
+var _flip_all_btn: Button
 var _title := "PACK"
 var _entries: Array = []           ## owned-card entries, best first
 var _dupe: Dictionary = {}         ## uid -> true when you already owned that card
@@ -43,6 +53,7 @@ func _ready() -> void:
 	_back = cfg.get("back", _back)
 	_title = cfg.get("title", "PACK")
 	_pack = PackCatalog.get_pack(str(cfg.get("pack", ""))) if cfg.has("pack") else null
+	_mystery = PackCatalog.get_pack(str(cfg["mystery"])) if cfg.has("mystery") else null
 	var uids: Array = cfg.get("uids", [])
 	var owned_before := {}
 	for e in _prof.cards:
@@ -82,7 +93,8 @@ func _build() -> void:
 	_dark.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_content.add_child(_dark)
-	var head := TitleBar.new(_title)
+	# A Mystery pack keeps its secret in the title too.
+	var head := TitleBar.new(_mystery.display_name if _mystery != null else _title)
 	head.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	head.offset_bottom = 26
 	_content.add_child(head)
@@ -91,6 +103,9 @@ func _build() -> void:
 	add_child(_coins)
 	var pc := _pack.color if _pack != null else CardView.tier_color(_best_tier())
 	_pack_art = PackArt.new(pc, _title.replace(" PACK", ""), 3.0)
+	if _mystery != null:
+		_pack_art.color = _mystery.color
+		_pack_art.label = "MYSTERY"
 	_pack_art.size = Vector2(PackArt.W, PackArt.H) * 3.0
 	_content.add_child(_pack_art)
 	_prompt = MetaUI.label("TAP TO OPEN", UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_CENTER)
@@ -172,6 +187,10 @@ func _intro() -> void:
 func _open() -> void:
 	step = Step.TEARING
 	_prompt.text = ""
+	if _mystery != null:
+		await _mystery_spin()
+		if _skip:
+			return
 	var tier := _best_tier()
 	Sfx.play("rumble")
 	var tw := create_tween().set_parallel()
@@ -222,6 +241,10 @@ func _walkout() -> void:
 	tw.tween_property(_dark, "color:a", 0.82 if big else 0.55, 0.35)
 	tw.tween_property(_stage, "spot", 1.0, 0.6)
 	tw.tween_property(_stage, "rays", 0.5 if big else 0.3, 0.6)
+	await _tier_climb(tier)
+	if _skip:
+		return
+	_stage.color = tc
 	if big:
 		Sfx.play("walkout")
 		# 1) Position.
@@ -285,6 +308,10 @@ func _walkout() -> void:
 		await _wait(0.35)
 		if _skip:
 			return
+	if card.is_xfactor():
+		await _xfactor_sting(card)
+		if _skip:
+			return
 	# 4) The card flips in.
 	_hero = CardView.new(card, e, 2)
 	_hero.face_down = true
@@ -312,8 +339,124 @@ func _walkout() -> void:
 	nm.size = Vector2(_vp().x, 10)
 	_content.add_child(nm)
 	_walk_nodes.append(nm)
+	if card.is_xfactor():
+		nm.text += "  -  ⚡ " + str(AbilityRules.get_def(card.ability).get("name", ""))
+		nm.add_theme_color_override("font_color", CardRules.PROGRAM_COLORS["xf"].lightened(0.35))
 	step = Step.REVEALED
+	_hero_seen = true
 	_prompt.text = "TAP TO SEE ALL %d CARDS" % _entries.size() if _entries.size() > 1 else "TAP TO CONTINUE"
+
+
+## Mystery pack: the foil cycles through the packs it could be, slowing down like a slot
+## machine, and lands on the real one: "IT'S A GOLD PACK!".
+func _mystery_spin() -> void:
+	var ids: Array = Array(_mystery.mystery)
+	var steps := 16
+	var delay := 0.05
+	Sfx.play("rumble")
+	for k in steps:
+		var p := PackCatalog.get_pack(str(ids[k % ids.size()]))
+		if k == steps - 1:
+			p = _pack
+		if p != null:
+			_pack_art.color = p.color
+			_pack_art.label = p.display_name.replace(" PACK", "")
+		Sfx.play("spin")
+		_pack_art.shake = 0.3
+		await _wait(delay)
+		if _skip:
+			return
+		delay *= 1.17
+	_pack_art.shake = 0.0
+	var col := _pack.color if _pack != null else UiSkin.YELLOW
+	Fx.flash(self, Color(col.lightened(0.5), 0.6), 0.35)
+	Fx.burst(_content, _pack_art.position + _pack_art.size * 0.5, col.lightened(0.3), 30, 120.0, 0.7, 1.5)
+	var t := _big_text("IT'S A %s!" % (_pack.display_name if _pack != null else "PACK"), 3, col)
+	_slam(t, Vector2(0, -_pack_art.size.y * 0.5 - 4))
+	Sfx.play("big" if _pack != null and _pack.price >= 9000 else "reveal")
+	await _wait(1.0)
+	_fade_out(t)
+
+
+## The tier climb: BRONZE... SILVER... GOLD... up to the best card's tier, one rising step
+## at a time. Sometimes it stalls a tier short ("...", the lights dip) and then bursts
+## through to the real tier.
+func _tier_climb(target: int) -> void:
+	var fake := target >= 1 and randf() < FAKE_OUT_CHANCE
+	var stop := target - 1 if fake else target
+	for t in range(0, stop + 1):
+		var tc := CardView.tier_color(t)
+		_stage.color = tc
+		_stage.rays = 0.25 + 0.15 * t
+		var lbl := _big_text(CardRules.NAMES[t] + ("" if t == target else "..."), 4, tc)
+		_pop(lbl, Vector2(0, -6))
+		Sfx.play("climb%d" % t)
+		Fx.burst(_content, _vp() * 0.5, tc.lightened(0.3), 6 + t * 6, 60.0 + t * 20.0, 0.5, 1.0)
+		await _wait(0.5 if t < stop else 0.65)
+		_fade_out(lbl)
+		if _skip:
+			return
+	if not fake:
+		return
+	# The fake-out: the lights dip... then it breaks through.
+	var dots := _big_text("...", 4, Color.WHITE)
+	_pop(dots, Vector2(0, -6))
+	Sfx.play("fizzle")
+	var dim := create_tween().set_parallel()
+	dim.tween_property(_stage, "rays", 0.08, 0.5)
+	dim.tween_property(_dark, "color:a", 0.9, 0.5)
+	await _wait(0.95)
+	_fade_out(dots)
+	if _skip:
+		return
+	var tc2 := CardView.tier_color(target)
+	_stage.color = tc2
+	_stage.rays = 0.6 + 0.1 * target
+	Fx.flash(self, Color(tc2.lightened(0.5), 0.6), 0.35)
+	Fx.shake(_content, 5.0, 0.3)
+	var up := _big_text(CardRules.NAMES[target] + "!", 5, tc2)
+	_slam(up, Vector2(0, -6))
+	Sfx.play("climb%d" % target)
+	Fx.burst(_content, _vp() * 0.5, tc2.lightened(0.3), 40, 150.0, 0.8, 2.0)
+	create_tween().tween_property(_dark, "color:a", 0.82, 0.3)
+	await _wait(0.8)
+	_fade_out(up)
+
+
+## X-Factor stinger: pink lightning, "X-FACTOR" slams in and the ability is named.
+func _xfactor_sting(card: CardDef) -> void:
+	var xc: Color = CardRules.PROGRAM_COLORS["xf"]
+	var d := AbilityRules.get_def(card.ability)
+	_stage.color = xc
+	Sfx.play("xf")
+	Fx.flash(self, Color(xc.lightened(0.4), 0.55), 0.3)
+	var t := _big_text("X-FACTOR", 5, xc)
+	_slam(t, Vector2(0, -22))
+	var nm := MetaUI.label("⚡ %s ⚡" % str(d.get("name", "")), Color.WHITE, 16, HORIZONTAL_ALIGNMENT_CENTER)
+	nm.position = Vector2(0, _vp().y * 0.5 + 14)
+	nm.size = Vector2(_vp().x, 18)
+	_content.add_child(nm)
+	_walk_nodes.append(nm)
+	var tx := MetaUI.label(str(d.get("text", "")), UiSkin.YELLOW, 8, HORIZONTAL_ALIGNMENT_CENTER)
+	tx.position = Vector2(0, _vp().y * 0.5 + 36)
+	tx.size = Vector2(_vp().x, 10)
+	_content.add_child(tx)
+	_walk_nodes.append(tx)
+	for i in 3:
+		Fx.burst(_content, Vector2(randf_range(60, _vp().x - 60), randf_range(50, _vp().y - 60)), xc.lightened(0.2),
+				14, 90.0, 0.5, 1.5)
+	await _wait(1.5)
+	for n in [t, nm, tx]:
+		_fade_out(n)
+
+
+## Lighter than _slam: a quick 2x -> 1x pop (tier climb steps).
+func _pop(r: Control, offset: Vector2) -> void:
+	r.position = ((_vp() - r.size) * 0.5).round() + offset
+	r.pivot_offset = r.size * 0.5
+	r.scale = Vector2(2, 2)
+	var tw := create_tween()
+	tw.tween_property(r, "scale", Vector2.ONE, 0.1)
 
 
 ## Particles, glow, shake and stingers scaled to rarity.
@@ -467,14 +610,15 @@ func _show_summary(instant := false) -> void:
 			col.add_theme_constant_override("separation", 2)
 			row.add_child(col)
 			var v := CardView.new(GameData.card(e["def"]), e, card_scale)
-			v.face_down = not instant
-			v.tapped.connect(func(_v: CardView) -> void: pass)
+			# The walkout already showed the best card; the rest wait for your tap.
+			v.face_down = not instant and not (_hero_seen and e == _entries[0])
+			v.tapped.connect(func(tv: CardView) -> void: _flip_one(tv))
 			col.add_child(v)
 			_cards.append(v)
 			var dupe: bool = _dupe.get(int(e["uid"]), false)
 			var tag := MetaUI.label("DUPE +%d" % EconomyRules.quicksell_value(GameData.db, e) if dupe else "NEW!",
 					UiSkin.MUTED if dupe else UiSkin.GREEN, 8, HORIZONTAL_ALIGNMENT_CENTER)
-			tag.modulate.a = 1.0 if instant else 0.0
+			tag.modulate.a = 0.0 if v.face_down else 1.0
 			col.add_child(tag)
 			v.set_meta("tag", tag)
 	var bar := HBoxContainer.new()
@@ -485,9 +629,10 @@ func _show_summary(instant := false) -> void:
 	if sell_total > 0:
 		_sell_btn = MetaUI.button("QUICK SELL DUPES +%s" % CoinPill.fmt(sell_total), Vector2(150, 26), _sell_dupes)
 		bar.add_child(_sell_btn)
-	if _pack != null and _pack.price > 0:
-		var again := MetaUI.button("OPEN ANOTHER  %s" % CoinPill.fmt(_pack.price), Vector2(140, 26), _open_another)
-		again.disabled = not EconomyRules.can_buy(_prof, _pack)
+	var buy_pack := _buy_pack()
+	if buy_pack != null and buy_pack.price > 0:
+		var again := MetaUI.button("OPEN ANOTHER  %s" % CoinPill.fmt(buy_pack.price), Vector2(140, 26), _open_another)
+		again.disabled = not EconomyRules.can_buy(_prof, buy_pack) or EconomyRules.has_pending_draft(_prof)
 		bar.add_child(again)
 	elif not _prof.pending_packs.is_empty():
 		bar.add_child(MetaUI.button("NEXT FREE PACK (%d)" % _prof.pending_packs.size(), Vector2(140, 26), _open_next_free))
@@ -496,11 +641,60 @@ func _show_summary(instant := false) -> void:
 	if instant:
 		_next = _cards.size()
 		return
-	_deal()
+	if _cards.all(func(v: CardView) -> bool: return not v.face_down):
+		return
+	_prompt.text = "TAP A CARD TO FLIP IT"
+	_flip_all_btn = MetaUI.button("FLIP ALL", Vector2(80, 26), _deal)
+	bar.add_child(_flip_all_btn)
+	bar.move_child(_flip_all_btn, 0)
 
 
-## Flips the summary cards one by one, best last for a final pop.
+## Pack bought by OPEN ANOTHER: a Mystery pack is bought again as a Mystery pack.
+func _buy_pack() -> PackDef:
+	return _mystery if _mystery != null else _pack
+
+
+## Tap-to-flip in the summary: Gold+ cards rattle first, then flip with a pop and a burst.
+func _flip_one(v: CardView) -> void:
+	if step != Step.SUMMARY or not v.face_down or v.has_meta("flipping"):
+		return
+	v.set_meta("flipping", true)
+	var tier := v.tier()
+	if tier >= CardRules.Tier.GOLD:
+		v.glow = 0.5
+		Fx.shake(v, 2.0 + tier, 0.3)
+		Sfx.play("rumble")
+		await _wait(0.35)
+		if not is_instance_valid(v):
+			return
+	_reveal_card(v)
+	if _cards.all(func(c: CardView) -> bool: return not c.face_down):
+		_prompt.text = ""
+		if is_instance_valid(_flip_all_btn):
+			_flip_all_btn.visible = false
+
+
+func _reveal_card(v: CardView) -> void:
+	v.face_down = false
+	_next += 1
+	Fx.pop(v, 1.15, 0.22)
+	var tier := v.tier()
+	Sfx.play("flip" if tier < CardRules.Tier.GOLD else "big")
+	if tier >= CardRules.Tier.GOLD:
+		v.glow = 0.6
+		Fx.burst(self, v.global_position + v.size * 0.5, CardView.tier_color(tier), 14, 70.0, 0.6, 1.0)
+	if v.is_xfactor():
+		Sfx.play("xf")
+		Fx.burst(self, v.global_position + v.size * 0.5, CardRules.PROGRAM_COLORS["xf"], 16, 80.0, 0.6, 1.0)
+	var tag: Label = v.get_meta("tag")
+	tag.create_tween().tween_property(tag, "modulate:a", 1.0, 0.15)
+
+
+## FLIP ALL: flips the remaining cards one by one, best last for a final pop.
 func _deal() -> void:
+	_prompt.text = ""
+	if is_instance_valid(_flip_all_btn):
+		_flip_all_btn.visible = false
 	var order: Array = range(_cards.size())
 	order.reverse()
 	for i in order:
@@ -508,18 +702,9 @@ func _deal() -> void:
 		if not is_instance_valid(self) or step != Step.SUMMARY:
 			return
 		var v: CardView = _cards[i]
-		if not v.face_down:
+		if not v.face_down or v.has_meta("flipping"):
 			continue
-		v.face_down = false
-		_next += 1
-		Fx.pop(v, 1.15, 0.22)
-		var tier := v.tier()
-		Sfx.play("flip" if tier < CardRules.Tier.GOLD else "big")
-		if tier >= CardRules.Tier.GOLD:
-			v.glow = 0.6
-			Fx.burst(self, v.global_position + v.size * 0.5, CardView.tier_color(tier), 14, 70.0, 0.6, 1.0)
-		var tag: Label = v.get_meta("tag")
-		tag.create_tween().tween_property(tag, "modulate:a", 1.0, 0.15)
+		_reveal_card(v)
 
 
 func _dupe_value() -> int:
@@ -554,12 +739,15 @@ func _sell_dupes() -> void:
 func _open_another() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var uids := EconomyRules.buy_and_open(_prof, _pack, GameData.db, rng, int(Time.get_unix_time_from_system()))
-	if uids.is_empty():
+	var r := EconomyRules.buy(_prof, _buy_pack(), GameData.db, rng, int(Time.get_unix_time_from_system()))
+	if r.is_empty():
 		return
 	SaveManager.save()
-	SceneRouter.goto(SceneRouter.PACK_OPEN, {"uids": uids, "title": _pack.display_name, "pack": _pack.id,
-			"back": _back})
+	var real: PackDef = r["pack"]
+	var cfg := {"uids": r["uids"], "title": real.display_name, "pack": real.id, "back": _back}
+	if r["mystery"]:
+		cfg["mystery"] = _buy_pack().id
+	SceneRouter.goto(SceneRouter.PACK_OPEN, cfg)
 
 
 func _open_next_free() -> void:
