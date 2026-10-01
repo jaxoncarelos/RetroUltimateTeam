@@ -309,7 +309,7 @@ func _sim_cpu_drive() -> void:
 	var outcome: String = d["outcome"]
 	var end_x := clampf(float(d["end_x"]), FieldGeo.OWN_GOAL + 1.0, FieldGeo.OPP_GOAL - 1.0)
 	var name := (teams[cpu] as TeamData).team_name.to_upper()
-	var head := {"td": "%s TOUCHDOWN" % name, "fg": "%s FIELD GOAL" % name, "miss": "%s MISS THE FG" % name,
+	var head: String = {"td": "%s TOUCHDOWN" % name, "fg": "%s FIELD GOAL" % name, "miss": "%s MISS THE FG" % name,
 			"punt": "DEFENSE HOLDS - %s PUNT" % name, "turnover": "INTERCEPTED!" if d["int"] else "FUMBLE RECOVERED!",
 			"downs": "STOPPED ON DOWNS!"}.get(outcome, name)
 	var sub := "%s DRIVE: %d PLAYS · %d YDS · %d:%02d" % [cpu, int(d["plays"]), int(d["yards"]), int(secs) / 60,
