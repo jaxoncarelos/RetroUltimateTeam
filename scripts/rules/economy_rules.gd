@@ -432,19 +432,21 @@ static func franchise_elite(profile: Profile, db: RosterDB, rng: RandomNumberGen
 
 
 
-## One-time tester grant (Settings → TESTER COINS) to try new packs on an existing save.
+## Tester grant (Settings → TESTER COINS) to try new packs on an existing save: claimable
+## once per TESTER_ROUND (bump it to hand out another round, e.g. after a pack bug).
 const TESTER_COINS := 50000
+const TESTER_ROUND := 2
 
 
 static func can_claim_tester_coins(profile: Profile) -> bool:
-	return int(profile.stats.get("tester_coins", 0)) == 0
+	return int(profile.stats.get("tester_coins", 0)) < TESTER_ROUND
 
 
-## Adds TESTER_COINS once per save. Returns coins added (0 = already claimed).
+## Adds TESTER_COINS once per round. Returns coins added (0 = already claimed).
 static func claim_tester_coins(profile: Profile) -> int:
 	if not can_claim_tester_coins(profile):
 		return 0
-	profile.stats["tester_coins"] = 1
+	profile.stats["tester_coins"] = TESTER_ROUND
 	profile.coins += TESTER_COINS
 	return TESTER_COINS
 

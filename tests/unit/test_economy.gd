@@ -331,3 +331,5 @@ func test_tester_coins_are_one_time_and_saved() -> void:
 	var loaded := Profile.from_dict(JSON.parse_string(JSON.stringify(prof.to_dict())))
 	assert_false(EconomyRules.can_claim_tester_coins(loaded), "still claimed after a save/load")
 	assert_true(EconomyRules.can_claim_tester_coins(Profile.from_dict({})), "old saves can claim it")
+	prof.stats["tester_coins"] = EconomyRules.TESTER_ROUND - 1
+	assert_eq(EconomyRules.claim_tester_coins(prof), EconomyRules.TESTER_COINS, "a new round can be claimed again")
