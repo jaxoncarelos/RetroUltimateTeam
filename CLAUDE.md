@@ -130,5 +130,14 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    base coverages, no throw): receiver 20 yds downfield ~2.7 s, first pressure ~3.2 s, sack ~4.2 s.
    Ball flight: arm 20 + 14*thp/99 yd/s (was 17 + 13), `ball_gravity` 30 -> 48 so lobs drop faster
    (85 THP: 15 yd 0.47 s, 22 yd 0.9 s, 30 yd 1.3 s (was 1.6), 50 yd 1.6 s (was 2.0)); test_flight_times_feel_quick.
+21. [x] Retro Bowl route (owner: "defense is too complicated, Dolphins gain 20+ every play"): CPU possessions are
+   simulated as whole drives (`MatchController._sim_cpu_drive` -> `GameSim.sim_drive`/`drive_rate`: both teams'
+   game OVR + start field position, yards fit the field, box score, clock runoff, banner, ball back by
+   kickoff/punt/turnover). Playable defense only in challenges or with `--play-defense` (`--human=away`,
+   `--drawtest`); defense pace setting hidden. Found on the way: the human's suggested defense (and the
+   highlights auto-sim) always used Cover 0 (ties rank by playbook order). Pocket pass pro: `BlockBrain` cup
+   (`POCKET` angles/radii around the QB) + `PlayRunner.pocket_assignments()` (closest threats -> nearest free
+   blocker) + RB blitz pickup. Blitz first pressure 1.2 s -> 2.75 s; CPU-vs-CPU sacks now ~0.8/team (CPU QBs throw
+   before base pressure arrives; engine AI-vs-AI only matters for balance tests now). Debug: `--quick --show=cpudrive`.
 Next ideas (after the owner's playtest): see MORNING_NOTES.md. Card revamp follow-ups: CPU star
 abilities, ability UI on the lineup screen, ability-themed sets/objectives, balance pass on ability boosts.
