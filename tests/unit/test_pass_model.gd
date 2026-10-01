@@ -241,3 +241,17 @@ func test_cpu_read_uses_the_same_planner() -> void:
 	assert_false(e.is_empty())
 	assert_eq(int(e["kind"]), PassModel.Kind.LOB)
 	assert_almost_eq((e["target"] as Vector2).distance_to(r.lead_point(r.off_slots["WR1"])), 0.0, 0.01)
+
+
+## The ball gets there: a good arm (85 THP) throws a 15-yard bullet in ~0.5 s, a 30-yard lob
+## lands in ~1.3 s and a 50-yard bomb in ~1.6 s (owner: "so slow in the air").
+func test_flight_times_feel_quick() -> void:
+	var from := Vector2(30, 26)
+	var d15 := PassModel.plan(t, 85.0, from, from + Vector2(15, 0))
+	var d30 := PassModel.plan(t, 85.0, from, from + Vector2(30, 0))
+	var d50 := PassModel.plan(t, 85.0, from, from + Vector2(50, 0))
+	assert_lt(float(d15["dur"]), 0.55)
+	assert_lt(float(d30["dur"]), 1.4)
+	assert_lt(float(d50["dur"]), 1.7)
+	assert_lt(float(d15["dur"]), float(d30["dur"]))
+	assert_lt(float(d30["dur"]), float(d50["dur"]))

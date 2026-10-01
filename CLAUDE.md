@@ -119,5 +119,7 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
 20. [x] Pocket/speed pass (owner: "5 s in, receiver only 20 yds downfield, nobody near my QB"): everyone faster
    (speed 5.2 + 4.8*spd/99 yd/s, accel 11 + 13*acc/99) and `pass_shed_mult` 1.9 -> 1.25. test_pocket_time (you at QB,
    base coverages, no throw): receiver 20 yds downfield ~2.7 s, first pressure ~3.2 s, sack ~4.2 s.
+   Ball flight: arm 20 + 14*thp/99 yd/s (was 17 + 13), `ball_gravity` 30 -> 48 so lobs drop faster
+   (85 THP: 15 yd 0.47 s, 22 yd 0.9 s, 30 yd 1.3 s (was 1.6), 50 yd 1.6 s (was 2.0)); test_flight_times_feel_quick.
 Next ideas (after the owner's playtest): see MORNING_NOTES.md. Card revamp follow-ups: CPU star
 abilities, ability UI on the lineup screen, ability-themed sets/objectives, balance pass on ability boosts.

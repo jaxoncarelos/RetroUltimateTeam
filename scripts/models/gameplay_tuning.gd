@@ -15,8 +15,8 @@ extends Resource
 @export var pursuit_speed_mult := 1.07 ## pursuing defenders run a bit faster (effort + angles)
 
 @export_group("Passing")
-@export var throw_speed_base := 17.0   ## yd/s
-@export var throw_speed_range := 13.0
+@export var throw_speed_base := 20.0   ## yd/s
+@export var throw_speed_range := 14.0
 @export var throw_dist_base := 38.0    ## max yards at 0 throw power
 @export var throw_dist_range := 30.0
 @export var aim_gain := 0.36           ## yards of throw per screen pixel of drag (short pulls)
@@ -33,7 +33,7 @@ extends Resource
 @export var bullet_apex_per_yd := 0.05
 @export var lob_apex_base := 3.0       ## yards of apex on a full lob
 @export var lob_apex_per_yd := 0.24    ## (45-yard bomb ≈ 14 yards high)
-@export var ball_gravity := 30.0       ## yd/s² (game gravity): sets how long a lob hangs
+@export var ball_gravity := 48.0       ## yd/s² (game gravity): sets how long a lob hangs
 @export var touch_threshold := 0.22    ## loft ≥ this shows TOUCH in the aim preview
 @export var lob_threshold := 0.6       ## loft ≥ this shows LOB
 @export_subgroup("Lane and contest")
