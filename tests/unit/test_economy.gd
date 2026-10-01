@@ -27,7 +27,7 @@ func _starter(team := "KC") -> Profile:
 func _real_card_of_tier(tier: int, skip := 0) -> String:
 	var ids := db.card_ids_of_tier(tier)
 	ids.sort()
-	var base := ids.filter(func(i: String) -> bool: return not i.ends_with("_prime"))
+	var base := ids.filter(func(i: String) -> bool: return not i.ends_with("_prime") and not i.ends_with("_xf"))
 	return base[skip % base.size()]
 
 

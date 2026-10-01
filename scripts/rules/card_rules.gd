@@ -5,7 +5,8 @@ extends RefCounted
 ## rookies 60-73). The tier is derived from the card OVR, never a cap on who can be what.
 ## A few top players also have a rare "PRIME" program card (+PRIME_BONUS OVR).
 ## Young players have potential (pot) and develop with XP (Collection.award_xp).
-## Card ids: base = the player id ("mahomes_patrick"); prime = "<player id>_prime".
+## Card ids: base = the player id ("mahomes_patrick"); prime = "<player id>_prime";
+## X-Factor = "<player id>_xf" (+2 OVR and an AbilityRules ability).
 ## Pure logic.
 
 enum Tier { BRONZE, SILVER, GOLD, ELITE }
@@ -25,8 +26,14 @@ const COLORS := [Color("#b86f3c"), Color("#c2c3c7"), Color("#ffcf40"), Color("#b
 const PROGRAM_BASE := "base"
 const PROGRAM_PRIME := "prime"
 const PROGRAM_CHAMP := "champ"       ## Super Bowl trophy: a flat 99 of your franchise star
-const PROGRAM_NAMES := {"base": "", "prime": "PRIME", "champ": "CHAMP"}
-const PROGRAM_COLORS := {"base": Color(1, 1, 1, 0), "prime": Color("#29adff"), "champ": Color("#ffb000")}
+## X-Factor: +XF_BONUS OVR and an in-game ability (AbilityRules) that powers up mid-drive.
+const PROGRAM_XFACTOR := "xf"
+const PROGRAM_NAMES := {"base": "", "prime": "PRIME", "champ": "CHAMP", "xf": "X-FACTOR"}
+const PROGRAM_COLORS := {"base": Color(1, 1, 1, 0), "prime": Color("#29adff"), "champ": Color("#ffb000"),
+		"xf": Color("#ff2b6e")}
+const XF_MIN_OVR := 74            ## players at or above this get an X-Factor card
+const XF_BONUS := 2
+const XF_QUICKSELL_MULT := 2
 const CHAMP_OVR := 99
 const CHAMP_QUICKSELL_MULT := 6
 const PRIME_MIN_OVR := 86         ## players at or above this get a Prime card
@@ -58,6 +65,8 @@ static func eligible(tier: int, real_ovr: int) -> bool:
 static func program_ovr(program: String, real_ovr: int) -> int:
 	if program == PROGRAM_CHAMP:
 		return CHAMP_OVR
+	if program == PROGRAM_XFACTOR:
+		return mini(real_ovr + XF_BONUS, 99)
 	return mini(real_ovr + (PRIME_BONUS if program == PROGRAM_PRIME else 0), 99)
 
 
@@ -70,6 +79,10 @@ static func has_prime(real_ovr: int) -> bool:
 	return real_ovr >= PRIME_MIN_OVR
 
 
+static func has_xfactor(real_ovr: int) -> bool:
+	return real_ovr >= XF_MIN_OVR
+
+
 ## Attributes of a card: real attributes scaled by (card OVR + boost) / real OVR, clamped.
 static func card_attrs(real_attrs: Dictionary, real_ovr: int, c_ovr: int, boost := 0) -> Dictionary:
 	var f := float(c_ovr + boost) / maxf(real_ovr, 1.0)
@@ -80,7 +93,14 @@ static func card_attrs(real_attrs: Dictionary, real_ovr: int, c_ovr: int, boost 
 
 
 static func quicksell(tier: int, program := PROGRAM_BASE) -> int:
-	var mult := PRIME_QUICKSELL_MULT if program == PROGRAM_PRIME else (CHAMP_QUICKSELL_MULT if program == PROGRAM_CHAMP else 1)
+	var mult := 1
+	match program:
+		PROGRAM_PRIME:
+			mult = PRIME_QUICKSELL_MULT
+		PROGRAM_CHAMP:
+			mult = CHAMP_QUICKSELL_MULT
+		PROGRAM_XFACTOR:
+			mult = XF_QUICKSELL_MULT
 	return int(TABLE[tier][3]) * mult
 
 
@@ -98,12 +118,18 @@ static func prime_id(player_id: String) -> String:
 	return player_id + "_prime"
 
 
+static func xf_id(player_id: String) -> String:
+	return player_id + "_xf"
+
+
 ## "mahomes_patrick_prime" -> ["mahomes_patrick", "prime"]; "mahomes_patrick" -> [.., "base"].
 static func split_card_id(card: String) -> Array:
 	if card.ends_with("_champ"):
 		return [card.left(card.length() - 6), PROGRAM_CHAMP]
 	if card.ends_with("_prime"):
 		return [card.left(card.length() - 6), PROGRAM_PRIME]
+	if card.ends_with("_xf"):
+		return [card.left(card.length() - 3), PROGRAM_XFACTOR]
 	return [card, PROGRAM_BASE]
 
 

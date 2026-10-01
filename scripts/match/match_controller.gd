@@ -36,6 +36,7 @@ var teams: Dictionary = {}          ## abbr -> TeamData
 var lineups: Dictionary = {}        ## abbr -> {"offense": {...}, "defense": {...}, "K": attrs}
 var human := ""                     ## the human's team abbr ("" = CPU vs CPU)
 var memory: DefenseMemory           ## CPU defense learning the human offense
+var abilities := AbilityTracker.new()   ## the human lineup's X-Factor card abilities
 var off_play: PlayDef
 var def_play: PlayDef
 var last_def_call: PlayDef
@@ -223,6 +224,7 @@ func _resolve_lineups(home_abbr: String, away_abbr: String) -> void:
 	if human != "" and prof.has_team() and prof.franchise_team == home_abbr and not prof.lineup.is_empty():
 		var base_ovr := Collection.team_ovr(prof, GameData.db)
 		var chem := Collection.chemistry(prof, GameData.db)
+		abilities.setup(Collection.lineup_entries(prof, GameData.db))
 		# Franchise Chemistry: your starters play up to +3 OVR better.
 		var entries := TeamRating.rescale_entries(Collection.lineup_entries(prof, GameData.db), base_ovr,
 				int(round(base_ovr + chem)))
@@ -289,7 +291,34 @@ func _after(delay: float, fn: Callable) -> void:
 
 
 func _kicker(team: String) -> Dictionary:
-	return lineups[team].get("K", RatingModel.fill_attrs("K", 75))
+	var k: Dictionary = lineups[team].get("K", RatingModel.fill_attrs("K", 75))
+	return abilities.apply_kicker(k, _clutch()) if team == human else k
+
+
+## Situation for "clutch" X-Factor abilities.
+func _clutch() -> Dictionary:
+	return {"quarter": gs.clock.quarter, "half_seconds_left": gs.clock.half_seconds_left()}
+
+
+## X-Factor chips for the side the human is playing: active ones glow, the rest show progress.
+func _update_abilities() -> void:
+	if human == "" or not abilities.has_any() or _sim():
+		return
+	var off := gs.possession == human
+	var rows: Array = []
+	for a in abilities.progress(_clutch()):
+		var slot: String = a["slot"]
+		var is_off := slot in TeamRating.OFFENSE_SLOTS
+		if slot != "K" and is_off != off:
+			continue
+		if slot == "K" and not a["on"]:
+			continue
+		var nm := str(a["name"])
+		var t := "%s: %s" % [nm.substr(nm.find(". ") + 2) if nm.find(". ") >= 0 else nm, a["ability"]]
+		if not a["on"] and int(a["need"]) > 1:
+			t += " %d/%d" % [int(a["have"]), int(a["need"])]
+		rows.append({"text": t, "on": a["on"]})
+	hud.set_abilities(rows)
 
 
 # ---------------------------------------------------------------- game flow
@@ -452,6 +481,13 @@ func _cpu_timeouts() -> void:
 func _setup_formation() -> void:
 	var off_l: Dictionary = lineups[gs.possession]["offense"]
 	var def_l: Dictionary = lineups[gs.defense()]["defense"]
+	if human != "" and abilities.has_any():
+		abilities.on_drive(gs.drive_no)
+		if gs.possession == human:
+			off_l = abilities.apply(off_l, _clutch())
+		else:
+			def_l = abilities.apply(def_l, _clutch())
+		_update_abilities()
 	runner.setup_play(off_play, def_play, gs.downs.los_x, _ball_y(), off_l, def_l)
 	field.los_x = gs.downs.los_x
 	field.first_down_x = gs.downs.first_down_x
@@ -639,6 +675,16 @@ func _on_play_ended(r: Dictionary) -> void:
 		var gained: int = r["yards"] if r["type"] not in ["incomplete", "int", "int_td", "fumble"] else 0
 		memory.record(off_play.id, off_play.formation.id, off_play.category,
 				-10 if r["turnover"] else gained, off_play.display_name)
+	if human != "" and abilities.has_any():
+		var ev := r.duplicate()
+		ev["side"] = "offense" if gs.possession == human else "defense"
+		ev["run_play"] = off_play.is_run()
+		ev["down"] = gs.downs.down
+		for a in abilities.record(ev):
+			if not _sim():
+				hud.show_ability(str(a["name"]), str(a["ability"]), str(a["text"]))
+				Sfx.play("sparkle")
+		_update_abilities()
 	_spot_y = FieldGeo.clamp_to_hashes(r["spot_y"])
 	if _two_point:
 		_finish_two_point(r)
@@ -1312,7 +1358,7 @@ func _jersey(team: TeamData) -> Dictionary:
 	return team.uniform_colors() if team.abbr == gs.home else team.away_colors()
 
 
-## Debug: `-- --show=pause|pat|final|kick|tip` opens that HUD piece after ~6 s (screenshots).
+## Debug: `-- --show=pause|pat|final|kick|tip|xf` opens that HUD piece after ~6 s (screenshots).
 func _debug_show(kind: String) -> void:
 	await get_tree().create_timer(6.0).timeout
 	match kind:
@@ -1324,6 +1370,18 @@ func _debug_show(kind: String) -> void:
 			hud.show_choice("YOU WIN!", "KC 31  PHI 17", ["PLAY AGAIN"] as Array[String])
 		"snap":
 			_snap()
+		"xf":
+			# Switch on the first X-Factor ability of the side on the field.
+			if hud.tip_open():
+				hud._tip.visible = false
+				hud.tip_closed.emit()
+			for a in abilities.progress(_clutch()):
+				if (str(a["slot"]) in TeamRating.OFFENSE_SLOTS) == (gs.possession == human):
+					abilities.active[a["slot"]] = true
+					var d := AbilityRules.get_def(abilities.cards[a["slot"]]["id"])
+					hud.show_ability(str(a["name"]), str(d["name"]), str(d["text"]))
+					break
+			_update_abilities()
 		"simrest":
 			_sim_rest_of_game()
 		"half":

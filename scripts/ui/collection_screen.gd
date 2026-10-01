@@ -214,6 +214,14 @@ func _show_detail(v: CardView) -> void:
 	var p: PlayerData = v.player
 	col.add_child(MetaUI.label(p.name.to_upper(), UiSkin.YELLOW, 8))
 	col.add_child(MetaUI.label("%s  #%d  %s  AGE %d" % [p.pos, p.jersey, p.team, int(info.get("age", 0))], UiSkin.MUTED))
+	var ab := str(info.get("ability", ""))
+	if ab != "":
+		var d := AbilityRules.get_def(ab)
+		col.add_child(MetaUI.label("⚡ X-FACTOR: " + str(d["name"]), CardRules.PROGRAM_COLORS["xf"].lightened(0.3)))
+		var al := MetaUI.label(str(d["text"]), UiSkin.WHITE)
+		al.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		al.custom_minimum_size = Vector2(200, 0)
+		col.add_child(al)
 	var a := CardRules.card_attrs(p.attrs, p.ovr, int(info.get("ovr", v.ovr())))
 	for pair in _key_attrs(p.pos, a):
 		var h := HBoxContainer.new()

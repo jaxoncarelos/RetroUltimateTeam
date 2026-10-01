@@ -113,6 +113,8 @@ static func pick_card(tier: int, pack: PackDef, profile: Profile, db: RosterDB, 
 		var w := 1.0 / (1.0 + IN_TIER_FALLOFF * maxi(0, c.ovr - maxi(tier_min, 60)))
 		if c.is_prime():
 			w *= PRIME_WEIGHT
+		elif c.is_xfactor():
+			w *= pack.xf_weight
 		if p.pos in weak:
 			w *= WEAK_POS_WEIGHT
 		ids.append(cid)

@@ -26,6 +26,7 @@ var overtime := false           ## the game went to overtime
 var ot_first := ""
 var stats := {}                 ## team -> box score dictionary
 var drive_start_x := 35.0
+var drive_no := 0               ## counts possessions (card abilities reset per drive)
 var last_event := ""            ## human-readable summary of the last state change
 
 
@@ -53,6 +54,7 @@ func defense() -> String:
 ## Gives `team` the ball at `x` (its own coordinates), first and ten.
 func start_possession(team: String, x: float) -> void:
 	possession = team
+	drive_no += 1
 	downs.start_drive(clampf(x, FieldGeo.OWN_GOAL + 1.0, FieldGeo.OPP_GOAL - 1.0))
 	drive_start_x = downs.los_x
 

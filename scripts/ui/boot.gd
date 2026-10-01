@@ -47,6 +47,12 @@ func _demo_profile() -> void:
 	if OS.get_cmdline_user_args().has("--coach-demo"):
 		prof.coach["level"] = 9
 		prof.coach["perks"] = {"pocket": 2, "payday": 1, "breaker": 3}
+	if OS.get_cmdline_user_args().has("--xf"):
+		# X-Factor versions of the franchise's best players, starting.
+		for pid in ["mahomes_patrick", "kelce_travis", "jones_chris", "mcduffie_trent", "butker_harrison"]:
+			if GameData.db.cards.has(CardRules.xf_id(pid)):
+				prof.add_card(CardRules.xf_id(pid))
+		Collection.auto_lineup(prof, GameData.db)
 	if OS.get_cmdline_user_args().has("--champ"):
 		EconomyRules.champion_reward(prof, GameData.db)
 	if OS.get_cmdline_user_args().has("--season"):

@@ -73,6 +73,7 @@ var scrambling := false
 var play_time := 0.0
 var broken_tackles := 0
 var fumbled := false
+var last_tackler: PlayerAgent = null   ## who made the last tackle (card abilities credit him)
 ## Receiver the CPU QB is currently reading (DefenseSwitcher uses it pre-throw).
 var qb_target_hint: PlayerAgent = null
 ## Live aim reticle while the human is aiming (Vector2.INF otherwise); the camera leads to it.
@@ -139,6 +140,7 @@ func setup_play(p_off: PlayDef, p_def: PlayDef, p_los_x: float, p_ball_y: float,
 	scrambling = false
 	play_time = 0.0
 	broken_tackles = 0
+	last_tackler = null
 	carrier = null
 	handoff_to = null
 	key_level = 0.0
@@ -550,6 +552,7 @@ func fall_forward(a: PlayerAgent) -> float:
 
 
 func on_tackle(tackler: PlayerAgent, runner: PlayerAgent) -> void:
+	last_tackler = tackler
 	runner.tackled_speed = runner.velocity.x
 	var speed := runner.velocity.length()
 	var slide := fall_forward(runner)
@@ -969,8 +972,25 @@ func _end_play(type: String, spot: Vector2, text: String) -> void:
 		"air_yards": ball.to.x - los_x if pass_thrown else 0.0,
 		"throw_kind": int(throw_plan.get("kind", -1)),
 		"time": play_time,
+		# Who did it (MatchController's card abilities): the ball carrier at the whistle
+		# (receiver after a catch, interceptor after a pick), the tackler, and on an
+		# incompletion the defender closest to the ball.
+		"carrier_slot": carrier.slot if carrier != null else "",
+		"tackler_slot": last_tackler.slot if last_tackler != null else "",
+		"ball_def_slot": _nearest_defender_slot(ball.field_pos) if type == "incomplete" else "",
 	}
 	_set_spot(_pending_result, spot)
+
+
+func _nearest_defender_slot(at: Vector2) -> String:
+	var best := ""
+	var best_d := 3.0
+	for d in defense:
+		var dd := d.field_pos.distance_to(at)
+		if dd < best_d:
+			best_d = dd
+			best = d.slot
+	return best
 
 
 ## Dead-ball spot and yards. "yards" is exactly the change in the line of scrimmage the

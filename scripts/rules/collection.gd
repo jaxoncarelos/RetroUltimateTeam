@@ -129,7 +129,7 @@ static func dev_room(db: RosterDB, entry: Dictionary) -> int:
 
 ## Everything the UI shows about an owned card:
 ## {uid, def, player_id, name, short, pos, team, jersey, age, ovr, base_ovr, tier, program,
-##  pot, dev, boost, xp, xp_next (0 = maxed), locked, in_lineup, prospect, retired}
+##  ability, pot, dev, boost, xp, xp_next (0 = maxed), locked, in_lineup, prospect, retired}
 static func card_info(profile: Profile, db: RosterDB, entry: Dictionary) -> Dictionary:
 	var c: CardDef = db.cards.get(entry.get("def", ""))
 	var uid := int(entry.get("uid", 0))
@@ -140,7 +140,7 @@ static func card_info(profile: Profile, db: RosterDB, entry: Dictionary) -> Dict
 	var room := dev_room(db, entry)
 	return {"uid": uid, "def": c.id, "player_id": p.id, "name": p.name, "short": p.short_name(), "pos": p.pos,
 			"team": p.team, "jersey": p.jersey, "age": p.age, "ovr": card_ovr(db, entry), "base_ovr": c.ovr,
-			"tier": card_tier(db, entry), "program": c.program, "pot": card_pot(db, entry), "dev": dev,
+			"tier": card_tier(db, entry), "program": c.program, "ability": c.ability, "pot": card_pot(db, entry), "dev": dev,
 			"boost": int(entry.get("boost", 0)), "xp": int(entry.get("xp", 0)),
 			"xp_next": CardRules.xp_to_next(dev) if room > 0 else 0, "locked": bool(entry.get("locked", false)),
 			"in_lineup": profile.in_lineup(uid), "prospect": room > 0, "retired": false}
@@ -195,7 +195,7 @@ static func auto_lineup(profile: Profile, db: RosterDB) -> void:
 		profile.lineup[slot] = best[slot]["key"]
 
 
-## slot -> {name, jersey, attrs, ovr, pos, uid, look} for the profile's lineup (look =
+## slot -> {name, jersey, attrs, ovr, pos, uid, look, ability} for the profile's lineup (look =
 ## PlayerData.look, used for the field sprite's skin tone/visor).
 static func lineup_entries(profile: Profile, db: RosterDB) -> Dictionary:
 	var out := {}
@@ -211,7 +211,7 @@ static func lineup_entries(profile: Profile, db: RosterDB) -> Dictionary:
 		var ovr := card_ovr(db, e)
 		out[slot] = {"name": p.short_name(), "jersey": p.jersey, "pos": p.pos, "uid": int(e["uid"]),
 				"attrs": CardRules.card_attrs(p.attrs, p.ovr, c.ovr, ovr - c.ovr if extra > 0 else 0), "ovr": ovr,
-				"look": p.look}
+				"look": p.look, "ability": c.ability}
 	return out
 
 

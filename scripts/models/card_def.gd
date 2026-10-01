@@ -14,6 +14,7 @@ var quicksell := 25
 var program := CardRules.PROGRAM_BASE
 var pot := 55          ## development ceiling (card OVR + growth room of the player)
 var age := 0
+var ability := ""      ## AbilityRules id (X-Factor and CHAMP cards), "" = none
 
 
 ## Base card of a player. `_tier` is legacy (ignored): there is one base card per player.
@@ -25,7 +26,17 @@ static func build_program(p: PlayerData, program: String) -> CardDef:
 	var c := CardDef.new()
 	c.player_id = p.id
 	c.program = program
-	c.id = CardRules.prime_id(p.id) if program == CardRules.PROGRAM_PRIME else (CardRules.champ_id(p.id) if program == CardRules.PROGRAM_CHAMP else CardRules.card_id(p.id))
+	match program:
+		CardRules.PROGRAM_PRIME:
+			c.id = CardRules.prime_id(p.id)
+		CardRules.PROGRAM_CHAMP:
+			c.id = CardRules.champ_id(p.id)
+		CardRules.PROGRAM_XFACTOR:
+			c.id = CardRules.xf_id(p.id)
+		_:
+			c.id = CardRules.card_id(p.id)
+	if program in [CardRules.PROGRAM_XFACTOR, CardRules.PROGRAM_CHAMP]:
+		c.ability = AbilityRules.ability_for(p.id, p.pos)
 	c.ovr = CardRules.program_ovr(program, p.ovr)
 	c.tier = CardRules.tier_for_ovr(c.ovr)
 	c.attrs = CardRules.card_attrs(p.attrs, p.ovr, c.ovr)
@@ -41,3 +52,7 @@ func is_champ() -> bool:
 
 func is_prime() -> bool:
 	return program == CardRules.PROGRAM_PRIME
+
+
+func is_xfactor() -> bool:
+	return program == CardRules.PROGRAM_XFACTOR

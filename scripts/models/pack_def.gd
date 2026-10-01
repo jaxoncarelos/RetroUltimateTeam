@@ -15,3 +15,7 @@ extends Resource
 @export var positions: PackedStringArray = []
 @export var team := ""
 @export var color := Color("#b86f3c")
+## X-Factor (ability) cards vs a base card of the same tier: weight multiplier per card.
+@export var xf_weight := 0.2
+## At least this many cards are X-Factor versions (when the filters allow one).
+@export var xf_guarantee := 0

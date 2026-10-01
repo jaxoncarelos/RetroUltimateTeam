@@ -76,6 +76,10 @@ func is_prime() -> bool:
 	return card != null and card.has_method("is_prime") and card.is_prime()
 
 
+func is_xfactor() -> bool:
+	return card != null and card.ability != "" and not card.is_champ()
+
+
 ## Mouse only: touches arrive as emulated mouse clicks (and project.godot also emulates
 ## touch from the mouse, so handling both would fire twice per tap). Squishes while held.
 func _gui_input(event: InputEvent) -> void:
@@ -103,7 +107,7 @@ func _process(delta: float) -> void:
 	_t += delta
 	if flash > 0.0:
 		flash = maxf(0.0, flash - delta * 1.6)
-	if flash > 0.0 or (not face_down and tier() >= CardRules.Tier.GOLD) or glow > 0.0:
+	if flash > 0.0 or (not face_down and (tier() >= CardRules.Tier.GOLD or is_xfactor())) or glow > 0.0:
 		queue_redraw()
 
 
@@ -207,6 +211,14 @@ func _draw_front(tc: Color) -> void:
 	elif is_prime():
 		draw_rect(Rect2(3, 14, 29, 9), Color("#29adff"))
 		draw_string(font, Vector2(5, 21), "PRIME", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color.WHITE)
+	elif is_xfactor():
+		# X-Factor: pink chip + a pulsing bolt; the ability's name lives in the detail view.
+		var xc: Color = CardRules.PROGRAM_COLORS["xf"]
+		draw_rect(Rect2(3, 14, 17, 9), xc)
+		draw_string(font, Vector2(5, 21), "XF", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color.WHITE)
+		var pulse := 0.6 + 0.4 * sin(_t * 5.0)
+		draw_colored_polygon(PackedVector2Array([Vector2(24, 14), Vector2(20, 19), Vector2(23, 19), Vector2(21, 24),
+				Vector2(26, 18), Vector2(23, 18)]), Color(UiSkin.YELLOW, pulse))
 	if boost > 0:
 		var bt := "+%d" % boost
 		draw_rect(Rect2(W - 5 - PixelFont.text_width(bt), 14, PixelFont.text_width(bt) + 2, 9), Color("#0d5a2a"))

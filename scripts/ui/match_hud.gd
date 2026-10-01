@@ -23,6 +23,7 @@ const WARN_COLOR := Color("#ff004d")
 const BAR_SIZE := 4
 const BAR_H := 14
 const SWITCH_SIZE := Vector2(78, 46)
+const XF_COLOR := Color("#ff2b6e")   ## X-Factor abilities (CardRules.PROGRAM_COLORS["xf"])
 
 ## Set by the match: name tags read the agents' positions from it (optional).
 var runner: PlayRunner
@@ -53,6 +54,9 @@ var kick_meter: KickMeter
 
 var _banner: _Banner
 var _warning: Label
+var _xf_box: VBoxContainer          ## X-Factor ability chips (top left)
+var _xf_toast: Label                ## "X-FACTOR ON" pop-up
+var _xf_queue: Array = []
 var _flash: ColorRect
 var _tip: RetroPanel
 var _tip_label: Label
@@ -114,6 +118,26 @@ func _ready() -> void:
 	_warning.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_warning.visible = false
 	_root.add_child(_warning)
+
+	_xf_box = VBoxContainer.new()
+	_xf_box.add_theme_constant_override("separation", 1)
+	_xf_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_anchor(_xf_box, Vector2(0.0, 0.0), Rect2(4 + SafeArea.left(), BAR_H + 3, 150, 60))
+	_root.add_child(_xf_box)
+	_xf_toast = Label.new()
+	_anchor(_xf_toast, Vector2(0.5, 0.0), Rect2(-130, 46, 260, 30))
+	_xf_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_xf_toast.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_xf_toast.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	var xf_bg := StyleBoxFlat.new()
+	xf_bg.bg_color = Color(0.08, 0.02, 0.1, 0.92)
+	xf_bg.border_color = XF_COLOR
+	xf_bg.set_border_width_all(2)
+	xf_bg.set_content_margin_all(4)
+	_xf_toast.add_theme_stylebox_override("normal", xf_bg)
+	_xf_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_xf_toast.visible = false
+	_root.add_child(_xf_toast)
 
 	# Compact CHANGE PLAY panel (top right, under the bar) + special teams pills below.
 	_change = Button.new()
@@ -544,6 +568,49 @@ func set_hint(text: String) -> void:
 
 func show_replay(on: bool) -> void:
 	_replay_fx.visible = on
+
+
+## X-Factor chips: rows [{text, on}] (on = glowing, else progress in grey). [] hides them.
+func set_abilities(rows: Array) -> void:
+	for c in _xf_box.get_children():
+		_xf_box.remove_child(c)
+		c.queue_free()
+	for r in rows:
+		var l := Label.new()
+		l.text = ("⚡ " if r["on"] else "") + str(r["text"])
+		l.add_theme_color_override("font_color", Color.WHITE if r["on"] else UiTheme.DIM)
+		var bg := StyleBoxFlat.new()
+		bg.bg_color = Color(XF_COLOR, 0.85) if r["on"] else Color(0.05, 0.05, 0.12, 0.7)
+		bg.set_content_margin_all(1)
+		bg.content_margin_left = 3
+		bg.content_margin_right = 3
+		l.add_theme_stylebox_override("normal", bg)
+		l.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_xf_box.add_child(l)
+
+
+## Big pop-up when an X-Factor ability switches on (queued if one is already showing).
+func show_ability(player: String, ability: String, text: String) -> void:
+	_xf_queue.append("X-FACTOR!  %s: %s\n%s" % [player, ability, text])
+	if not _xf_toast.visible:
+		_next_ability()
+
+
+func _next_ability() -> void:
+	if _xf_queue.is_empty():
+		_xf_toast.visible = false
+		return
+	_xf_toast.text = str(_xf_queue.pop_front())
+	_xf_toast.visible = true
+	_xf_toast.modulate.a = 1.0
+	_xf_toast.pivot_offset = _xf_toast.size * 0.5
+	_xf_toast.scale = Vector2(1.6, 1.6)
+	var tw := create_tween()
+	tw.tween_property(_xf_toast, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(2.2)
+	tw.tween_property(_xf_toast, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(_next_ability)
 
 
 func show_banner(text: String, sub := "", seconds := 1.6) -> void:
