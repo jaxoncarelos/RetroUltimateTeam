@@ -453,7 +453,7 @@ static func franchise_elite(profile: Profile, db: RosterDB, rng: RandomNumberGen
 ## Tester grant (Settings → TESTER COINS) to try new packs on an existing save: claimable
 ## once per TESTER_ROUND (bump it to hand out another round, e.g. after a pack bug).
 const TESTER_COINS := 50000
-const TESTER_ROUND := 2
+const TESTER_ROUND := 3
 
 
 static func can_claim_tester_coins(profile: Profile) -> bool:

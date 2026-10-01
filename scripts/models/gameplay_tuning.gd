@@ -115,7 +115,7 @@ extends Resource
 @export var snap_engage_range := 2.8   ## on run plays linemen fire off and engage the man over them at the snap
 @export var run_seal_push := 0.15      ## yd/s run blockers drive their man sideways, away from the carrier's lane
 @export var fall_forward_time := 0.26 ## tackled carriers visibly slide forward: forward speed × this (yards)…
-@export var fall_slide_max := 2.2      ## …capped here (cosmetic slide only; the spot is the tackle contact point).
+@export var fall_slide_max := 0.6      ## …capped here (a short stumble, so the body stops about where the ball is spotted).
 @export var fall_forward_max := 0.5    ## Fall-forward yards credited past the contact point on a hard hit.
 @export var down_slide_decel := 25.0   ## yd/s² a downed player's slide slows at
 @export var shed_base := 1.9           ## seconds a block holds at equal ratings

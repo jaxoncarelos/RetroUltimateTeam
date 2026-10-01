@@ -115,8 +115,7 @@ func test_spot_is_contact_point_not_end_of_slide() -> void:
 	var r: Dictionary = ended[0]
 	assert_eq(r["type"], "tackle")
 	assert_almost_eq(float(r["spot_x"]), contact_ball_x, 0.5 + runner.tuning.fall_forward_max)
-	assert_gt(c.field_pos.x - 50.0, 1.0, "the body slid well past the contact point")
-	assert_gt(c.field_pos.x - float(r["spot_x"]), 0.8, "...but the spot did not follow it")
+	assert_lte(c.field_pos.x - 50.0, runner.tuning.fall_slide_max + 0.3, "the body only stumbles a little past the contact point")
 
 
 func test_downed_at_the_one_is_not_a_touchdown() -> void:
