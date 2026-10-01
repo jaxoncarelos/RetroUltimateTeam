@@ -22,9 +22,9 @@ const FIRST_WINS_BONUS := [300, 200, 150]   ## career wins 1, 2, 3
 const WEAK_POS_WEIGHT := 1.25    ## positions below your lineup average are this much likelier
 const PRIME_WEIGHT := 0.05       ## a Prime card vs a base card of the same tier
 const IN_TIER_FALLOFF := 0.12    ## higher OVR inside a tier is rarer: weight 1/(1 + k*(ovr - tier min))
-## Elite tier: every OVR point above 90 multiplies the weight by this (a 95 is ~6x rarer
-## than a 90, a 99 ~40x), so a 99 is the pull of a career.
-const ELITE_FALLOFF := 0.66
+## Elite tier: every OVR point above 90 multiplies the weight by this (a 95 is ~4x rarer
+## than a 90, a 99 ~13x), so a 99 is the pull of a career.
+const ELITE_FALLOFF := 0.75
 
 ## Sets: trade cards in for rewards. needs = {tier, count, franchise_only}; reward = pack id
 ## or "franchise_elite" (a star card of one of your franchise's real players).
