@@ -116,5 +116,8 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    0.05x; "Win 5" objective pays a Gold pack, "Win 10" a Draft pack; no Elite at coach level 25; slower card
    development (XP 60/game, levels 600+150n). test_progression_pace: saving for Gold packs gives an 85+ within
    ~20 games and often a 90+ in the first season; 95+ stays rare.
+20. [x] Pocket/speed pass (owner: "5 s in, receiver only 20 yds downfield, nobody near my QB"): everyone faster
+   (speed 5.2 + 4.8*spd/99 yd/s, accel 11 + 13*acc/99) and `pass_shed_mult` 1.9 -> 1.25. test_pocket_time (you at QB,
+   base coverages, no throw): receiver 20 yds downfield ~2.7 s, first pressure ~3.2 s, sack ~4.2 s.
 Next ideas (after the owner's playtest): see MORNING_NOTES.md. Card revamp follow-ups: CPU star
 abilities, ability UI on the lineup screen, ability-themed sets/objectives, balance pass on ability boosts.

@@ -3,10 +3,10 @@ extends Resource
 ## Every gameplay constant lives here so balancing never requires code changes.
 
 @export_group("Movement")
-@export var speed_base := 4.6          ## yd/s at 0 speed rating
-@export var speed_range := 4.4         ## extra yd/s at 99 speed
-@export var accel_base := 9.0          ## yd/s^2
-@export var accel_range := 11.0
+@export var speed_base := 5.2          ## yd/s at 0 speed rating
+@export var speed_range := 4.8         ## extra yd/s at 99 speed
+@export var accel_base := 11.0         ## yd/s^2
+@export var accel_range := 13.0
 @export var reaction_slow := 0.35      ## seconds at awareness 60
 @export var reaction_fast := 0.10      ## seconds at awareness 99
 @export var cut_keep_min := 0.45       ## velocity kept through a route cut at route running 0
@@ -121,7 +121,7 @@ extends Resource
 @export var shed_min := 0.5
 @export var shed_jitter := 0.35
 @export_subgroup("Pass protection")
-@export var pass_shed_mult := 1.9      ## pass-pro blocks hold this much longer while the QB still has the ball
+@export var pass_shed_mult := 1.25     ## pass-pro blocks hold this much longer while the QB still has the ball
 @export var pass_rusher_cd := 0.35     ## s a rusher who shed a pass block can't be re-engaged (run: 0.8)
 @export var qb_evade_mult := 0.42      ## human QB: a rusher's tackle chance is scaled by this at the snap (he sidesteps)…
 @export var qb_evade_time := 3.8       ## …fading back to normal by this many seconds into the play

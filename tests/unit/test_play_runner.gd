@@ -147,7 +147,8 @@ func test_draw_waits_before_the_handoff() -> void:
 
 
 func test_pocket_holds_against_base_coverage() -> void:
-	# A QB who never throws must survive long enough for deep routes to develop (3.5 s+).
+	# A QB who never throws must survive long enough for deep routes to develop (3 s+: receivers
+	# are 20 yards downfield in ~2.7 s since the 2026-10 speed pass).
 	for def_id in ["cover1", "cover3", "cover4"]:
 		for off_id in ["post_wheel", "deep_shot", "four_verts"]:
 			var off: PlayDef = null
@@ -167,7 +168,7 @@ func test_pocket_holds_against_base_coverage() -> void:
 					break
 			assert_false(ended.is_empty(), "%s vs %s never ended" % [off_id, def_id])
 			if not ended.is_empty() and ended[0]["type"] == "sack":
-				assert_gt(float(ended[0]["time"]), 3.5, "%s vs %s sacked too fast" % [off_id, def_id])
+				assert_gt(float(ended[0]["time"]), 3.0, "%s vs %s sacked too fast" % [off_id, def_id])
 
 
 func test_deep_zone_defenders_do_not_retreat_toward_the_qb_on_a_deep_ball() -> void:
