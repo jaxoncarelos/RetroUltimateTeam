@@ -308,7 +308,7 @@ func _play_next() -> void:
 func _open_pack() -> void:
 	var cfg := GameFlow.open_pending_config(prof, SceneRouter.HUB)
 	if not cfg.is_empty():
-		SceneRouter.goto(SceneRouter.PACK_OPEN, cfg)
+		SceneRouter.goto(cfg["scene"], cfg)
 
 
 ## Score strip: your helmet + score, FINAL, their score + helmet, box line, mode message.

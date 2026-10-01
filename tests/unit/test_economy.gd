@@ -274,7 +274,8 @@ func test_progression_curve() -> void:
 			income["objectives" if i["id"] == "objective" else "match"] += int(i["coins"])
 		income["objectives"] += int(ObjectiveRules.claim_all(prof, t)["coins"])
 		while not prof.pending_packs.is_empty():
-			EconomyRules.open_pending(prof, db, rng)
+			if EconomyRules.open_pending(prof, db, rng).get("draft", false):
+				EconomyRules.pick_draft(prof, db, _best_option(prof))
 		for id in ["elite", "gold", "silver"]:
 			var pack := PackCatalog.get_pack(id)
 			while EconomyRules.can_buy(prof, pack):
@@ -333,3 +334,13 @@ func test_tester_coins_are_one_time_and_saved() -> void:
 	assert_true(EconomyRules.can_claim_tester_coins(Profile.from_dict({})), "old saves can claim it")
 	prof.stats["tester_coins"] = EconomyRules.TESTER_ROUND - 1
 	assert_eq(EconomyRules.claim_tester_coins(prof), EconomyRules.TESTER_COINS, "a new round can be claimed again")
+
+
+## Draft packs in the sims: keep the highest-rated option.
+func _best_option(prof: Profile) -> int:
+	var opts: Array = prof.pending_pick.get("options", [])
+	var best := 0
+	for i in opts.size():
+		if db.cards[opts[i]].ovr > db.cards[opts[best]].ovr:
+			best = i
+	return best

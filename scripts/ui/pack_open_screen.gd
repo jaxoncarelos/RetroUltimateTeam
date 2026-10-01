@@ -753,7 +753,7 @@ func _open_another() -> void:
 func _open_next_free() -> void:
 	var cfg := GameFlow.open_pending_config(_prof, _back)
 	if not cfg.is_empty():
-		SceneRouter.goto(SceneRouter.PACK_OPEN, cfg)
+		SceneRouter.goto(cfg["scene"], cfg)
 
 
 # ---------------------------------------------------------------- effects layer

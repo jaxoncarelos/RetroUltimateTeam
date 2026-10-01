@@ -102,7 +102,7 @@ func _play() -> void:
 func _open_pending() -> void:
 	var cfg := GameFlow.open_pending_config(prof, SceneRouter.HUB)
 	if not cfg.is_empty():
-		SceneRouter.goto(SceneRouter.PACK_OPEN, cfg)
+		SceneRouter.goto(cfg["scene"], cfg)
 
 
 # ---------------------------------------------------------------- panels

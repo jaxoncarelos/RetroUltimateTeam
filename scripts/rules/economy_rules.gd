@@ -203,10 +203,15 @@ static func pick_draft(profile: Profile, db: RosterDB, index: int, unix_time := 
 	return uid
 
 
-## Adds a pack's cards to the collection, counts it for objectives and coach XP.
+## Adds a pack's cards to the collection, counts it for objectives and coach XP. A
+## draft-style pack (pick one) is queued in Profile.pending_packs instead (returns []) so its
+## pick screen opens like any other reward pack.
 static func grant_pack(profile: Profile, pack: PackDef, db: RosterDB, rng: RandomNumberGenerator,
 		unix_time := 0) -> Array[int]:
 	var uids: Array[int] = []
+	if pack.pick:
+		profile.pending_packs.append(pack.id)
+		return uids
 	var ids := open_pack(pack, profile, db, rng)
 	for id in ids:
 		uids.append(profile.add_card(id, unix_time))
@@ -232,15 +237,26 @@ static func _record_opened(profile: Profile, pack: PackDef, ids: Array[String], 
 
 
 ## Opens the first reward pack waiting in Profile.pending_packs (starter pack, level-up,
-## login streak, objective packs). Returns {"pack": id, "title": display name, "uids": [...]}
-## ({} when none are waiting).
+## login streak, objective packs). Returns {"pack": id, "title": display name, "uids": [...],
+## "draft": bool} ({} when none are waiting). A draft-style pack (position packs) rolls its
+## options into Profile.pending_pick instead ("draft": true, no uids); if a pick is already
+## waiting, that one comes first (the queue is left alone).
 static func open_pending(profile: Profile, db: RosterDB, rng: RandomNumberGenerator, unix_time := 0) -> Dictionary:
+	if has_pending_draft(profile):
+		var waiting := str(profile.pending_pick.get("pack", ""))
+		var wp := PackCatalog.get_pack(waiting)
+		return {"pack": waiting, "title": wp.display_name if wp != null else "DRAFT", "uids": [] as Array[int],
+				"draft": true}
 	while not profile.pending_packs.is_empty():
 		var id := str(profile.pending_packs.pop_front())
 		var pack := PackCatalog.get_pack(id)
 		if pack == null:
 			continue
-		return {"pack": id, "title": pack.display_name, "uids": grant_pack(profile, pack, db, rng, unix_time)}
+		if pack.pick:
+			start_draft(profile, pack, db, rng)
+			return {"pack": id, "title": pack.display_name, "uids": [] as Array[int], "draft": true}
+		return {"pack": id, "title": pack.display_name, "uids": grant_pack(profile, pack, db, rng, unix_time),
+				"draft": false}
 	return {}
 
 

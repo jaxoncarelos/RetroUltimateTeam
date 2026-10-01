@@ -175,6 +175,6 @@ func _payout(coins: int, packs: Array, ups: Array, from: Vector2) -> void:
 		var open := func() -> void:
 			var cfg := GameFlow.open_pending_config(prof, SceneRouter.OBJECTIVES)
 			if not cfg.is_empty():
-				SceneRouter.goto(SceneRouter.PACK_OPEN, cfg)
+				SceneRouter.goto(cfg["scene"], cfg)
 		MetaUI.popup(self, "PACK EARNED!", MetaUI.label("A NEW PACK IS WAITING", UiSkin.YELLOW, 16), [["LATER", Callable()],
 				["OPEN IT", open, true]])

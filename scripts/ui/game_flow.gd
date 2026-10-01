@@ -116,6 +116,9 @@ static func sim_result(prof: Profile, cfg: Dictionary) -> Dictionary:
 
 
 ## First reward pack waiting to be opened, as a pack-opening config ({} if none).
+const DRAFT_SCENE := "res://scenes/meta/draft.tscn"
+
+
 static func open_pending_config(prof: Profile, back := SceneRouter.HUB) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
@@ -123,7 +126,9 @@ static func open_pending_config(prof: Profile, back := SceneRouter.HUB) -> Dicti
 	if res.is_empty():
 		return {}
 	SaveManager.save()
-	return {"uids": res["uids"], "title": res["title"], "pack": res["pack"], "back": back}
+	# "scene": where to go (the pack opening, or the pick screen for a draft-style pack).
+	return {"uids": res["uids"], "title": res["title"], "pack": res["pack"], "back": back,
+			"scene": DRAFT_SCENE if res.get("draft", false) else SceneRouter.PACK_OPEN}
 
 
 ## Day / night and weather for a game at `home`'s stadium (shown on the prematch screen).

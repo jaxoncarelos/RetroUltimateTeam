@@ -93,7 +93,11 @@ func _demo_config(screen: String) -> Dictionary:
 		"draft":
 			var rng := RandomNumberGenerator.new()
 			rng.seed = 11
-			EconomyRules.start_draft(prof, PackCatalog.get_pack("draft"), GameData.db, rng)
+			var did := "draft"
+			for a in OS.get_cmdline_user_args():
+				if a.begins_with("--pack="):
+					did = a.get_slice("=", 1)
+			EconomyRules.start_draft(prof, PackCatalog.get_pack(did), GameData.db, rng)
 			return {}
 		"prematch":
 			var opp := "PHI" if prof.franchise_team != "PHI" else "KC"

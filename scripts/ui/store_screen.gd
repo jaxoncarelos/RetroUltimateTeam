@@ -56,7 +56,7 @@ func _ready() -> void:
 		var open_free := func() -> void:
 			var cfg := GameFlow.open_pending_config(prof, SceneRouter.STORE)
 			if not cfg.is_empty():
-				SceneRouter.goto(SceneRouter.PACK_OPEN, cfg)
+				SceneRouter.goto(cfg["scene"], cfg)
 		var free := MetaUI.yellow("OPEN FREE PACK x%d" % prof.pending_packs.size(), Vector2(150, 22), open_free)
 		hint.add_child(free)
 		Fx.pulse.call_deferred(free, 1.06, 0.8)

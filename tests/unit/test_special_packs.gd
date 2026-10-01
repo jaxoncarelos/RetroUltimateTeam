@@ -95,3 +95,37 @@ func test_trenches_pack_is_linemen_only() -> void:
 	for i in 40:
 		for id in EconomyRules.open_pack(pack, prof, db, rng):
 			assert_has(["OL", "DL"], db.players[db.cards[id].player_id].pos)
+
+
+func test_position_packs_are_drafts_of_that_position() -> void:
+	for id in ["qb", "receiver", "defense", "trenches"]:
+		var prof := _starter()
+		prof.pending_packs = []
+		var pack := PackCatalog.get_pack(id)
+		assert_true(pack.pick, "%s is a draft" % id)
+		prof.coins = pack.price
+		var before := prof.cards.size()
+		var r := EconomyRules.buy(prof, pack, db, rng)
+		assert_true(r["draft"])
+		assert_eq(prof.cards.size(), before, "nothing added before the pick")
+		var opts: Array = prof.pending_pick["options"]
+		assert_eq(opts.size(), pack.card_count)
+		for o in opts:
+			assert_has(pack.positions, db.players[db.cards[o].player_id].pos, "%s option %s" % [id, o])
+		assert_gt(EconomyRules.pick_draft(prof, db, 0), 0)
+
+
+func test_reward_position_pack_opens_as_a_draft() -> void:
+	var prof := _starter()
+	prof.pending_packs = []
+	var before := prof.cards.size()
+	EconomyRules.grant_pack(prof, PackCatalog.get_pack("qb"), db, rng)
+	assert_eq(prof.cards.size(), before, "a reward draft is queued, not opened blindly")
+	assert_eq(prof.pending_packs, ["qb"])
+	var res := EconomyRules.open_pending(prof, db, rng)
+	assert_true(res["draft"])
+	assert_true(EconomyRules.has_pending_draft(prof))
+	prof.pending_packs = ["silver"]
+	var again := EconomyRules.open_pending(prof, db, rng)
+	assert_true(again["draft"], "the waiting pick comes first")
+	assert_eq(prof.pending_packs, ["silver"], "the queue is left alone")

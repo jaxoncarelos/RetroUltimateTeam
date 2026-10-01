@@ -42,7 +42,7 @@ static func show(owner: Control, prof: Profile, ui: Dictionary) -> void:
 			var open_it := func() -> void:
 				var cfg := GameFlow.open_pending_config(prof, SceneRouter.HUB)
 				if not cfg.is_empty():
-					SceneRouter.goto(SceneRouter.PACK_OPEN, cfg)
+					SceneRouter.goto(cfg["scene"], cfg)
 			MetaUI.popup(owner, "DAY %d REWARD" % int(res["day"]), body, [["LATER", Callable()], ["OPEN IT", open_it, true]])
 	dim = MetaUI.popup(owner, "DAILY CHECK-IN  -  STREAK %d" % (streak + 1), col, [["CLAIM", claim, true]])
 

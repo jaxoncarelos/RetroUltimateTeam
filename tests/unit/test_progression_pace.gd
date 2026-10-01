@@ -42,7 +42,8 @@ func _run(team: String, seed: int, smart: bool, games := 25) -> Dictionary:
 		EconomyRules.postgame(prof, db, r, t)
 		ObjectiveRules.claim_all(prof, t)
 		while not prof.pending_packs.is_empty():
-			EconomyRules.open_pending(prof, db, rng)
+			if EconomyRules.open_pending(prof, db, rng).get("draft", false):
+				EconomyRules.pick_draft(prof, db, _best_option(prof))
 		for id in (["gold"] if smart else ["elite", "gold", "silver", "bronze"]):
 			var pack := PackCatalog.get_pack(id)
 			while EconomyRules.can_buy(prof, pack):
@@ -85,3 +86,13 @@ func test_a_smart_saver_gets_a_star_in_the_first_season() -> void:
 		assert_true(int(r["95"]) < 0 or int(r["95"]) > 10, "%s: no 95+ in the first 10 games" % teams[i])
 	assert_gte(lucky, 2, "a 90+ in the first season happens, with some luck")
 	assert_lt(lucky, teams.size() + 1)
+
+
+## Draft packs in the sims: keep the highest-rated option.
+func _best_option(prof: Profile) -> int:
+	var opts: Array = prof.pending_pick.get("options", [])
+	var best := 0
+	for i in opts.size():
+		if db.cards[opts[i]].ovr > db.cards[opts[best]].ovr:
+			best = i
+	return best

@@ -26,7 +26,7 @@ func _init(p_color := Color("#ffcf40"), p_label := "GOLD", p_scale := 1.0) -> vo
 
 
 static func for_pack(pack: PackDef, p_scale := 1.0) -> PackArt:
-	var short := pack.display_name.replace(" PACK", "") if pack != null else "PACK"
+	var short := pack.display_name.replace(" PACK", "").replace(" DRAFT", "") if pack != null else "PACK"
 	if pack != null and pack.team == "FRANCHISE":
 		# "FRANCHISE" is too long for the band even condensed: show your team's nickname.
 		var team: TeamData = GameData.team(SaveManager.profile.franchise_team)

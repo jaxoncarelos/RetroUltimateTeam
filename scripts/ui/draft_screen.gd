@@ -1,6 +1,7 @@
 extends Control
-## DRAFT PACK: three face-down prospects you only get hints about (each card glows in its
-## tier color and shows its position; X-Factor cards crackle pink). Tap one, KEEP IT, and
+## Draft-style packs (DRAFT PACK, QB / RECEIVER / DEFENSE / TRENCHES DRAFT): face-down
+## prospects you only get hints about (each card glows in its tier color and shows its
+## position, or its team when they all play the same position; X-Factor cards crackle pink). Tap one, KEEP IT, and
 ## it flips with the usual celebration; then the other two flip over to show what you
 ## passed on. The options were saved when the pack was bought (Profile.pending_pick), so
 ## leaving here and coming back offers the same three.
@@ -16,6 +17,7 @@ var _keep: Button
 var _info: Label
 var _bar: HBoxContainer
 var _t := 0.0
+var _pack: PackDef
 
 
 func _ready() -> void:
@@ -27,6 +29,7 @@ func _ready() -> void:
 		SceneRouter.goto.call_deferred(_back)
 		return
 	_ids = _prof.pending_pick.get("options", [])
+	_pack = PackCatalog.get_pack(str(_prof.pending_pick.get("pack", "")))
 	_build()
 
 
@@ -36,7 +39,7 @@ func _build() -> void:
 	bg.footer_line = 0
 	bg.tint = Color(0.5, 0.7, 0.55)
 	add_child(bg)
-	var head := TitleBar.new("DRAFT PACK  -  KEEP ONE")
+	var head := TitleBar.new("%s  -  KEEP ONE" % (_pack.display_name if _pack != null else "DRAFT"))
 	head.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	head.offset_bottom = 26
 	add_child(head)
@@ -47,12 +50,19 @@ func _build() -> void:
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 6)
 	add_child(col)
-	_info = MetaUI.label("THE GLOW TELLS THE TIER. THE CHIP TELLS THE POSITION. CHOOSE WISELY.", UiSkin.WHITE, 8,
-			HORIZONTAL_ALIGNMENT_CENTER)
+	# One position (QB draft…): the team is the second hint instead of the position.
+	var positions := {}
+	for id in _ids:
+		var oc: CardDef = GameData.card(str(id))
+		if oc != null:
+			positions[GameData.player(oc.player_id).pos] = true
+	var by_team := positions.size() == 1 and _ids.size() > 1
+	_info = MetaUI.label("THE GLOW TELLS THE TIER. THE CHIP TELLS THE %s. CHOOSE WISELY." % ("TEAM" if by_team else "POSITION"),
+			UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_CENTER)
 	col.add_child(_info)
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 22)
+	row.add_theme_constant_override("separation", 22 if _ids.size() <= 3 else 8)
 	col.add_child(row)
 	for i in _ids.size():
 		var c: CardDef = GameData.card(str(_ids[i]))
@@ -66,7 +76,10 @@ func _build() -> void:
 		slot.add_child(v)
 		_views.append(v)
 		var p: PlayerData = GameData.player(c.player_id) if c != null else null
-		var hint := MetaUI.label("%s%s" % [p.pos if p != null else "?", "  ⚡" if c != null and c.is_xfactor() else ""],
+		var chip := "?"
+		if p != null:
+			chip = p.team if by_team else p.pos
+		var hint := MetaUI.label("%s%s" % [chip, "  ⚡" if c != null and c.is_xfactor() else ""],
 				Color.WHITE, 16, HORIZONTAL_ALIGNMENT_CENTER)
 		slot.add_child(hint)
 		_hints.append(hint)
@@ -104,7 +117,7 @@ func _select(i: int) -> void:
 		var tw := _views[k].create_tween()
 		tw.tween_property(_views[k], "position:y", -8.0 if k == i else 0.0, 0.12)
 	_keep.disabled = false
-	_keep.text = "KEEP THIS %s" % _hints[i].text.get_slice(" ", 0)
+	_keep.text = "KEEP THIS ONE"
 
 
 func _confirm() -> void:
