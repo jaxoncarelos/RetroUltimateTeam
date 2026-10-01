@@ -48,5 +48,5 @@ assignments = {
 "type": "route"
 }
 }
-counters = PackedStringArray()
-tags = PackedStringArray("play_action")
+counters = Array[String]([])
+tags = Array[String](["play_action"])

@@ -66,12 +66,21 @@ jobs:
           "$GODOT" --headless --path . --export-pack iOS "update-e${EPOCH}-${GITHUB_SHA::7}.pck"
           ls -l update-*.pck
 
-      - name: Verify the update pack keeps its data
+      - name: Verify the update pack keeps its data (alone and on top of the last release's pack)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p /tmp/probe
+          mkdir -p /tmp/probe /tmp/prev
           printf 'config_version=5\n[application]\nconfig/name="PackProbe"\n' > /tmp/probe/project.godot
           cp tools/verify_pack.gd /tmp/probe/verify_pack.gd
-          "$GODOT" --headless --path /tmp/probe --script res://verify_pack.gd -- "$PWD/$(ls update-*.pck)"
+          NEW="$PWD/$(ls update-*.pck)"
+          export EXPECT_QB_NAME="$(sed -n 's/^display_name = "\(.*\)"$/\1/p' data/packs/qb.tres)"
+          "$GODOT" --headless --path /tmp/probe --script res://verify_pack.gd -- "$NEW"
+          gh release download latest --pattern 'update-*.pck' --dir /tmp/prev || true
+          PREV="$(ls /tmp/prev/update-*.pck 2>/dev/null | head -1)"
+          if [ -n "$PREV" ]; then
+            "$GODOT" --headless --path /tmp/probe --script res://verify_pack.gd -- "$PREV" "$NEW"
+          fi
 
       - name: Build unsigned app
         run: |

@@ -49,5 +49,5 @@ assignments = {
 "type": "zone"
 }
 }
-counters = PackedStringArray("SHORT", "RUN")
-tags = PackedStringArray("blitz")
+counters = Array[String](["SHORT", "RUN"])
+tags = Array[String](["blitz"])

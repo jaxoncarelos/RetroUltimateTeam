@@ -32,10 +32,11 @@ Godot 4.7 + GDScript retro football game. Design/roadmap: `PLAN.md`. Status tabl
   reopen it" / failures / "build has no update token"); coming back to the app re-checks. Each release's notes say
   `Auto-updates: ON` or `OFF (UPDATE_TOKEN secret missing)` (the build also raises a warning). engine_epoch is 2
   since the 2026-10-01 updater fix, so epoch-1 IPAs need one fresh IPA install.
-- Export gotcha: Godot 4.7's text->binary resource conversion on export dropped every PackedStringArray
-  (pack `positions`/`mystery`, play `tags`/`counters`): QB packs pulled any position on the phone while tests
-  passed. project.godot sets `editor/export/convert_text_resources_to_binary=false` (export-only, no IPA
-  needed); CI runs `tools/verify_pack.gd` on the update pack and fails the build if that data is missing.
+- Export gotcha: Godot 4.7's text->binary resource conversion on export drops PackedStringArray properties, so
+  resource string lists are `Array[String]` (pack `positions`/`mystery`, play `tags`/`counters`); never use
+  PackedStringArray in exported .tres data. Keep the conversion ON: installed builds hold `.remap` files, and an
+  update pack must ship its own remaps to override them (turning conversion off once left phones reading the old
+  QB PACK). CI runs `tools/verify_pack.gd` on the new pack alone and stacked on the previous release's pack.
 - The owner is away from the PC while testing: push fixes, trigger the build, and report the release link. Don't wait to be asked.
 
 ## Conventions

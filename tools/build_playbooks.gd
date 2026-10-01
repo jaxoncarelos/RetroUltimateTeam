@@ -396,8 +396,8 @@ func _formation(id: String, name: String, side: String, slots: Dictionary) -> Fo
 func _play(id: String, name: String, side: String, cat: String, form: FormationDef, asg: Dictionary,
 		counters: Array = [], tags: Array = []) -> PlayDef:
 	var p := PlayDef.new()
-	p.counters = PackedStringArray(counters)
-	p.tags = PackedStringArray(tags)
+	p.counters.assign(counters)
+	p.tags.assign(tags)
 	p.id = id
 	p.display_name = name
 	p.side = side

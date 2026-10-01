@@ -75,10 +75,10 @@ func test_mixing_six_plays_stays_unkeyed() -> void:
 func test_counter_weight_favors_counters_of_recent_category() -> void:
 	for i in 4:
 		_call("dive%d" % i, 4, "form%d" % i, "RUN")
-	var vs_run := mem.counter_weight(PackedStringArray(["RUN"]))
-	var vs_deep := mem.counter_weight(PackedStringArray(["DEEP"]))
+	var vs_run := mem.counter_weight(["RUN"])
+	var vs_deep := mem.counter_weight(["DEEP"])
 	assert_gt(vs_run, vs_deep * 1.5)
-	assert_eq(mem.counter_weight(PackedStringArray()), 1.0)
+	assert_eq(mem.counter_weight([]), 1.0)
 
 
 func test_play_caller_counters_run_spam() -> void:
@@ -104,7 +104,7 @@ func test_play_caller_counters_run_spam() -> void:
 
 func test_goal_line_defense_only_near_goal() -> void:
 	var p := PlayDef.new()
-	p.tags = PackedStringArray(["goal_line"])
+	p.tags.assign(["goal_line"])
 	var far := AIPlayCaller.defense_situation_mult(p, {"los_x": 40.0, "to_go": 10, "down": 1})
 	var near := AIPlayCaller.defense_situation_mult(p, {"los_x": 107.0, "to_go": 3, "down": 1})
 	assert_lt(far, 0.2)

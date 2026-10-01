@@ -19,9 +19,9 @@ extends Resource
 @export var formation: FormationDef
 @export var assignments: Dictionary = {}
 ## Defense: offensive categories this call is strong against (drives CPU counter-calls).
-@export var counters: PackedStringArray = []
+@export var counters: Array[String] = []
 ## Situational tags, e.g. short_yardage, goal_line, screen, play_action, deep, prevent.
-@export var tags: PackedStringArray = []
+@export var tags: Array[String] = []
 
 
 func is_run() -> bool:

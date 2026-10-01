@@ -96,7 +96,7 @@ func category_share(category: String) -> float:
 
 ## Weight multiplier for a defensive call that counters the given offensive categories.
 ## `expected` optionally biases the shares (situation prior: {"RUN": 0.6, ...}).
-func counter_weight(counters: PackedStringArray, expected: Dictionary = {}) -> float:
+func counter_weight(counters: Array, expected: Dictionary = {}) -> float:
 	if counters.is_empty():
 		return 1.0
 	var t := tuning

@@ -41,5 +41,5 @@ assignments = {
 "type": "block"
 }
 }
-counters = PackedStringArray()
-tags = PackedStringArray()
+counters = Array[String]([])
+tags = Array[String]([])

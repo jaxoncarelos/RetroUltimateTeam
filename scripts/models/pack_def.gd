@@ -12,7 +12,7 @@ extends Resource
 @export var card_count := 5
 @export var odds := PackedFloat32Array([0.8, 0.18, 0.02, 0.0])
 @export var guarantee_tier := -1
-@export var positions: PackedStringArray = []
+@export var positions: Array[String] = []
 @export var team := ""
 @export var color := Color("#b86f3c")
 ## X-Factor (ability) cards vs a base card of the same tier: weight multiplier per card.
@@ -22,7 +22,7 @@ extends Resource
 ## Draft pack: the cards are shown face-down with hints and you keep ONE of them.
 @export var pick := false
 ## Mystery pack: it is secretly one of these packs (weights sum to 1), revealed on opening.
-@export var mystery: PackedStringArray = []
+@export var mystery: Array[String] = []
 @export var mystery_weights := PackedFloat32Array()
 ## One-line store pitch ("" = the card count / guarantee summary).
 @export var blurb := ""

@@ -47,5 +47,5 @@ assignments = {
 "type": "zone"
 }
 }
-counters = PackedStringArray("DEEP")
-tags = PackedStringArray()
+counters = Array[String](["DEEP"])
+tags = Array[String]([])
