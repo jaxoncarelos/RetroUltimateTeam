@@ -211,6 +211,11 @@ func _draw_front(tc: Color) -> void:
 	elif is_prime():
 		draw_rect(Rect2(3, 14, 29, 9), Color("#29adff"))
 		draw_string(font, Vector2(5, 21), "PRIME", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color.WHITE)
+	elif card.program == CardRules.PROGRAM_BASE and GameData.db != null \
+			and GameData.db.cards.has(CardRules.core_id(card.player_id)):
+		# The real-rating card of a player who also has a (common) Core card.
+		draw_rect(Rect2(3, 14, 21, 9), Color("#ffcf40"))
+		draw_string(font, Vector2(5, 21), "PRO", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UiSkin.SHADOW)
 	elif is_xfactor():
 		# X-Factor: pink chip + a pulsing bolt; the ability's name lives in the detail view.
 		var xc: Color = CardRules.PROGRAM_COLORS["xf"]

@@ -6,7 +6,8 @@ extends RefCounted
 ## A few top players also have a rare "PRIME" program card (+PRIME_BONUS OVR).
 ## Young players have potential (pot) and develop with XP (Collection.award_xp).
 ## Card ids: base = the player id ("mahomes_patrick"); prime = "<player id>_prime";
-## X-Factor = "<player id>_xf" (+2 OVR and an AbilityRules ability).
+## X-Factor = "<player id>_xf" (+2 OVR and an AbilityRules ability); Core = "<player id>_core"
+## (the common, lower-rated version: core_ovr).
 ## Pure logic.
 
 enum Tier { BRONZE, SILVER, GOLD, ELITE }
@@ -28,9 +29,16 @@ const PROGRAM_PRIME := "prime"
 const PROGRAM_CHAMP := "champ"       ## Super Bowl trophy: a flat 99 of your franchise star
 ## X-Factor: +XF_BONUS OVR and an in-game ability (AbilityRules) that powers up mid-drive.
 const PROGRAM_XFACTOR := "xf"
-const PROGRAM_NAMES := {"base": "", "prime": "PRIME", "champ": "CHAMP", "xf": "X-FACTOR"}
+## Core: the common version of a good player, rated well below his real OVR (core_ovr), so a
+## pack usually gives you a 77 Josh Allen and his real 96 card is a rare pull. The real-rating
+## card of a player who has a Core version shows a "PRO" chip.
+const PROGRAM_CORE := "core"
+const PROGRAM_NAMES := {"base": "", "prime": "PRIME", "champ": "CHAMP", "xf": "X-FACTOR", "core": ""}
 const PROGRAM_COLORS := {"base": Color(1, 1, 1, 0), "prime": Color("#29adff"), "champ": Color("#ffb000"),
-		"xf": Color("#ff2b6e")}
+		"xf": Color("#ff2b6e"), "core": Color(1, 1, 1, 0)}
+const CORE_MIN_OVR := 80          ## players at or above this get a Core card
+const CORE_LOW := 56              ## core OVR of a real 55 ...
+const CORE_HIGH := 81             ## ... and of a real 99 (linear in between)
 const XF_MIN_OVR := 74            ## players at or above this get an X-Factor card
 const XF_BONUS := 2
 const XF_QUICKSELL_MULT := 2
@@ -41,8 +49,8 @@ const PRIME_BONUS := 4
 const PRIME_QUICKSELL_MULT := 2
 
 ## Development: XP needed for the next +1 OVR is XP_BASE + XP_STEP * levels already gained.
-const XP_BASE := 400
-const XP_STEP := 100
+const XP_BASE := 600
+const XP_STEP := 150
 const POT_CAP := 95
 ## Age -> potential bonus over the current OVR for young players (older = none).
 const POT_BY_AGE := {21: 15, 22: 13, 23: 10, 24: 6, 25: 3}
@@ -67,6 +75,8 @@ static func program_ovr(program: String, real_ovr: int) -> int:
 		return CHAMP_OVR
 	if program == PROGRAM_XFACTOR:
 		return mini(real_ovr + XF_BONUS, 99)
+	if program == PROGRAM_CORE:
+		return core_ovr(real_ovr)
 	return mini(real_ovr + (PRIME_BONUS if program == PROGRAM_PRIME else 0), 99)
 
 
@@ -81,6 +91,15 @@ static func has_prime(real_ovr: int) -> bool:
 
 static func has_xfactor(real_ovr: int) -> bool:
 	return real_ovr >= XF_MIN_OVR
+
+
+static func has_core(real_ovr: int) -> bool:
+	return real_ovr >= CORE_MIN_OVR
+
+
+## Core card OVR: real 80 -> 70, 85 -> 73, 90 -> 76, 96 -> 79, 99 -> 81.
+static func core_ovr(real_ovr: int) -> int:
+	return int(round(lerpf(CORE_LOW, CORE_HIGH, clampf((real_ovr - 55.0) / 44.0, 0.0, 1.0))))
 
 
 ## Attributes of a card: real attributes scaled by (card OVR + boost) / real OVR, clamped.
@@ -122,6 +141,10 @@ static func xf_id(player_id: String) -> String:
 	return player_id + "_xf"
 
 
+static func core_id(player_id: String) -> String:
+	return player_id + "_core"
+
+
 ## "mahomes_patrick_prime" -> ["mahomes_patrick", "prime"]; "mahomes_patrick" -> [.., "base"].
 static func split_card_id(card: String) -> Array:
 	if card.ends_with("_champ"):
@@ -130,6 +153,8 @@ static func split_card_id(card: String) -> Array:
 		return [card.left(card.length() - 6), PROGRAM_PRIME]
 	if card.ends_with("_xf"):
 		return [card.left(card.length() - 3), PROGRAM_XFACTOR]
+	if card.ends_with("_core"):
+		return [card.left(card.length() - 5), PROGRAM_CORE]
 	return [card, PROGRAM_BASE]
 
 

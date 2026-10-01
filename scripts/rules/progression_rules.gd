@@ -2,7 +2,7 @@ class_name ProgressionRules
 extends RefCounted
 ## Coach level (1..MAX_LEVEL): every match, claimed objective and opened pack grants coach
 ## XP; every level-up pays coins plus a free pack at levels ending in 3 (Bronze), 5 (Silver)
-## and 0 (Gold); Elite at 25 and 50.
+## and 0 (Gold); Elite only at 50.
 ## Reward packs go to Profile.pending_packs (opened via EconomyRules.open_pending).
 ## State: Profile.coach = {"xp": total xp, "level": int}. Pure logic.
 
@@ -57,7 +57,7 @@ static func level_progress(xp: int) -> Dictionary:
 ## Reward for reaching level `n`: {"coins": int, "pack": pack id or ""}.
 static func rewards_for_level(n: int) -> Dictionary:
 	var pack := ""
-	if n == 25 or n == MAX_LEVEL:
+	if n == MAX_LEVEL:
 		pack = "elite"
 	elif n % 10 == 0:
 		pack = "gold"

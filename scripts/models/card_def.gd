@@ -33,6 +33,8 @@ static func build_program(p: PlayerData, program: String) -> CardDef:
 			c.id = CardRules.champ_id(p.id)
 		CardRules.PROGRAM_XFACTOR:
 			c.id = CardRules.xf_id(p.id)
+		CardRules.PROGRAM_CORE:
+			c.id = CardRules.core_id(p.id)
 		_:
 			c.id = CardRules.card_id(p.id)
 	if program in [CardRules.PROGRAM_XFACTOR, CardRules.PROGRAM_CHAMP]:
@@ -56,3 +58,7 @@ func is_prime() -> bool:
 
 func is_xfactor() -> bool:
 	return program == CardRules.PROGRAM_XFACTOR
+
+
+func is_core() -> bool:
+	return program == CardRules.PROGRAM_CORE

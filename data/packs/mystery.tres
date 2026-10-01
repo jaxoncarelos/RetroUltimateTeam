@@ -15,4 +15,4 @@ positions = PackedStringArray()
 team = ""
 color = Color(0.5137, 0.4627, 0.6118, 1)
 mystery = PackedStringArray("bronze", "silver", "xfactor", "gold", "elite")
-mystery_weights = PackedFloat32Array(0.5, 0.3, 0.1, 0.07, 0.03)
+mystery_weights = PackedFloat32Array(0.55, 0.3, 0.1, 0.04, 0.01)

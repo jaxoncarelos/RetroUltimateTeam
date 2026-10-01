@@ -125,7 +125,8 @@ func fill_depth(team_abbrs: Array) -> void:
 
 ## Base card of every player (generated depth included, so a thin team can still field a
 ## lineup; packs never pull them) plus a Prime card for real stars (CardRules.has_prime) and
-## an X-Factor ability card for good players (CardRules.has_xfactor).
+## an X-Factor ability card for good players (CardRules.has_xfactor) and a common Core
+## (lower-rated) card for every 80+ player (CardRules.has_core).
 func build_catalog() -> void:
 	cards.clear()
 	for id in players:
@@ -135,6 +136,9 @@ func build_catalog() -> void:
 		if not p.generated and CardRules.has_prime(p.ovr):
 			var pr := CardDef.build_program(p, CardRules.PROGRAM_PRIME)
 			cards[pr.id] = pr
+		if not p.generated and CardRules.has_core(p.ovr):
+			var co := CardDef.build_program(p, CardRules.PROGRAM_CORE)
+			cards[co.id] = co
 		if not p.generated and CardRules.has_xfactor(p.ovr):
 			var xf := CardDef.build_program(p, CardRules.PROGRAM_XFACTOR)
 			cards[xf.id] = xf

@@ -6,9 +6,9 @@
 script = ExtResource("1")
 id = "gold"
 display_name = "GOLD PACK"
-price = 12000
+price = 15000
 card_count = 5
-odds = PackedFloat32Array(0.0, 0.62, 0.34, 0.04)
+odds = PackedFloat32Array(0.0, 0.72, 0.26, 0.02)
 guarantee_tier = 2
 positions = PackedStringArray()
 team = ""

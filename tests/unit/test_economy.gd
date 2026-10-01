@@ -85,7 +85,7 @@ func test_pulls_follow_real_ratings() -> void:
 		assert_gte(best, 80, "gold pack guarantee = an 80+ card")
 	var rate := float(elite) / cards
 	gut.p("gold pack: %.1f%% of cards 90+, %d primes in %d cards" % [rate * 100.0, primes, cards])
-	assert_between(rate, 0.02, 0.10, "90+ is rare in a Gold pack")
+	assert_between(rate, 0.003, 0.05, "90+ is rare in a Gold pack")
 	var ep := PackCatalog.get_pack("elite")
 	for i in 50:
 		var best := 0
@@ -135,7 +135,7 @@ func test_starter_pack_waits_and_opens() -> void:
 	var best := 0
 	for uid in res["uids"]:
 		best = maxi(best, Collection.card_ovr(db, prof.find(uid)))
-	assert_gte(best, 80, "the first pack has a Gold")
+	assert_gte(best, 70, "the first pack has a Silver")
 	assert_true(prof.pending_packs.is_empty())
 	assert_eq(EconomyRules.open_pending(prof, db, rng), {})
 	assert_eq(ObjectiveRules.find(prof, "m_first_pack")["done"], true, "opening it completes an objective")
@@ -292,6 +292,17 @@ func test_progression_curve() -> void:
 			if not trained:
 				EconomyRules.quicksell(prof, db, uid)
 		Collection.auto_lineup(prof, db)
+		if g in [1, 3, 5, 10, 20, 30, 50, 100]:
+			var best := 0
+			var n90 := 0
+			for e in prof.cards:
+				var o := Collection.card_ovr(db, e)
+				best = maxi(best, o)
+				if o >= 90:
+					n90 += 1
+			gut.p("  g%d best card %d, %d cards 90+, %d cards" % [g, best, n90, prof.cards.size()])
+			if g <= 5:
+				assert_lt(best, 90, "no 90+ card in the first few games: those are a grind")
 		if g in [5, 10, 20, 50, 100]:
 			at[g] = Collection.team_ovr(prof, db)
 			var dev := 0
@@ -303,10 +314,9 @@ func test_progression_curve() -> void:
 			gut.p("  g%d ovr %d lineup dev +%d boost +%d coins %d level %d" % [g, at[g], dev, boost, prof.coins,
 					int(prof.coach["level"])])
 	gut.p("progression OVR: start %d, %s  coach level %d  income %s" % [start, at, int(prof.coach["level"]), income])
-	assert_between(start, 69, 74)
-	assert_between(at[5], start + 1, 80, "a quick first-session hook, not an instant endgame")
-	assert_between(at[20], 77, 84, "about 80 after a season")
-	assert_between(at[50], 82, 88, "about 85 after 50 games")
-	assert_gte(at[100], 86, "88+ endgame after 100 games")
-	assert_lte(at[100], 95)
+	assert_between(start, 68, 74)
+	assert_between(at[5], start, 77, "a quick first-session hook, not an instant endgame")
+	assert_between(at[20], 74, 81, "high 70s after a season")
+	assert_between(at[50], 78, 85, "about 80 after 50 games")
+	assert_between(at[100], 82, 90, "mid 80s after 100 games: 90s are the long grind")
 	assert_gt(income["objectives"], 0, "objectives are a real income source")

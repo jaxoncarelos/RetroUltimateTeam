@@ -144,7 +144,8 @@ func test_starting_squad_every_team() -> void:
 	for abbr in TeamData.load_all():
 		var ids := Collection.starter_card_ids(db, abbr)
 		var star := db.franchise_star(abbr)
-		assert_has(ids, star.id, "%s gets its franchise star" % abbr)
+		var star_id := CardRules.core_id(star.id) if db.cards.has(CardRules.core_id(star.id)) else star.id
+		assert_has(ids, star_id, "%s gets its franchise star (as his Core card)" % abbr)
 		var above := 0
 		for id in ids:
 			var c: CardDef = db.cards[id]
@@ -152,7 +153,7 @@ func test_starting_squad_every_team() -> void:
 			assert_false(p.generated, "%s starter %s is a real player" % [abbr, id])
 			if c.ovr > Collection.STARTER_CAP_MAX:
 				above += 1
-		assert_eq(above, 1, "%s: only the franchise star is above %d" % [abbr, Collection.STARTER_CAP_MAX])
+		assert_lte(above, 1, "%s: only the franchise star can be above %d" % [abbr, Collection.STARTER_CAP_MAX])
 		var prof := Profile.new()
 		Collection.grant_starters(prof, db, abbr)
 		for s in TeamRating.ALL_SLOTS:
@@ -170,7 +171,7 @@ func test_starter_squad_kc() -> void:
 	assert_eq(prof.franchise_team, "KC")
 	var m := -1
 	for e in prof.cards:
-		if e["def"] == "mahomes_patrick":
+		if e["def"] == "mahomes_patrick_core":
 			m = int(e["uid"])
 	assert_ne(m, -1, "KC's franchise star is Mahomes")
 	assert_eq(int(prof.lineup["QB"]), m)

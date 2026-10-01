@@ -146,8 +146,10 @@ func test_a_starter_elsewhere_is_not_an_upgrade() -> void:
 	prof.lineup["WR1"] = star
 	# A second Chase card can't also start at WR2, and is no upgrade over himself at equal OVR.
 	prof.add_card("chase_jamarr")
-	assert_false(EconomyRules.lineup_upgrades(prof, db).has("WR2"))
-	assert_false(EconomyRules.lineup_upgrades(prof, db).has("WR1"))
+	var ups := EconomyRules.lineup_upgrades(prof, db)
+	if ups.has("WR2"):   # the WR Chase bumped can be one; Chase himself can't
+		assert_ne(db.cards[prof.find(int(ups["WR2"]["uid"]))["def"]].player_id, "chase_jamarr")
+	assert_false(ups.has("WR1"))
 
 
 func test_better_copy_of_the_same_player_is_an_upgrade() -> void:

@@ -20,8 +20,11 @@ const STREAK_STEP := 0.10        ## +10% of the base per consecutive win after t
 const STREAK_CAP := 0.50
 const FIRST_WINS_BONUS := [300, 200, 150]   ## career wins 1, 2, 3
 const WEAK_POS_WEIGHT := 1.25    ## positions below your lineup average are this much likelier
-const PRIME_WEIGHT := 0.12       ## a Prime card vs a base card of the same tier
+const PRIME_WEIGHT := 0.05       ## a Prime card vs a base card of the same tier
 const IN_TIER_FALLOFF := 0.12    ## higher OVR inside a tier is rarer: weight 1/(1 + k*(ovr - tier min))
+## Elite tier: every OVR point above 90 multiplies the weight by this (a 95 is ~6x rarer
+## than a 90, a 99 ~40x), so a 99 is the pull of a career.
+const ELITE_FALLOFF := 0.66
 
 ## Sets: trade cards in for rewards. needs = {tier, count, franchise_only}; reward = pack id
 ## or "franchise_elite" (a star card of one of your franchise's real players).
@@ -129,6 +132,8 @@ static func pick_card(tier: int, pack: PackDef, profile: Profile, db: RosterDB, 
 		if xf_only and not c.is_xfactor():
 			continue
 		var w := 1.0 / (1.0 + IN_TIER_FALLOFF * maxi(0, c.ovr - maxi(tier_min, 60)))
+		if tier >= CardRules.Tier.ELITE:
+			w = pow(ELITE_FALLOFF, c.ovr - tier_min)
 		if c.is_prime():
 			w *= PRIME_WEIGHT
 		elif c.is_xfactor():

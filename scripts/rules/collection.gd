@@ -7,18 +7,18 @@ extends RefCounted
 const STARTER_SILVER := 5          ## legacy (v1 starter scheme), unused
 const STARTER_CAP_MAX := 77        ## franchise players at or below this OVR join the starting squad
 const STARTER_CAP_MIN := 64
-const STARTER_TARGET_MAX := 72     ## starting team OVR target (lowers the cap until reached)
+const STARTER_TARGET_MAX := 70     ## starting team OVR target (lowers the cap until reached)
 const FILL_MAX_OVR := 69           ## league-wide fill players (rookies / free-agent types)
 const FILL_TARGET_OVR := 66
 const STARTER_PACK := "starter"    ## free pack queued for a new career
 ## Development XP per game: lineup cards; bench cards earn a share.
-const XP_PER_GAME := 100
-const XP_WIN_BONUS := 50
+const XP_PER_GAME := 60
+const XP_WIN_BONUS := 30
 const XP_BENCH_SHARE := 0.25
 
 
 ## Starter card ids for a franchise: its real players rated <= a cap (backups, rookies,
-## role players), ONE franchise star (the team's best player), and low-rated real players
+## role players), ONE franchise star (the team's best player, as his Core card), and low-rated real players
 ## from other teams for any lineup slot still empty. The cap starts at STARTER_CAP_MAX and
 ## drops until the squad's team OVR <= STARTER_TARGET_MAX. Never generated players.
 static func starter_card_ids(db: RosterDB, abbr: String) -> Array[String]:
@@ -43,7 +43,9 @@ static func _squad(db: RosterDB, abbr: String, star: PlayerData, cap: int) -> Ar
 		have[p.pos] = int(have.get(p.pos, 0)) + 1
 	var ids: Array[String] = []
 	for p in mine:
-		ids.append(CardRules.card_id(p.id))
+		# The franchise star starts as his Core card: his real card is something to chase.
+		var core := CardRules.core_id(p.id)
+		ids.append(core if p == star and db.cards.has(core) else CardRules.card_id(p.id))
 	# Fill empty lineup slots with low-rated real players from anywhere else.
 	var need := {}
 	for slot in TeamRating.ALL_SLOTS:

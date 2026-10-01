@@ -108,5 +108,11 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    Playbook 30 offense (12 new concepts, every eligible runs routes); `PlayAdvisor.suggest` rotates the
    4-play bar (best first, then a varied weighted mix, recent calls demoted). Debug: `--demo-profile --xf
    --quick --show=xf`, `--screen=store --tab=1`, `--screen=draft`, `--screen=pack_open --pack=mystery`.
+19. [x] Progression v3 (owner: "a 95 Mahomes after one game kills the hype"): Core cards (`<player>_core`,
+   `CardRules.core_ovr`: real 80->70 … 96->79 … 99->81) for every 80+ player are the common version; the real
+   card shows a PRO chip. Franchise star starts as his Core card, starter team ~70. Tougher odds/prices
+   (gold 15k: 2% elite/card; elite 60k), elite tier weight `ELITE_FALLOFF` 0.66 per OVR above 90, primes 0.05x,
+   no Elite pack at coach level 25, slower card development (XP 60/game, levels 600+150n). Sim (test_economy
+   progression): team 70 -> 74 (g10) -> 78 (g20) -> 81 (g50) -> 86 (g100); first 90+ card ~g20-80.
 Next ideas (after the owner's playtest): see MORNING_NOTES.md. Card revamp follow-ups: CPU star
 abilities, ability UI on the lineup screen, ability-themed sets/objectives, balance pass on ability boosts.

@@ -214,6 +214,10 @@ func _show_detail(v: CardView) -> void:
 	var p: PlayerData = v.player
 	col.add_child(MetaUI.label(p.name.to_upper(), UiSkin.YELLOW, 8))
 	col.add_child(MetaUI.label("%s  #%d  %s  AGE %d" % [p.pos, p.jersey, p.team, int(info.get("age", 0))], UiSkin.MUTED))
+	if v.card.is_core():
+		var real: CardDef = GameData.card(CardRules.card_id(v.card.player_id))
+		if real != null:
+			col.add_child(MetaUI.label("CORE CARD - HIS PRO CARD IS A %d" % real.ovr, UiSkin.MUTED))
 	var ab := str(info.get("ability", ""))
 	if ab != "":
 		var d := AbilityRules.get_def(ab)

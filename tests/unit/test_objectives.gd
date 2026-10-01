@@ -161,7 +161,7 @@ func test_coach_levels_and_rewards() -> void:
 		assert_eq(ProgressionRules.level_from_xp(ProgressionRules.xp_for_level(lv)), lv)
 		assert_gt(int(ProgressionRules.rewards_for_level(lv)["coins"]), 0, "every level pays")
 	assert_eq(ProgressionRules.rewards_for_level(10)["pack"], "gold")
-	assert_eq(ProgressionRules.rewards_for_level(25)["pack"], "elite")
+	assert_eq(ProgressionRules.rewards_for_level(25)["pack"], "silver", "elite packs are earned, not handed out")
 	assert_eq(ProgressionRules.rewards_for_level(50)["pack"], "elite")
 	var pr := ProgressionRules.level_progress(ProgressionRules.xp_for_level(3) + 10)
 	assert_eq(pr["level"], 3)
