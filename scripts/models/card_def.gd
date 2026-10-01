@@ -42,7 +42,7 @@ static func build_program(p: PlayerData, program: String) -> CardDef:
 	c.ovr = CardRules.program_ovr(program, p.ovr)
 	c.tier = CardRules.tier_for_ovr(c.ovr)
 	c.attrs = CardRules.card_attrs(p.attrs, p.ovr, c.ovr)
-	c.quicksell = CardRules.quicksell(c.tier, program)
+	c.quicksell = CardRules.sell_price(c.ovr, program)
 	c.pot = maxi(c.ovr, p.pot + (c.ovr - p.ovr))
 	c.age = p.age
 	return c

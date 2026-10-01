@@ -147,7 +147,7 @@ func test_quicksell_rules() -> void:
 	assert_eq(EconomyRules.quicksell(prof, db, starter_uid), 0, "starters can't be sold")
 	var uid := prof.add_card("kelce_travis")
 	var coins := prof.coins
-	var value := CardRules.quicksell(CardRules.tier_for_ovr(db.cards["kelce_travis"].ovr))
+	var value := CardRules.sell_price(db.cards["kelce_travis"].ovr)
 	assert_eq(EconomyRules.quicksell(prof, db, uid), value)
 	assert_eq(prof.coins, coins + value)
 	var locked := prof.add_card("kelce_travis")

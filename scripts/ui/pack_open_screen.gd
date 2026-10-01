@@ -621,6 +621,14 @@ func _show_summary(instant := false) -> void:
 			tag.modulate.a = 0.0 if v.face_down else 1.0
 			col.add_child(tag)
 			v.set_meta("tag", tag)
+			# Don't need him? Sell him right here (70% of what he's worth; a banger pays big).
+			var sell := MetaUI.button("SELL %s" % CoinPill.fmt(EconomyRules.quicksell_value(GameData.db, e)),
+					Vector2(card_scale * CardView.W, 16), func() -> void: _sell_one(v))
+			sell.theme_type_variation = "PillButton"
+			sell.modulate.a = 0.0 if v.face_down else 1.0
+			sell.disabled = v.face_down
+			col.add_child(sell)
+			v.set_meta("sell", sell)
 	var bar := HBoxContainer.new()
 	bar.alignment = BoxContainer.ALIGNMENT_CENTER
 	bar.add_theme_constant_override("separation", 8)
@@ -688,6 +696,10 @@ func _reveal_card(v: CardView) -> void:
 		Fx.burst(self, v.global_position + v.size * 0.5, CardRules.PROGRAM_COLORS["xf"], 16, 80.0, 0.6, 1.0)
 	var tag: Label = v.get_meta("tag")
 	tag.create_tween().tween_property(tag, "modulate:a", 1.0, 0.15)
+	var sell: Button = v.get_meta("sell")
+	if sell.text.begins_with("SELL"):
+		sell.disabled = false
+		sell.create_tween().tween_property(sell, "modulate:a", 1.0, 0.15)
 
 
 ## FLIP ALL: flips the remaining cards one by one, best last for a final pop.
@@ -710,9 +722,31 @@ func _deal() -> void:
 func _dupe_value() -> int:
 	var total := 0
 	for e in _entries:
-		if _dupe.get(int(e["uid"]), false) and not e.get("locked", false) and not _prof.in_lineup(int(e["uid"])):
+		var uid := int(e["uid"])
+		if _dupe.get(uid, false) and not _prof.find(uid).is_empty() and not e.get("locked", false) \
+				and not _prof.in_lineup(uid):
 			total += EconomyRules.quicksell_value(GameData.db, e)
 	return total
+
+
+## SELL under one summary card.
+func _sell_one(v: CardView) -> void:
+	var uid := int(v.entry.get("uid", 0))
+	var gained := EconomyRules.quicksell(_prof, GameData.db, uid)
+	var sell: Button = v.get_meta("sell")
+	if gained <= 0:
+		MetaUI.toast(self, "LOCKED OR STARTING - CAN'T SELL", UiSkin.MUTED)
+		return
+	SaveManager.save()
+	Sfx.play("claim")
+	Fx.fly_coins(self, v.global_position + v.size * 0.5, _coins.coin_global(), 4 if gained < 5000 else 12)
+	v.dim = true
+	sell.text = "SOLD"
+	sell.disabled = true
+	_coins.set_coins(_prof.coins)
+	MetaUI.toast(self, "+%s COINS" % CoinPill.fmt(gained))
+	if is_instance_valid(_sell_btn) and _dupe_value() <= 0:
+		_sell_btn.disabled = true
 
 
 func _sell_dupes() -> void:
@@ -726,9 +760,12 @@ func _sell_dupes() -> void:
 	SaveManager.save()
 	Sfx.play("claim")
 	for v in _cards:
-		if _dupe.get(int(v.entry.get("uid", 0)), false):
+		if _dupe.get(int(v.entry.get("uid", 0)), false) and _prof.find(int(v.entry.get("uid", 0))).is_empty():
 			Fx.fly_coins(self, v.global_position + v.size * 0.5, _coins.coin_global(), 4)
 			v.dim = true
+			var sb: Button = v.get_meta("sell")
+			sb.text = "SOLD"
+			sb.disabled = true
 	_coins.set_coins(_prof.coins)
 	MetaUI.toast(self, "+%s COINS" % CoinPill.fmt(gained))
 	if is_instance_valid(_sell_btn):

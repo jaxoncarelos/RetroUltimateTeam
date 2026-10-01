@@ -111,6 +111,37 @@ static func card_attrs(real_attrs: Dictionary, real_ovr: int, c_ovr: int, boost 
 	return out
 
 
+## What a card is worth (coins) by card OVR: log-linear between these anchors, with a big
+## jump into the 90s (Elite). Selling pays SELL_SHARE of it, so a normal pack sells back for
+## roughly half its price while a banger is a payday (a 99 ≈ 1.5 Elite packs).
+const VALUE_CURVE := [[50, 15], [60, 25], [65, 45], [69, 90], [70, 300], [75, 1000], [79, 1300], [80, 1600],
+		[85, 2800], [89, 5000], [90, 16000], [92, 27000], [95, 46000], [99, 86000]]
+const SELL_SHARE := 0.7
+## Program premium on the value (X-Factor ability, Prime).
+const PROGRAM_VALUE := {"xf": 1.4, "prime": 1.2}
+
+
+static func card_value(ovr: int, program := PROGRAM_BASE) -> int:
+	var v := float(VALUE_CURVE[0][1])
+	if ovr >= int(VALUE_CURVE[-1][0]):
+		v = float(VALUE_CURVE[-1][1])
+	else:
+		for i in range(1, VALUE_CURVE.size()):
+			var hi: Array = VALUE_CURVE[i]
+			var lo: Array = VALUE_CURVE[i - 1]
+			if ovr <= int(hi[0]):
+				var u := clampf(float(ovr - int(lo[0])) / float(int(hi[0]) - int(lo[0])), 0.0, 1.0)
+				v = exp(lerpf(log(float(lo[1])), log(float(hi[1])), u))
+				break
+	return int(round(v * float(PROGRAM_VALUE.get(program, 1.0))))
+
+
+## Coins for quick-selling a card of this OVR/program (SELL_SHARE of its value, rounded to 10).
+static func sell_price(ovr: int, program := PROGRAM_BASE) -> int:
+	return maxi(10, int(round(card_value(ovr, program) * SELL_SHARE / 10.0)) * 10)
+
+
+## Legacy flat tier price (old saves / tests); the game sells at sell_price().
 static func quicksell(tier: int, program := PROGRAM_BASE) -> int:
 	var mult := 1
 	match program:

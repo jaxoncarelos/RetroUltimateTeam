@@ -264,7 +264,7 @@ static func quicksell_value(db: RosterDB, entry: Dictionary) -> int:
 	var c: CardDef = db.cards.get(entry.get("def", ""))
 	if c == null:
 		return 10
-	return CardRules.quicksell(Collection.card_tier(db, entry), c.program)
+	return c.quicksell   # by the card's own OVR: training/development never inflates the price
 
 
 ## Sells an unlocked card that isn't in the lineup. Returns coins gained (0 = refused).
