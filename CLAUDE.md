@@ -97,4 +97,16 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
 15. [x] Sim: `GameSim` drive-by-drive with momentum + matching box score (SIM GAME and sim-the-rest).
 13. [x] A league always runs: the hub starts a season if none exists (`GameFlow.needs_season/start_season`), so PLAY plays league games and the other teams are simmed (fixes division standings staying 0-0).
 12. [x] Sim the rest of a game (pause menu, or offered at halftime when up 28+: `MatchController._sim_rest_of_game`); Super Bowl title now also pays 3,000 coins + a locked 99 CHAMP card of the franchise star (`EconomyRules.champion_reward`, `CardRules.PROGRAM_CHAMP`). Playoffs/Super Bowl already existed in `SeasonRules`. Debug: `--show=half|simrest`, `-- --demo-profile --champ`.
-Next ideas (after the owner's playtest): see MORNING_NOTES.md.
+18. [x] Card revamp + playbook (playtest 2026-10-01): X-Factor cards (`CardRules.PROGRAM_XFACTOR`, id
+   `<player>_xf`, +2 OVR, 74+ players) carry one `AbilityRules` ability (17: GUNSLINGER, BELL COW, SACK ARTIST,
+   ICE IN THE VEINS…; scopes drive/series/game/clutch). `AbilityTracker` in MatchController counts plays
+   (PlayRunner results now carry `carrier_slot`/`tackler_slot`/`ball_def_slot`), resets per `GameState.drive_no`,
+   boosts the lineup before each snap; HUD chips + "X-FACTOR!" pop-up. Human team only (CPU has none yet).
+   Store tabs (`PackCatalog.SHELVES`): Mystery (secretly another pack), Draft (keep 1 of 3,
+   `Profile.pending_pick`, `scenes/meta/draft.tscn`), X-Factor, position packs incl. Trenches.
+   Opening: tier climb with fake-outs, mystery slot-machine spin, X-Factor sting, tap-to-flip summary.
+   Playbook 30 offense (12 new concepts, every eligible runs routes); `PlayAdvisor.suggest` rotates the
+   4-play bar (best first, then a varied weighted mix, recent calls demoted). Debug: `--demo-profile --xf
+   --quick --show=xf`, `--screen=store --tab=1`, `--screen=draft`, `--screen=pack_open --pack=mystery`.
+Next ideas (after the owner's playtest): see MORNING_NOTES.md. Card revamp follow-ups: CPU star
+abilities, ability UI on the lineup screen, ability-themed sets/objectives, balance pass on ability boosts.

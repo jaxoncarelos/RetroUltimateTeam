@@ -91,6 +91,8 @@ iOS export needs a Mac with Xcode (planned for Phase 6).
 | Plays & formations | `data/plays/**.tres`, `data/formations/*.tres` (edit in the Godot inspector) |
 | Gameplay balance | `data/tuning/gameplay_tuning.tres` (every speed/catch/tackle constant) |
 | Player sprites | `art/players/player_template.png` (16×20 frames, key colors swapped per team) |
+| Packs (price, odds, mystery/draft/X-Factor flags) | `data/packs/*.tres` (+ shelves in `scripts/rules/pack_catalog.gd`) |
+| X-Factor abilities (triggers, boosts) | `scripts/rules/ability_rules.gd` (`DEFS`) |
 
 `tools/build_playbooks.gd` and `tools/gen_player_sprites.gd` bootstrap the playbook and
 placeholder sheet; re-running them **overwrites** those files.
