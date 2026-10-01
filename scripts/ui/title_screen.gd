@@ -25,6 +25,7 @@ class _Backdrop:
 
 var _logo: TextureRect
 var _tap: Label
+var _update: Label
 var _t := 0.0
 var _leaving := false
 
@@ -81,7 +82,23 @@ func _ready() -> void:
 	ver.offset_left = -100 - SafeArea.right()
 	ver.offset_top = -12 - SafeArea.bottom()
 	add_child(ver)
+	# Auto-update status ("UPDATE READY - CLOSE THE APP FULLY AND REOPEN IT", failures…).
+	_update = MetaUI.label("", UiSkin.YELLOW, 8, HORIZONTAL_ALIGNMENT_CENTER)
+	_update.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_update.offset_left = -240
+	_update.offset_right = 240
+	_update.offset_top = -36 - SafeArea.bottom()
+	_update.offset_bottom = -26 - SafeArea.bottom()
+	_update.add_theme_color_override("font_shadow_color", UiSkin.SHADOW)
+	add_child(_update)
+	if Updater.has_method("headline"):
+		Updater.status_changed.connect(_refresh_update)
+		_refresh_update()
 	_intro.call_deferred()
+
+
+func _refresh_update() -> void:
+	_update.text = str(Updater.call("headline"))
 
 
 func _intro() -> void:

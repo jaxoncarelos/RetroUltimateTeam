@@ -39,6 +39,12 @@ jobs:
             echo "const REPO := \"${GITHUB_REPOSITORY}\""
             echo "const TOKEN := \"${UPDATE_TOKEN}\""
           } > scripts/build_info.gd
+          if [ -z "${UPDATE_TOKEN}" ]; then
+            echo "::warning title=Auto-updates OFF::Repo secret UPDATE_TOKEN is not set, so this build cannot download updates. Add a fine-grained read-only (Contents) token for this repo as the UPDATE_TOKEN secret."
+            echo "OTA_STATUS=OFF (UPDATE_TOKEN secret missing)" >> "$GITHUB_ENV"
+          else
+            echo "OTA_STATUS=ON" >> "$GITHUB_ENV"
+          fi
           # Base build lives in project.godot: a runtime pack can't override it, so the game can tell
           # that an update pack belongs to an older IPA.
           sed -i '' "s/^base_build=.*/base_build=\"${GITHUB_SHA::7}\"/" project.godot
@@ -86,5 +92,5 @@ jobs:
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest PocketGridiron.ipa update-e*.pck \
             --title "Latest build (${GITHUB_SHA::7})" \
-            --notes "Unsigned IPA built from ${GITHUB_SHA} on $(date -u +%F). Open in AltStore/Sideloadly to install." \
+            --notes "Unsigned IPA built from ${GITHUB_SHA} on $(date -u +%F). Open in AltStore/Sideloadly to install. Auto-updates: ${OTA_STATUS:-unknown}." \
             --target "$GITHUB_SHA"

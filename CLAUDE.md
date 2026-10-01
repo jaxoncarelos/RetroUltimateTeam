@@ -28,6 +28,10 @@ Godot 4.7 + GDScript retro football game. Design/roadmap: `PLAN.md`. Status tabl
   A new IPA is only needed when `autoload/updater.gd`, `project.godot` or the engine change — then bump
   `pocket_gridiron/engine_epoch` in project.godot. Never reference `BuildInfo` from `updater.gd`. A pack that
   doesn't reach the title screen is auto-discarded. CI stamps `scripts/build_info.gd` and `base_build`; don't commit those stamps.
+- OTA status: the title screen shows `Updater.headline()` (downloading / "update ready - close the app fully and
+  reopen it" / failures / "build has no update token"); coming back to the app re-checks. Each release's notes say
+  `Auto-updates: ON` or `OFF (UPDATE_TOKEN secret missing)` (the build also raises a warning). engine_epoch is 2
+  since the 2026-10-01 updater fix, so epoch-1 IPAs need one fresh IPA install.
 - The owner is away from the PC while testing: push fixes, trigger the build, and report the release link. Don't wait to be asked.
 
 ## Conventions

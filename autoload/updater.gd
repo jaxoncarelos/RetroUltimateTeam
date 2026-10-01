@@ -12,6 +12,9 @@ signal status_changed
 enum State { IDLE, CHECKING, DOWNLOADING, READY, UP_TO_DATE, NEEDS_IPA, FAILED, DISABLED }
 
 const META_PATH := "user://update_meta.json"
+const CHECK_TIMEOUT := 20.0      ## s for the release lookup
+const DOWNLOAD_TIMEOUT := 300.0  ## s for the pack itself (a few MB over a slow phone connection)
+const RECHECK_AFTER := 60.0      ## s: coming back to the app re-checks at most this often
 const PACK_PATH := "user://update.pck"
 const API_URL := "https://api.github.com/repos/%s/releases/tags/latest"
 
@@ -24,6 +27,7 @@ var _repo := ""
 var _token := ""
 var _current_id := "dev"
 var _http: HTTPRequest
+var _last_check := -1000.0
 
 
 func _init() -> void:
@@ -49,14 +53,39 @@ func _ready() -> void:
 	_current_id = str(consts.get("ID", "dev"))
 	_repo = str(consts.get("REPO", ""))
 	_token = str(consts.get("TOKEN", ""))
-	if _token.is_empty() or _repo.is_empty() or DisplayServer.get_name() == "headless":
+	if DisplayServer.get_name() == "headless" or _repo.is_empty():
 		_set_state(State.DISABLED, "updates off in dev builds")
+		return
+	if _token.is_empty():
+		_set_state(State.DISABLED, "auto-updates off: build has no update token")
 		return
 	_http = HTTPRequest.new()
 	_http.max_redirects = 0  # the asset redirect goes to a signed URL that must not get our token
-	_http.timeout = 30.0
 	add_child(_http)
 	check()
+
+
+## iOS rarely relaunches an app; switching back to it re-checks (and re-says "restart").
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_RESUMED and _http != null \
+			and Time.get_ticks_msec() / 1000.0 - _last_check > RECHECK_AFTER:
+		check()
+
+
+## One line for the title screen ("" = nothing worth saying).
+func headline() -> String:
+	match state:
+		State.DOWNLOADING:
+			return "DOWNLOADING UPDATE..."
+		State.READY:
+			return "UPDATE READY - CLOSE THE APP FULLY AND REOPEN IT"
+		State.NEEDS_IPA:
+			return "NEW VERSION NEEDS A FRESH IPA FROM THE RELEASE PAGE"
+		State.FAILED:
+			return "UPDATE CHECK FAILED: " + detail.to_upper()
+		State.DISABLED:
+			return "" if _repo.is_empty() else detail.to_upper()
+	return ""
 
 
 ## Called by the title screen: this launch worked, so keep the pack.
@@ -69,7 +98,9 @@ func mark_good() -> void:
 func check() -> void:
 	if _http == null or state in [State.CHECKING, State.DOWNLOADING]:
 		return
+	_last_check = Time.get_ticks_msec() / 1000.0
 	_set_state(State.CHECKING, "checking for updates")
+	_http.timeout = CHECK_TIMEOUT
 	_http.download_file = ""
 	var err := _http.request(API_URL % _repo, _auth_headers("application/vnd.github+json"))
 	if err != OK:
@@ -77,7 +108,10 @@ func check() -> void:
 		return
 	var res: Array = await _http.request_completed
 	if res[0] != HTTPRequest.RESULT_SUCCESS or res[1] != 200:
-		_set_state(State.FAILED, "offline" if res[0] != HTTPRequest.RESULT_SUCCESS else "check failed (%d)" % res[1])
+		var why := "offline"
+		if res[0] == HTTPRequest.RESULT_SUCCESS:
+			why = "token rejected (%d)" % res[1] if res[1] in [401, 403, 404] else "check failed (%d)" % res[1]
+		_set_state(State.FAILED, why)
 		return
 	var release: Variant = JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8())
 	var asset := _pick_asset(release)
@@ -118,6 +152,7 @@ func _download(asset: Dictionary) -> void:
 		_set_state(State.FAILED, "download failed (%d)" % res[1])
 		return
 	var part := PACK_PATH + ".part"
+	_http.timeout = DOWNLOAD_TIMEOUT
 	_http.download_file = part
 	if _http.request(location) != OK:
 		_set_state(State.FAILED, "download failed")
