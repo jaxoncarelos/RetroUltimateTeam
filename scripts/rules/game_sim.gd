@@ -16,6 +16,8 @@ const RUSH_YPC := 4.2
 const SACK_YARDS := 6
 const FORM_SD := 0.14                  ## per-game hot/cold swing of a team's scoring rate
 const RATING_PTS := 0.4                ## expected points per game per rating point over the opponent
+const FIELD_START := 37.0              ## field x of an average drive start (own 27)
+const FIELD_SCALE := 55.0              ## sim_drive scoring rate +100% per this many yards of better field
 
 ## Outcome weights of an average drive; tilted by the offense's rating (see _outcome_probs).
 const BASE := {"td": 0.215, "fg": 0.125, "miss": 0.02, "punt": 0.43, "turnover": 0.115, "downs": 0.095}
@@ -109,9 +111,25 @@ static func _pick(p: Dictionary, rng: RandomNumberGenerator) -> String:
 	return "punt"
 
 
+## Expected points per drive for an offense rated `off_ovr` against a defense rated `def_ovr`
+## (same prior as finish()), scaled by where the drive starts (field x, offense attacking +x):
+## a short field scores more, a drive from the 5 less.
+static func drive_rate(off_ovr: float, def_ovr: float, home: bool, start_x: float) -> float:
+	var prior := clampf(22.0 + (off_ovr - def_ovr + (1.5 if home else -1.5)) * RATING_PTS, 8.0, 40.0) \
+			/ (POSSESSIONS_PER_GAME * 0.5)
+	return maxf(0.25, prior * clampf(1.0 + (start_x - FIELD_START) / FIELD_SCALE, 0.55, 1.9))
+
+
+## One simulated possession for `off` from field x `start_x` (Retro Bowl-style CPU drives):
+## points, stats and box score like finish(); yards fit the field.
+## Returns {"outcome": td|fg|miss|punt|turnover|downs, "plays", "yards", "end_x", "int": bool}.
+static func sim_drive(gs: GameState, off: String, r: float, start_x: float, rng: RandomNumberGenerator) -> Dictionary:
+	return _drive(gs, off, r, rng, start_x)
+
+
 ## One possession for `off`: picks an outcome from the team's rate, then writes plays and yards
-## that fit it, and the points.
-static func _drive(gs: GameState, off: String, r: float, rng: RandomNumberGenerator) -> void:
+## that fit it, and the points. With `start_x` (>= 0) the yards fit the field from there.
+static func _drive(gs: GameState, off: String, r: float, rng: RandomNumberGenerator, start_x := -1.0) -> Dictionary:
 	var s: Dictionary = gs.stats[off]
 	var diff := int(gs.score[off]) - int(gs.score[gs.other(off)])
 	var outcome := _pick(_outcome_probs(r, diff <= -14), rng)
@@ -136,7 +154,19 @@ static func _drive(gs: GameState, off: String, r: float, rng: RandomNumberGenera
 		_:
 			plays = rng.randi_range(4, 9)
 			yards = rng.randi_range(10, 46)
+	if start_x >= 0.0:
+		var room := int(FieldGeo.OPP_GOAL - start_x)
+		match outcome:
+			"td":
+				yards = room
+			"fg", "miss":
+				yards = clampi(yards, 0, maxi(room - 3, 0))
+				if room - yards > 42:   # out of field goal range: it's a punt after all
+					outcome = "punt"
+			_:
+				yards = clampi(yards, int(FieldGeo.OWN_GOAL + 1.0 - start_x), maxi(room - 2, 0))
 	# Style: trailing teams throw more, leading teams run the ball.
+	var picked := false
 	var pass_rate := clampf(0.56 - diff / 70.0, 0.32, 0.78)
 	var passes := 0
 	for i in plays:
@@ -201,8 +231,11 @@ static func _drive(gs: GameState, off: String, r: float, rng: RandomNumberGenera
 		"turnover":
 			if rng.randf() < 0.65:
 				s["int"] += 1
+				picked = true
 			else:
 				s["fumbles_lost"] += 1
+	return {"outcome": outcome, "plays": plays, "yards": yards, "int": picked,
+			"end_x": (start_x if start_x >= 0.0 else FieldGeo.OWN_GOAL + 25.0) + yards}
 
 
 static func _add_fg(gs: GameState, team: String, rng: RandomNumberGenerator) -> void:

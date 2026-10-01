@@ -113,3 +113,29 @@ func test_a_close_even_game_stays_close_on_average() -> void:
 		_sim(gs, 78, 78, s + 1)
 		margin += absf(float(gs.score["KC"]) - float(gs.score["PHI"]))
 	assert_between(margin / n, 4.0, 14.0, "average final margin of a tied-at-half game")
+
+
+## Retro Bowl-style CPU drives: yards fit the field, scores add up, a short field scores more.
+func test_sim_drive_fits_the_field() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	var outcomes := {}
+	for i in 400:
+		var gs := GameState.new("MIA", "SEA")
+		var start := 20.0 + (i % 8) * 10.0
+		var d := GameSim.sim_drive(gs, "MIA", GameSim.drive_rate(80, 80, true, start), start, rng)
+		outcomes[d["outcome"]] = int(outcomes.get(d["outcome"], 0)) + 1
+		var end_x := start + int(d["yards"])
+		assert_between(end_x, FieldGeo.OWN_GOAL, FieldGeo.OPP_GOAL, "drive stays on the field")
+		if d["outcome"] == "td":
+			assert_eq(end_x, FieldGeo.OPP_GOAL, "a TD drive reaches the goal line")
+			assert_gte(int(gs.score["MIA"]), 6)
+		elif d["outcome"] == "fg":
+			assert_eq(int(gs.score["MIA"]), 3)
+			assert_lte(FieldGeo.OPP_GOAL - end_x, 42.0, "kicked from field goal range")
+		else:
+			assert_eq(int(gs.score["MIA"]), 0)
+	gut.p("sim drive outcomes: %s" % outcomes)
+	assert_true(outcomes.has("td") and outcomes.has("punt") and outcomes.has("turnover"))
+	assert_gt(GameSim.drive_rate(80, 80, true, 80.0), GameSim.drive_rate(80, 80, true, 20.0), "short field scores more")
+	assert_gt(GameSim.drive_rate(88, 75, true, 37.0), GameSim.drive_rate(75, 88, true, 37.0), "better offense scores more")

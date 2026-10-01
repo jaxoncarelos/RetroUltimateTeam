@@ -39,6 +39,8 @@ func test_human_match_runs_through_many_plays() -> void:
 		elif m.phase == MatchController.Phase.KICK_METER:
 			m.hud.kick_meter.stop_and_kick()
 	assert_gte(snaps, 14, "the match kept moving")
+	assert_eq(possessions.keys(), ["KC"], "the CPU's drives are simulated (Retro Bowl style): you only snap on offense")
+	assert_gt(m.gs.drive_no, 2, "the ball changed hands")
 	assert_true(m.gs.clock.seconds_left < GameClock.QUARTER or m.gs.clock.quarter > 1, "the clock ran")
 	gut.p("snaps %d, possessions %s, score %s, clock %s" % [snaps, possessions.keys(), m.gs.score, m.gs.clock.label()])
 

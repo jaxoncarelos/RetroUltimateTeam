@@ -31,8 +31,6 @@ func _refresh() -> void:
 		s.quarter_minutes = opts[(opts.find(s.quarter_minutes) + 1) % opts.size()])
 	_row("DIFFICULTY", "%s x%.2f" % [TeamRating.DIFFICULTY[s.difficulty][0], TeamRating.DIFFICULTY[s.difficulty][2]],
 			func() -> void: s.difficulty = (s.difficulty + 1) % TeamRating.DIFFICULTY.size())
-	_row("DEFENSE\nPACE", DefensePace.NAMES[s.defense_pace], func() -> void:
-		s.defense_pace = (s.defense_pace + 1) % DefensePace.NAMES.size())
 	_row("SEASON\nLENGTH", "%d GAMES" % s.season_games, func() -> void:
 		s.season_games = 17 if s.season_games == 8 else 8)
 	_row("SOUND", "OFF" if s.sfx_volume <= 0.0 else ("LOW" if s.sfx_volume < 0.6 else "HIGH"), func() -> void:

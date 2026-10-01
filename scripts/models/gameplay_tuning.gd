@@ -111,6 +111,7 @@ extends Resource
 @export var open_field_shed_mult := 0.35 ## blocks after the catch/handoff hold this much shorter
 @export var engage_range := 1.2
 @export var run_engage_range := 1.6    ## run blockers latch on from a bit farther
+@export var pocket_threat_range := 7.0  ## yards: an unblocked defender this close to the QB is a rusher to pick up
 @export var snap_engage_range := 2.8   ## on run plays linemen fire off and engage the man over them at the snap
 @export var run_seal_push := 0.15      ## yd/s run blockers drive their man sideways, away from the carrier's lane
 @export var fall_forward_time := 0.26 ## tackled carriers visibly slide forward: forward speed × this (yards)…

@@ -230,6 +230,8 @@ func snap() -> void:
 		a.in_stance = false
 		a.brain = _brain_for(a)
 	_apply_presnap_reads()
+	_blitz_pickup()
+	_pocket_time = -1.0
 	if human_team == PlayerAgent.Team.OFFENSE and not is_run_play():
 		qb_immune_until = tuning.qb_free_time
 	if human_team == PlayerAgent.Team.DEFENSE and controlled != null and hero_path.size() >= 2:
@@ -332,6 +334,67 @@ func _apply_presnap_reads() -> void:
 
 
 # ---------------------------------------------------------------- queries
+
+var _pocket_cache: Dictionary = {}
+var _pocket_time := -1.0
+
+
+## Pass protection matchups for this frame: blocker -> the rusher he takes. Free rushers
+## closest to the QB are the biggest threats; each goes to the nearest free pocket blocker
+## (sliding protection), so a blitzer is picked up instead of running free while a blocker
+## stands on an empty spot. Engaged pairs keep fighting (ContactResolver).
+func pocket_assignments() -> Dictionary:
+	if is_equal_approx(_pocket_time, play_time):
+		return _pocket_cache
+	_pocket_time = play_time
+	_pocket_cache = {}
+	if qb == null:
+		return _pocket_cache
+	var blockers: Array[PlayerAgent] = []
+	for o in offense:
+		if o.brain is BlockBrain and o.engaged_with == null and o.can_act() \
+				and (o.brain as BlockBrain).pocket_spot() != null:
+			blockers.append(o)
+	var threats: Array[PlayerAgent] = []
+	for d in defense:
+		if d.engaged_with != null or not d.can_act() or d.block_cd > 0.0:
+			continue
+		if d.brain is RushBrain or d.field_pos.distance_to(qb.field_pos) < tuning.pocket_threat_range:
+			threats.append(d)
+	threats.sort_custom(func(a: PlayerAgent, b: PlayerAgent) -> bool:
+		return a.field_pos.distance_squared_to(qb.field_pos) < b.field_pos.distance_squared_to(qb.field_pos))
+	for d in threats:
+		var best: PlayerAgent = null
+		var best_d := INF
+		for b in blockers:
+			var dd := b.field_pos.distance_to(d.field_pos)
+			if dd < best_d:
+				best_d = dd
+				best = b
+		if best == null:
+			break
+		_pocket_cache[best] = d
+		blockers.erase(best)
+	return _pocket_cache
+
+
+## Blitz pickup: when the defense rushes more men than the offense has pass blockers, the
+## back stays in to block instead of running his route.
+func _blitz_pickup() -> void:
+	if is_run_play() or not off_slots.has("RB"):
+		return
+	var rushers := 0
+	for d in defense:
+		if str(d.assignment.get("type", "")) == "rush":
+			rushers += 1
+	var blockers := 0
+	for o in offense:
+		if o.brain is BlockBrain:
+			blockers += 1
+	var rb: PlayerAgent = off_slots["RB"]
+	if rushers > blockers and rb.brain is RouteBrain:
+		rb.brain = BlockBrain.new(rb, self, "pass")
+
 
 func is_run_play() -> bool:
 	return off_play != null and off_play.is_run()

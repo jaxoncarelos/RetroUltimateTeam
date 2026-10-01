@@ -42,6 +42,9 @@ var def_play: PlayDef
 var last_def_call: PlayDef
 var passer: CpuPasser
 var pace: int = DefensePace.Pace.EVERY_SNAP
+## Retro Bowl style: the CPU's possessions are simulated as whole drives (no defense to play).
+## Challenges (some are about stopping the opponent) and `--play-defense` keep playable defense.
+var play_defense := false
 var sim_games := 0                  ## >0: headless batch mode
 var watch := false
 var rng := RandomNumberGenerator.new()
@@ -79,7 +82,9 @@ func _ready() -> void:
 	var home_abbr: String = config.get("home", "KC")
 	var away_abbr: String = config.get("away", "PHI")
 	var quarter_min: float = config.get("quarter_minutes", Settings.quarter_minutes)
-	pace = Settings.defense_pace
+	pace = DefensePace.Pace.EVERY_SNAP
+	var dbg := OS.get_cmdline_user_args()
+	play_defense = dbg.has("--play-defense") or dbg.has("--human=away") or dbg.has("--drawtest")
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--home="):
 			home_abbr = arg.get_slice("=", 1).to_upper()
@@ -274,6 +279,80 @@ func _human_offense() -> bool:
 	return human != "" and gs.possession == human
 
 
+func _sims_cpu_drives() -> bool:
+	return human != "" and not play_defense and not _is_challenge()
+
+
+## Team strength for simulated drives: the OVR the team plays at in this game (yours with
+## chemistry, the opponent's after the difficulty rescale).
+func _team_strength(team: String) -> float:
+	return float(lineups.get(team, {}).get("ovr", _sim_strength(team)))
+
+
+## The CPU has the ball: simulate its whole drive (GameSim) from where it starts, run the
+## clock, show the result, then hand the ball back (kickoff after a score, punt, turnover).
+func _sim_cpu_drive() -> void:
+	phase = Phase.RESULT
+	hud.hide_choice()
+	hud.show_play_bar(false)
+	hud.set_special_actions([] as Array[String])
+	hud.show_switch(false)
+	hud.set_hint("")
+	hud.set_abilities([])
+	var cpu := gs.possession
+	var start_x := gs.downs.los_x
+	var rate := GameSim.drive_rate(_team_strength(cpu), _team_strength(human), cpu == gs.home, start_x)
+	var d := GameSim.sim_drive(gs, cpu, rate, start_x, rng)
+	var secs := minf(float(d["plays"]) * rng.randf_range(24.0, 34.0), gs.clock.seconds_left)
+	gs.clock.seconds_left -= secs
+	gs.clock.stopped = true
+	var outcome: String = d["outcome"]
+	var end_x := clampf(float(d["end_x"]), FieldGeo.OWN_GOAL + 1.0, FieldGeo.OPP_GOAL - 1.0)
+	var name := (teams[cpu] as TeamData).team_name.to_upper()
+	var head := {"td": "%s TOUCHDOWN" % name, "fg": "%s FIELD GOAL" % name, "miss": "%s MISS THE FG" % name,
+			"punt": "DEFENSE HOLDS - %s PUNT" % name, "turnover": "INTERCEPTED!" if d["int"] else "FUMBLE RECOVERED!",
+			"downs": "STOPPED ON DOWNS!"}.get(outcome, name)
+	var sub := "%s DRIVE: %d PLAYS · %d YDS · %d:%02d" % [cpu, int(d["plays"]), int(d["yards"]), int(secs) / 60,
+			int(secs) % 60]
+	_update_scorebug()
+	if not _sim():
+		hud.show_banner(head, sub, 2.4)
+		var bad := outcome in ["td", "fg"]
+		Sfx.play("bad" if bad else "big")
+		Sfx.play("groan" if bad else "cheer")
+		if outcome in ["turnover", "downs"]:
+			hud.flash(Color("#00e436"), 0.4)
+	var after_score := func() -> void:
+		if _ot_over():
+			_final()
+		elif gs.clock.expired():
+			_kickoff_pending = cpu
+			_end_period()
+		else:
+			_kickoff(cpu)
+	var after_stop := func() -> void:
+		if _ot_over():
+			_final()
+		elif gs.clock.expired():
+			_end_period()
+		else:
+			_start_play_call()
+	match outcome:
+		"td", "fg":
+			gs.finish_drive(true, gs.clock.seconds_left)
+			_after(2.6, after_score)
+		"punt":
+			gs.downs.los_x = end_x
+			_after(2.6, _punt)
+		_:
+			gs.finish_drive(true, gs.clock.seconds_left)
+			gs.start_possession(human, FieldGeo.LENGTH - end_x)
+			_spot_y = FieldGeo.CENTER_Y
+			if not _sim():
+				camera.show_spot(gs.downs.los_x)
+			_after(2.6, after_stop)
+
+
 func _human_defense() -> bool:
 	return human != "" and gs.possession != human
 
@@ -369,6 +448,9 @@ func _start_play_call() -> void:
 		return
 	if gs.clock.expired():
 		_end_period()
+		return
+	if _sims_cpu_drives() and gs.possession != human and not _two_point:
+		_sim_cpu_drive()
 		return
 	phase = Phase.PLAY_CALL
 	hud.hide_choice()
@@ -1165,8 +1247,9 @@ func _show_pause_menu() -> void:
 
 ## Pause menu entries (index = choice): RESUME, pace, quarter length, [RESTART GAME,] QUIT TO MENU.
 func pause_options() -> Array[String]:
-	var opts: Array[String] = ["RESUME", "DEFENSE PACE: %s" % DefensePace.NAMES[pace],
-			"QUARTER: %.1f MIN (NEXT GAME)" % Settings.quarter_minutes]
+	var opts: Array[String] = ["RESUME", "QUARTER: %.1f MIN (NEXT GAME)" % Settings.quarter_minutes]
+	if play_defense:
+		opts.insert(1, "DEFENSE PACE: %s" % DefensePace.NAMES[pace])
 	if not config.get("from_hub", false):
 		opts.append("RESTART GAME")
 	if not _is_challenge():
@@ -1370,6 +1453,11 @@ func _debug_show(kind: String) -> void:
 			hud.show_choice("YOU WIN!", "KC 31  PHI 17", ["PLAY AGAIN"] as Array[String])
 		"snap":
 			_snap()
+		"cpudrive":
+			if hud.tip_open():
+				hud._tip.visible = false
+			gs.start_possession(gs.other(human), FieldGeo.OWN_GOAL + 25.0)
+			_sim_cpu_drive()
 		"xf":
 			# Switch on the first X-Factor ability of the side on the field.
 			if hud.tip_open():
