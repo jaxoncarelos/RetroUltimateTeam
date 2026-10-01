@@ -11,6 +11,8 @@ const WIN_COINS := 400
 const LOSS_COINS := 160
 const TIE_COINS := 240
 const GAME_COINS := LOSS_COINS
+const SIM_GAME_COINS := 400      ## a fully simulated win pays this (loss/tie scale by LOSS/WIN, TIE/WIN)
+const SIM_STAT_MULT := 0.1       ## per-stat bonuses / XP weight for simulated stats
 const TD_BONUS := 20
 const TAKEAWAY_BONUS := 25
 const SHUTOUT_BONUS := 50
@@ -500,26 +502,30 @@ static func match_rewards(r: Dictionary, first_win_today := false, win_streak :=
 	if r.get("forfeit", false):
 		return {"total": 0, "lines": [["FORFEIT", 0]], "items": [{"id": "forfeit", "label": "FORFEIT", "coins": 0}]}
 	var won := pf > pa
-	var base := int(round(GAME_COINS * mult))
+	# Simulated games: result coins scale to SIM_GAME_COINS, stat bonuses are weighted (see sim_counts).
+	var k := float(SIM_GAME_COINS) / float(WIN_COINS) if r.get("simulated", false) else 1.0
+	var cnt := sim_counts(r)
+	var base := int(round(GAME_COINS * mult * k))
 	items.append({"id": "base", "label": "GAME PLAYED", "coins": base})
 	var result_coins := 0
 	if won:
-		result_coins = int(round(WIN_COINS * mult)) - base
+		result_coins = int(round(WIN_COINS * mult * k)) - base
 		items.append({"id": "win", "label": "WIN BONUS", "coins": result_coins})
 	elif pf == pa:
-		result_coins = int(round(TIE_COINS * mult)) - base
+		result_coins = int(round(TIE_COINS * mult * k)) - base
 		items.append({"id": "tie", "label": "TIE BONUS", "coins": result_coins})
 	if won and win_streak >= 2:
 		var pct := minf(STREAK_STEP * (win_streak - 1), STREAK_CAP)
 		items.append({"id": "streak", "label": "WIN STREAK x%d (+%d%%)" % [win_streak, int(round(pct * 100))],
 				"coins": int(round((base + result_coins) * pct))})
 	if int(r.get("tds", 0)) > 0:
-		items.append({"id": "tds", "label": "%d TOUCHDOWNS" % int(r["tds"]), "coins": int(r["tds"]) * TD_BONUS})
+		items.append({"id": "tds", "label": "%d TOUCHDOWNS" % int(r["tds"]), "coins": int(round(float(cnt["tds"]) * TD_BONUS))})
 	var takeaways := int(r.get("def_ints", 0)) + int(r.get("def_sacks", 0))
 	if takeaways > 0:
-		items.append({"id": "defense", "label": "%d INTS + SACKS" % takeaways, "coins": takeaways * TAKEAWAY_BONUS})
+		items.append({"id": "defense", "label": "%d INTS + SACKS" % takeaways,
+				"coins": int(round(float(cnt["takeaways"]) * TAKEAWAY_BONUS))})
 	if pa == 0:
-		items.append({"id": "shutout", "label": "SHUTOUT", "coins": SHUTOUT_BONUS})
+		items.append({"id": "shutout", "label": "SHUTOUT", "coins": int(round(SHUTOUT_BONUS * float(cnt["shutout"])))})
 	if won and r.get("came_back", false):
 		items.append({"id": "comeback", "label": "COMEBACK WIN", "coins": COMEBACK_BONUS})
 	if won and first_win_today:
@@ -528,6 +534,48 @@ static func match_rewards(r: Dictionary, first_win_today := false, win_streak :=
 		items.append({"id": "first_wins", "label": "NEW COACH BONUS (WIN %d)" % career_wins,
 				"coins": int(FIRST_WINS_BONUS[career_wins - 1])})
 	return _total(items)
+
+
+## Weighted stat counts for the per-stat bonuses: {"tds", "takeaways", "shutout"} (floats).
+## Fully played: the real counts (weight 1). Fully simulated (r["simulated"], no "played_box"):
+## everything x SIM_STAT_MULT. Played then simmed ("played_box" = box at the moment of the sim):
+## played stats at full weight, the simmed remainder at SIM_STAT_MULT.
+static func sim_counts(r: Dictionary) -> Dictionary:
+	var tds := float(int(r.get("tds", 0)))
+	var take := float(int(r.get("def_ints", 0)) + int(r.get("def_sacks", 0)))
+	var shut := 1.0
+	if r.get("simulated", false):
+		if r.has("played_box"):
+			var pb: Dictionary = r["played_box"]
+			var p_tds := float(int(pb.get("tds", 0)))
+			var p_take := float(int(pb.get("def_ints", 0)) + int(pb.get("def_sacks", 0)))
+			tds = p_tds + (tds - p_tds) * SIM_STAT_MULT
+			take = p_take + (take - p_take) * SIM_STAT_MULT
+		else:
+			tds *= SIM_STAT_MULT
+			take *= SIM_STAT_MULT
+		shut = SIM_STAT_MULT
+	return {"tds": tds, "takeaways": take, "shutout": shut}
+
+
+## The box score objectives and coach XP see: a played game's box as is; a partly played game's
+## played_box (with the final pf/pa/won); a fully simulated game's counting stats x SIM_STAT_MULT.
+static func sim_box(r: Dictionary) -> Dictionary:
+	var box: Dictionary = r.get("box", {}).duplicate()
+	if not r.get("simulated", false):
+		return box
+	if r.has("played_box"):
+		box = (r["played_box"] as Dictionary).duplicate()
+		box["pf"] = int(r.get("pf", 0))
+		box["pa"] = int(r.get("pa", 0))
+		box["won"] = int(box["pf"]) > int(box["pa"])
+		return box
+	for key in box.keys():
+		if key in ["pf", "pa", "won", "came_back", "forfeit"]:
+			continue
+		if box[key] is int:
+			box[key] = int(round(float(box[key]) * SIM_STAT_MULT))
+	return box
 
 
 static func _total(items: Array) -> Dictionary:
@@ -574,7 +622,7 @@ static func postgame(profile: Profile, db: RosterDB, r: Dictionary, unix_time :=
 	var rw := match_rewards(r, first_win, int(profile.stats["win_streak"]), int(profile.stats["wins"]) if won else 0)
 	var items: Array = rw["items"]
 	# Objectives: record the box, auto-claim what this match finished.
-	var box: Dictionary = r.get("box", {}).duplicate()
+	var box: Dictionary = sim_box(r)
 	for k in ["pf", "pa", "tds", "def_ints", "def_sacks", "came_back", "forfeit"]:
 		if r.has(k) and not box.has(k):
 			box[k] = r[k]

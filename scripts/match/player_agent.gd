@@ -39,6 +39,9 @@ var juke_timer := 0.0
 var juke_cd := 0.0
 var juke_dir := 0.0
 var dive_timer := 0.0
+## Hesitation (swipe back): hesi_timer counts the slow phase then the burst phase (tackle mult applies throughout).
+var hesi_timer := 0.0
+var hesi_cd := 0.0
 var dive_recover := -1.0
 var throw_anim := 0.0
 var tackled_speed := 0.0   ## x speed at the moment of the tackle (fall-forward spot)
@@ -171,8 +174,18 @@ func start_juke(t: GameplayTuning, dir: float) -> bool:
 	return true
 
 
+## Hesitate: slow almost to a stop for hesi_time, then burst forward. Returns false on cooldown.
+func start_hesi(t: GameplayTuning) -> bool:
+	if hesi_cd > 0.0 or hesi_timer > 0.0 or not can_act():
+		return false
+	hesi_timer = t.hesi_time + t.hesi_burst_time
+	hesi_cd = t.hesi_cooldown + hesi_timer
+	return true
+
+
 func step(dt: float, t: GameplayTuning) -> void:
 	tackle_cd = maxf(0.0, tackle_cd - dt)
+	hesi_cd = maxf(0.0, hesi_cd - dt)
 	block_cd = maxf(0.0, block_cd - dt)
 	juke_cd = maxf(0.0, juke_cd - dt)
 	throw_anim = maxf(0.0, throw_anim - dt)
@@ -198,6 +211,13 @@ func step(dt: float, t: GameplayTuning) -> void:
 	burst_timer = maxf(0.0, burst_timer - dt)
 	burst_cd = maxf(0.0, burst_cd - dt)
 	var target_v := desired_dir * max_speed * throttle * speed_mult * (t.burst_mult if burst_timer > 0.0 else 1.0)
+	if hesi_timer > 0.0:
+		var was_slow := hesi_timer > t.hesi_burst_time
+		hesi_timer = maxf(0.0, hesi_timer - dt)
+		if was_slow and hesi_timer <= t.hesi_burst_time:
+			burst_timer = maxf(burst_timer, t.hesi_burst_time)   # exit with a short burst
+		elif was_slow:
+			target_v *= 0.25
 	if jump_timer > 0.0:
 		# The leap carries him toward the ball, ignoring his brain until he lands.
 		jump_timer -= dt

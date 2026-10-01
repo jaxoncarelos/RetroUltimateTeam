@@ -84,6 +84,21 @@ func _build_theme() -> Theme:
 	t.set_color("font_pressed_color", "PillButton", UiSkin.NAVY_DEEP)
 	t.set_color("font_hover_pressed_color", "PillButton", UiSkin.NAVY_DEEP)
 
+	# Match HUD: calm navy cards / buttons with a muted edge; yellow = selected / primary.
+	var hud_fill := Color(UiSkin.PANEL, 0.94)
+	for v in ["HudButton", "HudButtonHot", "HudCard"]:
+		t.set_type_variation(v, "Button")
+		var edge := UiSkin.YELLOW_DARK if v == "HudButtonHot" else UiSkin.HUD_EDGE
+		t.set_stylebox("normal", v, UiSkin.button_box(hud_fill, edge))
+		t.set_stylebox("hover", v, UiSkin.button_box(UiSkin.NAVY_HI, edge))
+		t.set_stylebox("pressed", v, UiSkin.button_box(UiSkin.YELLOW, UiSkin.YELLOW_DARK, true))
+		t.set_stylebox("hover_pressed", v, UiSkin.button_box(UiSkin.YELLOW, UiSkin.YELLOW_DARK, true))
+		t.set_stylebox("disabled", v, UiSkin.button_box(hud_fill, UiSkin.GREY))
+		t.set_color("font_pressed_color", v, UiSkin.NAVY_DEEP)
+		t.set_color("font_hover_pressed_color", v, UiSkin.NAVY_DEEP)
+	t.set_color("font_color", "HudButtonHot", UiSkin.YELLOW)
+	t.set_color("font_hover_color", "HudButtonHot", UiSkin.YELLOW)
+
 	t.set_stylebox("panel", "PanelContainer", UiSkin.panel_box())
 	t.set_stylebox("panel", "Panel", UiSkin.panel_box())
 	t.set_type_variation("PillPanel", "PanelContainer")

@@ -597,10 +597,7 @@ func _update_scorebug() -> void:
 
 
 func _update_snap_hint() -> void:
-	if off_play.is_run():
-		hud.set_hint("PRESS THE QB TO SNAP  ·  HOLD + DRAG UP/DOWN TO STEER")
-	else:
-		hud.set_hint("DRAG FROM THE QB: BACK = AIM  ·  FORWARD = RUN  ·  OR TAP")
+	hud.set_hint("DRAG BACK TO SNAP")
 
 
 func _on_play_selected(play: PlayDef) -> void:
@@ -620,9 +617,7 @@ func _on_tap(_pos: Vector2) -> void:
 	if _replay != null:
 		_end_replay()   # tap to skip the replay
 		return
-	if phase == Phase.PLAY_CALL and _human_offense():
-		_snap()
-	elif phase == Phase.KICK_METER:
+	if phase == Phase.KICK_METER:
 		hud.kick_meter.stop_and_kick()
 
 
@@ -706,7 +701,7 @@ func _snap() -> void:
 	if _human_defense():
 		hud.set_hint(DEFENSE_LIVE_HINT)
 	elif _human_offense():
-		hud.set_hint("DRAG UP/DOWN TO STEER  ·  FLICK TO JUKE  ·  DOUBLE-TAP TO DIVE" if off_play.is_run()
+		hud.set_hint("DRAG TO STEER  ·  SWIPE ← HESI  → DIVE  ↑↓ JUKE" if off_play.is_run()
 				else "DRAG BACK TO AIM, RELEASE TO THROW  ·  TAP = PASS TYPE  ·  DRAG FORWARD TO RUN")
 	else:
 		hud.set_hint("")
@@ -772,6 +767,8 @@ func _on_play_ended(r: Dictionary) -> void:
 		_finish_two_point(r)
 		return
 	var offense := gs.possession
+	var log_pre := {"quarter": gs.clock.quarter, "clock": gs.clock.label(), "down": gs.downs.down,
+			"dist": int(ceil(gs.downs.to_go())), "spot": int(round(gs.downs.los_x - FieldGeo.OWN_GOAL)), "team": offense}
 	var next := gs.apply_result(r, off_play.is_run(), _seconds_before_play)
 	var headline: String = r["text"]
 	var type: String = r["type"]
@@ -779,6 +776,10 @@ func _on_play_ended(r: Dictionary) -> void:
 		headline = _yards_text(int(r["yards"]))
 	elif type == "sack":
 		headline = "SACKED  %d" % int(r["yards"])
+	elif type in ["td", "int_td"]:
+		headline = td_headline(r)
+	if not _sim():
+		_log_play(log_pre, r, headline)
 	var sub := gs.last_event if gs.last_event != "" else gs.downs.down_text()
 	if gs.possession != offense and next == GameState.Next.PLAY:
 		sub = "%s BALL" % gs.possession
@@ -800,6 +801,46 @@ func _on_play_ended(r: Dictionary) -> void:
 				_after(1.4, _final)
 			else:
 				_after(1.4, _start_play_call)
+
+
+## "TOUCHDOWN TYREEK HILL - 42 YD" / "PICK SIX JOE SMITH - 35 YD". Uses r["scorer"] / r["td_yards"]
+## from PlayRunner; without them: "TOUCHDOWN!" (plus the yards when known).
+static func td_headline(r: Dictionary) -> String:
+	var lead := "PICK SIX" if str(r.get("type", "")) == "int_td" else "TOUCHDOWN"
+	var who := str(r.get("scorer", "")).strip_edges().to_upper()
+	var yds := int(r.get("td_yards", r.get("yards", 0)))
+	if who == "":
+		return "%s!" % lead if yds <= 0 else "%s! %d YD" % [lead, yds]
+	return "%s %s - %d YD" % [lead, who, maxi(yds, 0)]
+
+
+## Appends one entry to the play-by-play log (PlayByPlay.from_log shape).
+func _log_play(pre: Dictionary, r: Dictionary, headline: String) -> void:
+	var type := str(r["type"])
+	var yards := int(r["yards"])
+	var result := "gain"
+	match type:
+		"td":
+			result = "td"
+		"int", "int_td", "fumble":
+			result = "turnover"
+		_:
+			if gs.last_event == "FIRST DOWN":
+				result = "first_down"
+			elif gs.last_event == "TURNOVER ON DOWNS":
+				result = "downs"
+	var text := headline
+	if type == "int_td":
+		text = "Pass INTERCEPTED - " + headline
+	elif type in ["int", "fumble"]:
+		text = "Pass INTERCEPTED!" if type == "int" else "Ball FUMBLED, defense recovers!"
+	elif type == "incomplete":
+		text = "Pass incomplete"
+	var e := pre.duplicate()
+	e["text"] = text
+	e["yards"] = 0 if type in ["incomplete", "int", "int_td", "fumble"] else yards
+	e["result"] = result
+	play_log.append(e)
 
 
 func _yards_text(yards: int) -> String:
@@ -831,6 +872,13 @@ func _play_juice(type: String, offense: String) -> void:
 			Sfx.play("whistle")
 
 
+## Real plays so far (quarter, clock, down, dist, spot, team, text, yards, result), plus the
+## synthesized drives appended by _sim_rest_of_game (those carry simmed = true).
+var play_log: Array[Dictionary] = []
+const OFFENSE_TIP := "YOUR BALL. THE BEST CALL IS PRESELECTED (OR TAP ANOTHER / MORE). DRAG BACK TO SNAP. ON RUN PLAYS SWIPE ← HESI → DIVE ↑↓ JUKE. ON PASSES DRAG BACK TO AIM, RELEASE TO THROW."
+var _sim_extra: Dictionary = {}   ## played_box / played_pf / ... once the rest was simmed
+
+
 ## First-game coach tips (Settings.tutorial_done once offense and defense were explained).
 var _tips_seen: Dictionary = {}
 
@@ -845,7 +893,7 @@ func _coach_tips() -> void:
 		text = "4TH DOWN: PUNT OR KICK A FIELD GOAL WITH THE BUTTONS TOP RIGHT, OR PICK A PLAY TO GO FOR IT."
 	elif _human_offense() and not _tips_seen.has("offense"):
 		key = "offense"
-		text = "YOUR BALL. THE BEST CALL IS PRESELECTED (OR TAP ANOTHER / MORE). PRESS THE QB AND DRAG BACK TO AIM, RELEASE TO THROW. DRAG FORWARD TO RUN."
+		text = OFFENSE_TIP
 	elif _human_defense() and not _tips_seen.has("defense"):
 		key = "defense"
 		text = "DEFENSE! THE CALL PICKS YOUR HERO (YELLOW TAG). DRAG FROM HIM TO DRAW HIS PATH, THEN TAP THE FIELD TO SNAP. DRAG TO MOVE: PUSH AT BLOCKERS AND SWIPE (OR TAP WITH A SECOND FINGER) WHEN THE BAR FLASHES TO BEAT THEM, TAP FOR A BURST, TAP THE CARRIER TO DIVE, TAP THE BALL TO LEAP. SWITCH TAKES THE MAN NEAREST THE BALL."
@@ -961,7 +1009,9 @@ func _on_choice(index: int) -> void:
 		Phase.PAUSED:
 			_on_pause_choice(index)
 		Phase.FINAL:
-			if config.get("from_hub", false):
+			if index == 1 and not play_log.is_empty():
+				_open_play_by_play(_show_final_choice)
+			elif config.get("from_hub", false):
 				SceneRouter.goto(SceneRouter.RESULTS, {"last_result": match_result()})
 			else:
 				get_tree().reload_current_scene()
@@ -1106,11 +1156,28 @@ func _final() -> void:
 	Music.set_crowd(false)
 	if human != "" and not _sim():
 		Music.jingle("win" if w == human else "lose")
-	var title := "FINAL" if w == "" else ("YOU WIN!" if w == human else ("%s WIN" % teams[w].team_name.to_upper()))
+	_final_title = "FINAL" if w == "" else ("YOU WIN!" if w == human else ("%s WIN" % teams[w].team_name.to_upper()))
 	if human == "":
-		title = "FINAL"
-	hud.show_choice(title, _final_summary(),
-			["CONTINUE" if config.get("from_hub", false) else "PLAY AGAIN"] as Array[String])
+		_final_title = "FINAL"
+	_show_final_choice()
+
+
+var _final_title := "FINAL"
+
+
+func _show_final_choice() -> void:
+	var opts: Array[String] = ["CONTINUE" if config.get("from_hub", false) else "PLAY AGAIN"]
+	if not play_log.is_empty():
+		opts.append("PLAY-BY-PLAY")
+	hud.show_choice(_final_title, _final_summary(), opts)
+
+
+## Opens the tap-through play-by-play over the HUD; `back` runs when it closes.
+func _open_play_by_play(back: Callable) -> void:
+	var v := PlayByPlayView.new()
+	hud.add_child(v)
+	v.setup(PlayByPlay.from_log(play_log))
+	v.closed.connect(back)
 
 
 ## Summary handed back to the hub (rewards, season results).
@@ -1123,7 +1190,8 @@ func match_result(forfeit := false) -> Dictionary:
 			"def_ints": int(gs.stats[opp]["int"]), "def_sacks": int(gs.stats[opp]["sacks"]),
 			"difficulty": int(config.get("difficulty", Settings.difficulty)),
 			"mode": str(config.get("mode", "quick")), "extra": config.get("extra", {}),
-			"came_back": _comeback, "challenge_won": _chal_won, "box": gs.box_score(mine)}
+			"came_back": _comeback, "challenge_won": _chal_won, "box": gs.box_score(mine), "opp_box": gs.box_score(opp),
+			"play_log": play_log}.merged(_sim_extra)
 
 
 # ---------------------------------------------------------------- challenges
@@ -1254,6 +1322,8 @@ func pause_options() -> Array[String]:
 		opts.append("RESTART GAME")
 	if not _is_challenge():
 		opts.append("SIM REST OF GAME")
+	if not play_log.is_empty():
+		opts.append("PLAY-BY-PLAY")
 	opts.append("QUIT TO MENU")
 	return opts
 
@@ -1293,6 +1363,8 @@ func _on_pause_choice(index: int) -> void:
 			_pause_menu = PauseMenu.CONFIRM_SIM
 			hud.show_choice("SIM THE REST?", "%s %d  %s %d  ·  FINISHES THE GAME NOW" % [gs.home, gs.score[gs.home], gs.away, gs.score[gs.away]],
 					["KEEP PLAYING", "SIM IT"] as Array[String])
+		"PLAY-BY-PLAY":
+			_open_play_by_play(_show_pause_menu)
 		"RESTART GAME":
 			Engine.time_scale = 1.0
 			get_tree().reload_current_scene()
@@ -1478,8 +1550,10 @@ func _debug_show(kind: String) -> void:
 			_offer_sim()
 		"kick":
 			hud.kick_meter.start("FIELD GOAL  38 YD", 0.3, 0.12, 1.0)
+		"grid":
+			hud.show_playbook_grid(true)
 		"tip":
-			hud.show_tip("YOUR BALL. THE BEST CALL IS PRESELECTED (OR TAP ANOTHER / MORE). PRESS THE QB AND DRAG BACK TO AIM, RELEASE TO THROW. DRAG FORWARD TO RUN.")
+			hud.show_tip(OFFENSE_TIP)
 
 
 # ---------------------------------------------------------------- sim the rest
@@ -1498,7 +1572,18 @@ func _sim_strength(abbr: String) -> int:
 ## Finishes the game from the current score: the remaining share of a normal game's scoring
 ## is drawn with the same model as SIM GAME, never ending tied; then the final screen.
 func _sim_rest_of_game() -> void:
-	GameSim.finish(gs, {gs.home: _sim_strength(gs.home), gs.away: _sim_strength(gs.away)}, rng)
+	var mine := human if human != "" else gs.home
+	var played_box := gs.box_score(mine)
+	var played_pf := int(gs.score[mine])
+	var played_pa := int(gs.score[gs.other(mine)])
+	var summary := GameSim.finish(gs, {gs.home: _sim_strength(gs.home), gs.away: _sim_strength(gs.away)}, rng)
+	var seed_v := int(rng.randi() & 0x7fffffff)
+	var simmed := PlayByPlay.from_drives(summary.get("drive_log", []), seed_v)
+	for p in simmed:
+		p["simmed"] = true
+		play_log.append(p)
+	_sim_extra = {"played_box": played_box, "played_pf": played_pf, "played_pa": played_pa,
+			"simulated": true, "sim_started": true, "drive_log": summary.get("drive_log", []), "sim_seed": seed_v}
 	_half_offer = false
 	_pause_menu = PauseMenu.MAIN
 	Engine.time_scale = 1.0

@@ -115,7 +115,8 @@ extends Resource
 @export var snap_engage_range := 2.8   ## on run plays linemen fire off and engage the man over them at the snap
 @export var run_seal_push := 0.15      ## yd/s run blockers drive their man sideways, away from the carrier's lane
 @export var fall_forward_time := 0.26 ## tackled carriers visibly slide forward: forward speed × this (yards)…
-@export var fall_forward_max := 2.2    ## …capped here. The spot is where the ball comes to rest.
+@export var fall_slide_max := 2.2      ## …capped here (cosmetic slide only; the spot is the tackle contact point).
+@export var fall_forward_max := 0.5    ## Fall-forward yards credited past the contact point on a hard hit.
 @export var down_slide_decel := 25.0   ## yd/s² a downed player's slide slows at
 @export var shed_base := 1.9           ## seconds a block holds at equal ratings
 @export var shed_per_point := 0.035
@@ -226,5 +227,10 @@ extends Resource
 @export var juke_time := 0.22
 @export var juke_cooldown := 0.9
 @export var flick_speed := 450.0       ## px/s drag velocity that counts as a flick
+@export var snap_pull_dist := 24.0     ## view px: drag BACK (away from the line) this far from the press point to snap
+@export var hesi_time := 0.25          ## s: swipe-left hesitation (throttle drops) before the burst
+@export var hesi_burst_time := 0.5     ## s: speed burst (burst_mult) right after the hesitation
+@export var hesi_cooldown := 1.2
+@export var hesi_tackle_mult := 0.6    ## tackle chance multiplier on the carrier during hesi + burst
 @export var dive_distance := 2.0
 @export var dive_time := 0.35

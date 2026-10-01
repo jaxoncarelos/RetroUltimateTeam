@@ -103,6 +103,8 @@ func _demo_config(screen: String) -> Dictionary:
 			var opp := "PHI" if prof.franchise_team != "PHI" else "KC"
 			return {"home": prof.franchise_team, "away": opp, "mode": "quick", "from_hub": true}
 		"results":
+			if OS.get_cmdline_user_args().has("--sim-result"):
+				return {"last_result": GameFlow.sim_result(prof, {"away": "PHI"})}
 			return {"last_result": {"team": prof.franchise_team, "opponent": "PHI", "pf": 31, "pa": 17, "tds": 4,
 					"def_ints": 1, "def_sacks": 2, "difficulty": 1, "mode": "quick", "came_back": true,
 					"box": {"pass_yds": 287, "rush_yds": 96, "pass_td": 3, "rush_td": 1, "pass_att": 24, "pass_comp": 18,

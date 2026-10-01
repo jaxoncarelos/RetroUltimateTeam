@@ -96,6 +96,12 @@ var _pending_result: Dictionary = {}
 var _dead_timer := 0.0
 ## The dead-ball spot is read off the ball once the downed carrier's slide stops.
 var _spot_at_ball := false
+## Where the last tackle made contact (ball position, + small fall-forward credit).
+var tackle_spot := Vector2.ZERO
+var _has_tackle_spot := false
+var _carry_start_x := 0.0           ## where the current carrier got the ball (return yards)
+var _prev_carrier: PlayerAgent = null
+var _prev_pos := Vector2.ZERO       ## carrier position on the previous frame (goal/sideline order)
 
 
 func _init() -> void:
@@ -607,7 +613,7 @@ func start_scramble() -> void:
 ## visible slide (on_tackle), never hidden yardage: the spot is where the ball comes to rest.
 func fall_forward(a: PlayerAgent) -> float:
 	var fwd := 1.0 if a.team == PlayerAgent.Team.OFFENSE else -1.0
-	var yards := clampf(a.tackled_speed * fwd * tuning.fall_forward_time, 0.0, tuning.fall_forward_max)
+	var yards := clampf(a.tackled_speed * fwd * tuning.fall_forward_time, 0.0, tuning.fall_slide_max)
 	# The slide never carries the ball over the goal line he is running at.
 	var ball_x := a.field_pos.x + a.facing * Ball.HOLD_AHEAD
 	var room := (FieldGeo.OPP_GOAL - 0.3 - ball_x) if fwd > 0.0 else (ball_x - FieldGeo.OWN_GOAL - 0.3)
@@ -619,6 +625,11 @@ func on_tackle(tackler: PlayerAgent, runner: PlayerAgent) -> void:
 	runner.tackled_speed = runner.velocity.x
 	var speed := runner.velocity.length()
 	var slide := fall_forward(runner)
+	# The ball is spotted where the hit landed (plus a hair of fall-forward credit); the slide
+	# below is only an animation.
+	var credit := signf(slide) * minf(absf(slide), tuning.fall_forward_max)
+	tackle_spot = Vector2(runner.field_pos.x + runner.facing * Ball.HOLD_AHEAD + credit, runner.field_pos.y)
+	_has_tackle_spot = true
 	runner.knock_down()
 	tackler.knock_down(0.6)
 	tackler.velocity = runner.velocity * 0.5
@@ -724,6 +735,7 @@ func _set_carrier(a: PlayerAgent, lane := PackedVector2Array()) -> void:
 			x.engaged_with = null
 	carrier_lane = lane
 	carrier = a
+	_carry_start_x = a.field_pos.x
 	ball.give_to(a)
 	a.speed_mult = tuning.carrier_speed_mult
 	if a.team == human_team:
@@ -830,49 +842,89 @@ func _check_carrier() -> void:
 	if phase != Phase.LIVE or carrier == null:
 		return
 	var p := carrier.field_pos
+	var prev := _prev_pos if _prev_carrier == carrier else p
+	_prev_carrier = carrier
+	_prev_pos = p
 	if carrier == qb and not scrambling and not pass_thrown and not is_run_play() \
 			and p.x > los_x + 0.5:
 		start_scramble()
 	if carrier.team == PlayerAgent.Team.DEFENSE:
-		_check_return(p)
+		_check_return(p, prev)
 		return
-	if p.x >= FieldGeo.OPP_GOAL:
+	var out := p.y < 0.0 or p.y > FieldGeo.WIDTH
+	if p.x >= FieldGeo.OPP_GOAL and not (out and not _goal_first(prev, p, FieldGeo.OPP_GOAL)):
 		carrier.celebrating = true
 		big_moment.emit("td", p)
 		_end_play("td", p, "TOUCHDOWN!")
 		return
-	if p.y < 0.0 or p.y > FieldGeo.WIDTH:
-		# Out where the ball crossed the sideline; it stays there (the runner coasts on).
-		var at := Vector2(ball.field_pos.x, clampf(ball.field_pos.y, 0.0, FieldGeo.WIDTH))
-		_end_play("out", at, "OUT OF BOUNDS")
-		ball.place(at)
+	if out:
+		_out_of_bounds(prev, p)
 		return
 	if carrier.is_down:
 		if p.x <= FieldGeo.OWN_GOAL:
 			_end_play("safety", p, "SAFETY!")
 		elif carrier == qb and not pass_thrown and not is_run_play() and p.x < los_x:
-			_end_play("sack", ball.field_pos, "SACKED!")
-			_spot_at_ball = true
+			var at := _contact_spot()
+			_end_play("sack", at, "SACKED!")
+			ball.place(at)
 		else:
-			# Spotted where the ball comes to rest after his slide (finalized when the play
-			# ends); a runner downed short of the goal line is never a touchdown.
-			_end_play("tackle", ball.field_pos, "")
-			_spot_at_ball = true
+			# Spotted where the tackle made contact; a runner downed short of the goal
+			# line is never a touchdown. The slide afterwards is cosmetic.
+			var at := _contact_spot()
+			_end_play("tackle", at, "")
+			ball.place(at)
 
 
 ## Interception return (the defense runs toward -x): pick six, or down where tackled.
 ## Downed in the end zone it came from = touchback (the match controller handles spots).
-func _check_return(p: Vector2) -> void:
-	if p.x <= FieldGeo.OWN_GOAL:
+func _check_return(p: Vector2, prev: Vector2) -> void:
+	var out := p.y < 0.0 or p.y > FieldGeo.WIDTH
+	if p.x <= FieldGeo.OWN_GOAL and not (out and not _goal_first(prev, p, FieldGeo.OWN_GOAL)):
 		carrier.celebrating = true
 		big_moment.emit("td", p)
 		_end_play("int_td", p, "PICK SIX!")
-	elif p.y < 0.0 or p.y > FieldGeo.WIDTH:
-		_end_play("int", ball.field_pos, "INTERCEPTED!")
-		ball.place(ball.field_pos)
+	elif out:
+		var at := _exit_point(prev, p)
+		_end_play("int", at, "INTERCEPTED!")
+		ball.place(at)
 	elif carrier.is_down:
-		_end_play("int", ball.field_pos, "INTERCEPTED!")
-		_spot_at_ball = true
+		var at := _contact_spot()
+		_end_play("int", at, "INTERCEPTED!")
+		ball.place(at)
+
+
+## Spot of the tackle that just downed the carrier (falls back to the ball if he went down
+## without a tackle). Consumed once.
+func _contact_spot() -> Vector2:
+	var at := tackle_spot if _has_tackle_spot else ball.field_pos
+	_has_tackle_spot = false
+	return at
+
+
+## True when the segment prev -> p crossed the goal plane `goal_x` no later than it crossed
+## the sideline (so a runner who left the field first never scores).
+func _goal_first(prev: Vector2, p: Vector2, goal_x: float) -> bool:
+	var dx := p.x - prev.x
+	var dy := p.y - prev.y
+	if absf(dx) < 0.0001 or absf(dy) < 0.0001:
+		return true
+	var edge := 0.0 if p.y < 0.0 else FieldGeo.WIDTH
+	return (goal_x - prev.x) / dx <= (edge - prev.y) / dy
+
+
+## Where the carrier's path (prev -> p) left the field, with the ball a hair ahead of him.
+func _exit_point(prev: Vector2, p: Vector2) -> Vector2:
+	var edge := 0.0 if p.y < 0.0 else FieldGeo.WIDTH
+	var dy := p.y - prev.y
+	var t := clampf((edge - prev.y) / dy, 0.0, 1.0) if absf(dy) > 0.0001 else 1.0
+	var x := lerpf(prev.x, p.x, t) + carrier.facing * Ball.HOLD_AHEAD
+	return Vector2(clampf(x, FieldGeo.OWN_GOAL, FieldGeo.OPP_GOAL), edge)
+
+
+func _out_of_bounds(prev: Vector2, p: Vector2) -> void:
+	var at := _exit_point(prev, p)
+	_end_play("out", at, "OUT OF BOUNDS")
+	ball.place(at)
 
 
 ## Human defender's jump at the ball (swat / pick). Timing is judged at the catch point.
@@ -1026,6 +1078,7 @@ func _end_play(type: String, spot: Vector2, text: String) -> void:
 	for a in agents:
 		a.human = false
 	_spot_at_ball = false
+	_has_tackle_spot = false
 	_pending_result = {
 		"type": type,
 		"text": text,
@@ -1043,6 +1096,10 @@ func _end_play(type: String, spot: Vector2, text: String) -> void:
 		"ball_def_slot": _nearest_defender_slot(ball.field_pos) if type == "incomplete" else "",
 	}
 	_set_spot(_pending_result, spot)
+	if type == "td" or type == "int_td":
+		_pending_result["scorer"] = carrier.display_name if carrier != null else ""
+		# Whole-play yardage: from the line of scrimmage for a TD, the return for a pick six.
+		_pending_result["td_yards"] = int(FieldGeo.OPP_GOAL - los_x) if type == "td" else int(maxf(_carry_start_x - FieldGeo.OWN_GOAL, 0.0))
 
 
 func _nearest_defender_slot(at: Vector2) -> String:

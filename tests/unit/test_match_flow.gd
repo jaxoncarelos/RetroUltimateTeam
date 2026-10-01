@@ -76,3 +76,10 @@ func test_pause_menu_offers_quit_with_confirm() -> void:
 	m.request_pause()
 	assert_eq(m.phase, MatchController.Phase.RESULT)
 	assert_true(m._pause_queued)
+
+
+func test_td_headline() -> void:
+	assert_eq(MatchController.td_headline({"type": "td", "scorer": "Tyreek Hill", "td_yards": 42}), "TOUCHDOWN TYREEK HILL - 42 YD")
+	assert_eq(MatchController.td_headline({"type": "int_td", "scorer": "J. Smith", "td_yards": 35}), "PICK SIX J. SMITH - 35 YD")
+	assert_eq(MatchController.td_headline({"type": "td", "yards": 12}), "TOUCHDOWN! 12 YD")
+	assert_eq(MatchController.td_headline({"type": "td"}), "TOUCHDOWN!")

@@ -39,6 +39,7 @@ static func finish(gs: GameState, strength: Dictionary, rng: RandomNumberGenerat
 		form[t] = rng.randfn(0.0, FORM_SD)
 		rate[t] = maxf(0.25, (prior * (1.0 - w) + maxf(obs, 0.0) * w)) * exp(form[t])
 	var summary := {"drives": 0, "momentum": {}}
+	var dlog: Array = []
 	for t in teams:
 		summary["momentum"][t] = snappedf(rate[t], 0.01)
 	# Possessions left (a blowout burns clock: fewer drives), starting with the team that has the ball.
@@ -47,21 +48,24 @@ static func finish(gs: GameState, strength: Dictionary, rng: RandomNumberGenerat
 	var n := int(drives_f) + (1 if rng.randf() < drives_f - floorf(drives_f) else 0)
 	var off := gs.possession if gs.possession != "" else gs.away
 	for i in n:
-		_drive(gs, off, float(rate[off]), rng)
+		_drive(gs, off, float(rate[off]), rng, -1.0, dlog)
 		summary["drives"] += 1
 		off = gs.other(off)
 	# Never end tied: overtime possessions until someone scores (first score wins, a stop hands over).
 	var guard := 0
 	while int(gs.score[gs.home]) == int(gs.score[gs.away]) and guard < 12:
 		var before := int(gs.score[off])
-		_drive(gs, off, float(rate[off]), rng)
+		_drive(gs, off, float(rate[off]), rng, -1.0, dlog)
 		if int(gs.score[off]) == before:
 			off = gs.other(off)
 		guard += 1
 	if int(gs.score[gs.home]) == int(gs.score[gs.away]):
-		_add_fg(gs, gs.home if rng.randf() < 0.5 else gs.away, rng)
+		var fg_team: String = gs.home if rng.randf() < 0.5 else gs.away
+		_add_fg(gs, fg_team, rng)
+		dlog.append({"team": fg_team, "outcome": "fg", "plays": 6, "yards": 35, "points": 3, "start_x": 25.0})
 	gs.clock.seconds_left = 0.0
 	gs.clock.stopped = true
+	summary["drive_log"] = dlog
 	return summary
 
 
@@ -129,7 +133,10 @@ static func sim_drive(gs: GameState, off: String, r: float, start_x: float, rng:
 
 ## One possession for `off`: picks an outcome from the team's rate, then writes plays and yards
 ## that fit it, and the points. With `start_x` (>= 0) the yards fit the field from there.
-static func _drive(gs: GameState, off: String, r: float, rng: RandomNumberGenerator, start_x := -1.0) -> Dictionary:
+## Appends {team, outcome, plays, yards, points, start_x} to `dlog` (start_x = own-goal-line
+## yards, 0-100 scale; consumes no RNG).
+static func _drive(gs: GameState, off: String, r: float, rng: RandomNumberGenerator, start_x := -1.0, dlog: Array = []) -> Dictionary:
+	var pts_before := int(gs.score[off])
 	var s: Dictionary = gs.stats[off]
 	var diff := int(gs.score[off]) - int(gs.score[gs.other(off)])
 	var outcome := _pick(_outcome_probs(r, diff <= -14), rng)
@@ -234,6 +241,10 @@ static func _drive(gs: GameState, off: String, r: float, rng: RandomNumberGenera
 				picked = true
 			else:
 				s["fumbles_lost"] += 1
+	var net := pass_yds + rush_yds - sacks * SACK_YARDS
+	dlog.append({"team": off, "outcome": outcome, "plays": plays, "yards": net,
+			"points": int(gs.score[off]) - pts_before,
+			"start_x": clampf(100.0 - net, 1.0, 60.0) if outcome == "td" else 25.0})
 	return {"outcome": outcome, "plays": plays, "yards": yards, "int": picked,
 			"end_x": (start_x if start_x >= 0.0 else FieldGeo.OWN_GOAL + 25.0) + yards}
 

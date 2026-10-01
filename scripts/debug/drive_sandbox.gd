@@ -343,17 +343,12 @@ func _on_play_selected(play: PlayDef) -> void:
 
 
 func _update_snap_hint() -> void:
-	if selected_play.is_run():
-		hud.set_hint("PRESS THE QB TO SNAP  ·  HOLD + DRAG UP/DOWN TO STEER")
-	else:
-		hud.set_hint("DRAG FROM THE QB: BACK = AIM  ·  FORWARD = RUN  ·  OR TAP")
+	hud.set_hint("DRAG BACK TO SNAP")
 
 
+## Taps no longer snap on offense (drag back to snap); defense snaps through its own ready tap.
 func _on_tap(_pos: Vector2) -> void:
 	match state:
-		State.PLAY_CALL:
-			if not _human_defense():
-				_snap()
 		State.DRIVE_OVER:
 			_restart_drive()
 
@@ -379,9 +374,9 @@ func _snap() -> void:
 	if _human_defense():
 		hud.set_hint("DRAG TO MOVE  ·  RUN INTO THE CARRIER  ·  TAP HIM TO DIVE")
 	elif selected_play.is_run():
-		hud.set_hint("DRAG UP/DOWN TO STEER  ·  FLICK TO JUKE  ·  DOUBLE-TAP TO DIVE")
+		hud.set_hint("DRAG TO STEER  ·  SWIPE ← HESI  → DIVE  ↑↓ JUKE")
 	else:
-		hud.set_hint("DRAG BACK TO AIM, RELEASE TO THROW  ·  DRAG FORWARD TO RUN")
+		hud.set_hint("DRAG BACK TO AIM, RELEASE TO THROW  ·  TAP = PASS TYPE  ·  DRAG FORWARD TO RUN")
 
 
 ## Runs the live play to the whistle in one go (Defense Pace auto-sim).

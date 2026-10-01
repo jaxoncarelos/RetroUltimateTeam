@@ -19,6 +19,7 @@ var _obj_col: VBoxContainer
 var _grow_col: VBoxContainer
 var _pack_btn: Button
 var _score_panel: Control
+var _has_box := false
 
 
 func _ready() -> void:
@@ -85,6 +86,10 @@ func _build(r: Dictionary) -> void:
 	xh.add_child(_xp_bar)
 	_xp_gain = MetaUI.label("+0 XP", UiSkin.STAR_BLUE)
 	xh.add_child(_xp_gain)
+	var rb: Dictionary = res.get("result", {})
+	if rb.get("simulated", false) or not (rb.get("opp_box", {}) as Dictionary).is_empty():
+		right.add_child(_box_panel(rb))
+		_has_box = true
 	var op := RetroPanel.new("OBJECTIVES COMPLETE", UiSkin.PANEL, 4)
 	op.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(op)
@@ -125,10 +130,60 @@ func _score(r: Dictionary) -> Control:
 				int(b.get("pass_att", 0)), int(b.get("pass_yds", 0)), int(b.get("rush_att", 0)), int(b.get("rush_yds", 0)),
 				int(b.get("tds", int(r.get("tds", 0)))), int(r.get("def_sacks", 0)), int(r.get("def_ints", 0))]
 	if r.get("simulated", false):
-		sv.line = "SIMULATED GAME"
+		sv.line = ""
 	sv.msg = str(res.get("mode_msg", ""))
 	p.add_child(sv)
 	return p
+
+
+## Two-team box score (pass yds, rush yds, TDs, INT thrown, sacks taken) plus the PLAY-BY-PLAY button
+## when the result carries a drive_log (simulated games) or a play_log (played games).
+func _box_panel(r: Dictionary) -> Control:
+	var panel := RetroPanel.new("BOX SCORE", UiSkin.PANEL, 4)
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 4)
+	panel.add_child(h)
+	var g := GridContainer.new()
+	g.columns = 6
+	g.add_theme_constant_override("h_separation", 5)
+	g.add_theme_constant_override("v_separation", 0)
+	g.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	g.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(g)
+	for head in ["", "PASS", "RUSH", "TD", "INT", "SACK"]:
+		g.add_child(MetaUI.label(head, UiSkin.MUTED, 8, HORIZONTAL_ALIGNMENT_RIGHT))
+	var you := str(r.get("team", prof.franchise_team))
+	var rows: Array = [[you, r.get("box", {})], [str(r.get("opponent", "OPP")), r.get("opp_box", {})]]
+	for e in rows:
+		var b: Dictionary = e[1]
+		g.add_child(MetaUI.label(str(e[0]), UiSkin.YELLOW))
+		var vals: Array = ["-", "-", "-", "-", "-"]
+		if not b.is_empty():
+			vals = [int(b.get("pass_yds", 0)), int(b.get("rush_yds", 0)), int(b.get("tds", int(b.get("pass_td", 0)) + int(b.get("rush_td", 0)))),
+					int(b.get("int", 0)), int(b.get("sacks", 0))]
+		for v in vals:
+			g.add_child(MetaUI.label(str(v), UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_RIGHT))
+	var plays := play_by_play_of(r)
+	if not plays.is_empty():
+		var btn := MetaUI.button("PLAYS", Vector2(52, 28), func() -> void: _open_pbp(plays))
+		btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(btn)
+	return panel
+
+
+## The play list for a result: a real play_log if present, else one synthesized from drive_log.
+static func play_by_play_of(r: Dictionary) -> Array[Dictionary]:
+	if not (r.get("play_log", []) as Array).is_empty():
+		return PlayByPlay.from_log(r["play_log"])
+	if not (r.get("drive_log", []) as Array).is_empty():
+		return PlayByPlay.from_drives(r["drive_log"], int(r.get("sim_seed", 1)))
+	return [] as Array[Dictionary]
+
+
+func _open_pbp(plays: Array[Dictionary]) -> void:
+	var v := PlayByPlayView.new()
+	add_child(v)
+	v.setup(plays)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -175,10 +230,11 @@ func _run() -> void:
 		_obj_col.add_child(MetaUI.label("NONE THIS GAME", UiSkin.MUTED))
 		_obj_col.add_child(MetaUI.label("TAP OBJECTIVES TO SEE GOALS", UiSkin.MUTED))
 	var shown := 0
+	var max_show := 3 if _has_box else 5
 	var rest_coins := 0
 	for item in objs:
 		shown += 1
-		if shown > 5 and objs.size() > 6:
+		if shown > max_show and objs.size() > max_show + 1:
 			rest_coins += int(item["coins"])
 			running += int(item["coins"])
 			continue
@@ -194,7 +250,7 @@ func _run() -> void:
 		_total_l.text = "+%s" % CoinPill.fmt(running)
 		await _wait(0.25)
 	if rest_coins > 0:
-		var more := _obj_line("+%d MORE" % (objs.size() - 5), rest_coins, "")
+		var more := _obj_line("+%d MORE" % (objs.size() - max_show), rest_coins, "")
 		_obj_col.add_child(more)
 		Fx.pop(more, 1.15, 0.25)
 		Sfx.play("claim")

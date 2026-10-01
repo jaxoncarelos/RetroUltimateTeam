@@ -208,6 +208,35 @@ func test_match_rewards_are_itemized() -> void:
 	assert_eq(fourth["total"], EconomyRules.WIN_COINS)
 
 
+func _sim_r(pf: int, pa: int, tds: int, take: int, played: Dictionary = {}) -> Dictionary:
+	var r := {"pf": pf, "pa": pa, "tds": tds, "def_ints": take, "def_sacks": 0, "difficulty": 1, "simulated": true}
+	if not played.is_empty():
+		r["played_box"] = played
+	return r
+
+
+func test_sim_rewards_split() -> void:
+	# Fully simmed win: ~400 (3 TDs and 2 takeaways at x0.1 = +6 +5).
+	var win := EconomyRules.match_rewards(_sim_r(24, 10, 3, 2))
+	assert_eq(win["total"], 400 + 6 + 5)
+	print("REWARD full sim win: ", win["total"])
+	# Fully simmed loss: loss coins only plus a sliver of stat bonus.
+	var loss := EconomyRules.match_rewards(_sim_r(10, 24, 1, 0))
+	assert_eq(loss["total"], EconomyRules.LOSS_COINS + 2)
+	print("REWARD full sim loss: ", loss["total"])
+	# Played 2 TDs + 1 INT, simmed 1 more TD + 1 sack, won: played at full rate, remainder x0.1.
+	var pb := {"tds": 2, "def_ints": 1, "def_sacks": 0}
+	var half_win := EconomyRules.match_rewards(_sim_r(28, 10, 3, 2, pb))
+	assert_eq(half_win["total"], 400 + int(round(2.1 * 20)) + int(round(1.1 * 25)))
+	print("REWARD half played win: ", half_win["total"])
+	var half_loss := EconomyRules.match_rewards(_sim_r(14, 28, 2, 2, {"tds": 1, "def_ints": 0, "def_sacks": 0}))
+	assert_eq(half_loss["total"], EconomyRules.LOSS_COINS + 22 + 5)
+	print("REWARD half played loss: ", half_loss["total"])
+	# Fully played: unchanged (no simulated key).
+	var played := EconomyRules.match_rewards({"pf": 24, "pa": 10, "tds": 3, "def_ints": 2, "def_sacks": 0, "difficulty": 1})
+	assert_eq(played["total"], 400 + 60 + 50)
+
+
 func _box(won: bool, r: RandomNumberGenerator) -> Dictionary:
 	var tds := r.randi_range(2, 4) if won else r.randi_range(1, 3)
 	return {"pass_comp": r.randi_range(12, 22), "pass_att": 28, "pass_yds": r.randi_range(150, 300),

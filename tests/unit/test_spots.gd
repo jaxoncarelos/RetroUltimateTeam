@@ -89,7 +89,34 @@ func test_tackle_slide_is_visible_not_hidden_yards() -> void:
 	for i in 90:
 		c.step(DT, runner.tuning)
 	assert_almost_eq(c.field_pos.x - at, slide, 0.25, "the body slides exactly the fall-forward yards")
-	assert_lte(slide, runner.tuning.fall_forward_max)
+	assert_lte(slide, runner.tuning.fall_slide_max)
+
+
+func test_spot_is_contact_point_not_end_of_slide() -> void:
+	runner.rng.seed = 3
+	runner.setup_play(_play("hb_dive"), _play("cover2"), 35.0, FieldGeo.CENTER_Y, {}, {})
+	runner.snap()
+	for i in 90:
+		runner._physics_process(DT)
+		if runner.carrier != null and runner.carrier != runner.qb:
+			break
+	var c := runner.carrier
+	c.field_pos = Vector2(50.0, c.field_pos.y)
+	c.velocity = Vector2(9.0, 0.0)
+	var contact_ball_x := 50.0 + c.facing * Ball.HOLD_AHEAD
+	runner.on_tackle(runner.defense[0], c)
+	for i in 240:
+		runner._physics_process(DT)
+		if not ended.is_empty():
+			break
+	for i in 60:
+		runner._physics_process(DT)
+	assert_false(ended.is_empty())
+	var r: Dictionary = ended[0]
+	assert_eq(r["type"], "tackle")
+	assert_almost_eq(float(r["spot_x"]), contact_ball_x, 0.5 + runner.tuning.fall_forward_max)
+	assert_gt(c.field_pos.x - 50.0, 1.0, "the body slid well past the contact point")
+	assert_gt(c.field_pos.x - float(r["spot_x"]), 0.8, "...but the spot did not follow it")
 
 
 func test_downed_at_the_one_is_not_a_touchdown() -> void:
@@ -125,3 +152,38 @@ func test_spot_yard_matches_down_tracker() -> void:
 	assert_eq(DownTracker.spot_yard(43.49), 43.0)
 	assert_eq(DownTracker.spot_yard(43.5), 44.0)
 	assert_eq(DownTracker.spot_yard(109.7), FieldGeo.OPP_GOAL - 1.0, "never rounded into the end zone")
+
+
+func _carry_to(pos: Vector2, vel: Vector2) -> PlayerAgent:
+	runner.rng.seed = 3
+	runner.setup_play(_play("hb_dive"), _play("cover2"), 100.0, FieldGeo.CENTER_Y, {}, {})
+	runner.snap()
+	for i in 120:
+		runner._physics_process(DT)
+		if runner.carrier != null and runner.carrier != runner.qb:
+			break
+	var c := runner.carrier
+	c.field_pos = pos
+	c.velocity = vel
+	runner._prev_carrier = null
+	runner._check_carrier()   # records the previous in-bounds position
+	return c
+
+
+func test_leaving_the_field_before_the_goal_plane_is_no_touchdown() -> void:
+	# One frame: in bounds short of the goal -> out of bounds and past the goal line.
+	var c := _carry_to(Vector2(FieldGeo.OPP_GOAL - 0.3, 0.2), Vector2.ZERO)
+	c.field_pos = Vector2(FieldGeo.OPP_GOAL + 0.4, -0.3)
+	runner._check_carrier()
+	assert_eq(runner._pending_result.get("type", ""), "out", "stepped out first: no points")
+
+
+func test_crossing_the_goal_plane_in_bounds_scores_with_scorer_and_yards() -> void:
+	var c := _carry_to(Vector2(FieldGeo.OPP_GOAL - 0.3, 0.4), Vector2.ZERO)
+	c.display_name = "Tyreek Hill"
+	c.field_pos = Vector2(FieldGeo.OPP_GOAL + 0.4, -0.05)   # goal plane crossed first, then out
+	runner._check_carrier()
+	var r: Dictionary = runner._pending_result
+	assert_eq(r.get("type", ""), "td")
+	assert_eq(r.get("scorer", ""), "Tyreek Hill")
+	assert_eq(r.get("td_yards", -1), int(FieldGeo.OPP_GOAL - 100.0))

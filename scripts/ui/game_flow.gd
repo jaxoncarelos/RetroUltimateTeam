@@ -106,13 +106,14 @@ static func sim_result(prof: Profile, cfg: Dictionary) -> Dictionary:
 	var opp: String = cfg.get("away", "PHI")
 	var gs := GameState.new(you, opp)
 	gs.start_possession(opp, 25.0)   # your team receives the opening kickoff
-	GameSim.finish(gs, {you: Collection.team_ovr(prof, GameData.db), opp: GameData.db.team_ovr(opp)}, rng)
+	var summary := GameSim.finish(gs, {you: Collection.team_ovr(prof, GameData.db), opp: GameData.db.team_ovr(opp)}, rng)
 	var b := gs.box_score(you)
 	return {"team": you, "opponent": opp, "pf": int(b["pf"]), "pa": int(b["pa"]), "forfeit": false, "tds": int(b["tds"]),
 			"def_ints": int(b["def_ints"]), "def_sacks": int(b["def_sacks"]),
 			"difficulty": int(cfg.get("difficulty", Settings.difficulty)),
 			"mode": str(cfg.get("mode", "quick")), "extra": cfg.get("extra", {}), "came_back": false,
-			"challenge_won": false, "simulated": true, "box": b}
+			"challenge_won": false, "simulated": true, "box": b, "opp_box": gs.box_score(opp),
+			"drive_log": summary.get("drive_log", []), "sim_seed": int(rng.randi() & 0x7fffffff)}
 
 
 ## First reward pack waiting to be opened, as a pack-opening config ({} if none).

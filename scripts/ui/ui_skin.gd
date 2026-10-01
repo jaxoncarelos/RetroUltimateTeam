@@ -27,6 +27,7 @@ const COIN := Color("#ffcf40")
 const GREEN := Color("#3fe071")
 const RED := Color("#ff2e57")
 const BAR_BG := Color("#05081f")
+const HUD_EDGE := Color("#4a5fd0")      ## calm border for in-match HUD boxes (instead of near-white)
 
 # ---------------------------------------------------------------- bitmaps
 ## Our emblem: a shield with a star over a football (15x16).

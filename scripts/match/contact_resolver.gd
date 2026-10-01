@@ -246,6 +246,8 @@ func _roll(d: PlayerAgent, c: PlayerAgent, diving: bool, human: bool, mult := 1.
 	var p := RatingModel.tackle_prob(t, d.attr("tak"), c.attr("elu"), c.attr("str"), c.juke_timer > 0.0)
 	# Every tackle he already broke this play makes the next one likelier (legs tire, help arrives).
 	p += t.broken_tackle_bonus * ctx.broken_tackles
+	if c.hesi_timer > 0.0:
+		p *= t.hesi_tackle_mult   # hesitation: the carrier is briefly harder to bring down
 	if diving:
 		p += t.dive_tackle_bonus
 	var cap := t.tackle_max

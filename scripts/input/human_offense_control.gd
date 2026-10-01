@@ -1,9 +1,9 @@
 class_name HumanOffenseControl
 extends Node
 ## Offense controls (Retro Bowl style, one continuous gesture):
-##   Pre-snap: press on/near the QB -> snaps at once; keep the finger down and the same drag
-##     aims (drag BACK, slingshot) or scrambles (drag FORWARD). A tap anywhere also snaps.
-##     Dragging from anywhere else snaps too and starts aiming.
+##   Pre-snap: DRAG BACK (away from the line, GameplayTuning.snap_pull_dist px) from the press
+##     point to snap -- on every play. Taps and short drags never snap. The same finger then
+##     aims (pass play) or steers the carrier after the handoff (run play).
 ##   QB with the ball: drag BACK to aim, release to throw; drag FORWARD to scramble.
 ##     Aim = slingshot: the pull's direction is the throw direction and its length the
 ##     distance (the reticle is where the ball lands). Loft is automatic and previewed:
@@ -11,7 +11,8 @@ extends Node
 ##     any defender standing in the throwing lane. A light aim assist pulls the reticle onto a
 ##     receiver's in-stride spot when it is close (GameplayTuning.aim_assist_*).
 ##   Ball carrier: auto-runs the play's lane, then straight; drag up/down to steer (relative
-##   to where steering began), drag back to slow, flick up/down to juke, double-tap to dive.
+##   to where steering began), drag back to slow. Fast swipes: LEFT = hesitate, RIGHT = dive,
+##   UP/DOWN = juke.
 
 signal aim_changed(active: bool, target: Vector2)
 ## Emitted when a pre-snap gesture should snap the ball (the owner decides and calls snap).
@@ -41,12 +42,10 @@ func bind(p_runner: PlayRunner, input: TouchInput, p_tuning: GameplayTuning) -> 
 	tuning = p_tuning
 	runner.human_input = self
 	input.flick_speed = tuning.flick_speed
-	input.pressed.connect(_on_pressed)
 	input.drag_started.connect(_on_drag_started)
 	input.dragged.connect(_on_dragged)
 	input.released.connect(_on_released)
-	input.flicked.connect(_on_flicked)
-	input.double_tapped.connect(_on_double_tapped)
+	input.swiped.connect(_on_swiped)
 	input.tapped.connect(_on_tapped)
 	input.extra_tapped.connect(_on_extra_tapped)
 	runner.carrier_changed.connect(func(_a: PlayerAgent) -> void: _cancel_aim())
@@ -82,14 +81,28 @@ func _request_snap() -> void:
 	snap_requested.emit()
 
 
-func _on_pressed(pos: Vector2) -> void:
-	if _pre_snap() and is_near_qb(pos):
-		_request_snap()
+## Pre-snap: a deliberate pull BACK (-x, mostly horizontal) from the press point snaps the ball.
+func is_snap_pull(start: Vector2, pos: Vector2) -> bool:
+	var d := pos - start
+	return d.x <= -tuning.snap_pull_dist and -d.x >= absf(d.y) * 0.8
+
+
+## Snaps when the pre-snap drag is a deliberate pull-back, then starts the live gesture.
+func _try_snap(start: Vector2, pos: Vector2) -> void:
+	if not is_snap_pull(start, pos):
+		return
+	_request_snap()
+	_start_gesture(start, pos)
 
 
 func _on_drag_started(start: Vector2, pos: Vector2) -> void:
 	if _pre_snap():
-		_request_snap()
+		_try_snap(start, pos)
+	elif _live():
+		_start_gesture(start, pos)
+
+
+func _start_gesture(start: Vector2, pos: Vector2) -> void:
 	if not _live():
 		return
 	var d := pos - start
@@ -112,7 +125,10 @@ func _begin_steer(anchor: Vector2) -> void:
 	steer_throttle = 1.0
 
 
-func _on_dragged(_start: Vector2, pos: Vector2) -> void:
+func _on_dragged(start: Vector2, pos: Vector2) -> void:
+	if _pre_snap():
+		_try_snap(start, pos)
+		return
 	if not _live():
 		return
 	# A run play's handoff (or a catch) arrives mid-gesture: start steering from here.
@@ -122,6 +138,12 @@ func _on_dragged(_start: Vector2, pos: Vector2) -> void:
 		Mode.AIM:
 			if not runner.qb_is_passer():
 				_cancel_aim()
+				return
+			if pos.x - _aim_anchor.x > 20.0:
+				# Pushed forward past the press point after the pull-back snap: scramble instead.
+				_cancel_aim()
+				runner.start_scramble()
+				_begin_steer(pos)
 				return
 			aim_target = runner.aim_point(_aim_anchor, pos)
 			runner.aim_preview = aim_target
@@ -153,16 +175,27 @@ func _cancel_aim() -> void:
 	aim_changed.emit(false, Vector2.ZERO)
 
 
-func _on_flicked(dir: Vector2) -> void:
-	var c := _human_carrier()
-	if _live() and c != null:
-		c.start_juke(tuning, dir.y)
+## Swipe direction -> move: "left", "right", "up" or "down" (dominant axis).
+static func swipe_name(dir: Vector2) -> String:
+	if absf(dir.x) >= absf(dir.y):
+		return "right" if dir.x > 0.0 else "left"
+	return "down" if dir.y > 0.0 else "up"
 
 
-func _on_double_tapped(_pos: Vector2) -> void:
+func _on_swiped(dir: Vector2) -> void:
 	var c := _human_carrier()
-	if _live() and c != null and c.can_act():
-		c.start_dive(tuning, Vector2(1.0, steer_lateral * 0.5))
+	if not _live() or c == null:
+		return
+	match swipe_name(dir):
+		"left":
+			c.start_hesi(tuning)
+		"right":
+			if c.can_act():
+				c.start_dive(tuning, Vector2(1.0, steer_lateral * 0.5))
+		"up":
+			c.start_juke(tuning, -1.0)
+		"down":
+			c.start_juke(tuning, 1.0)
 
 
 ## Called by PlayRunner every physics frame before the brains.
