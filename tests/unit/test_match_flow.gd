@@ -22,7 +22,7 @@ func test_human_match_runs_through_many_plays() -> void:
 	var possessions := {}
 	# Budget in frames, not wall time: one-time art baking at kickoff causes long first frames.
 	var frames := 0
-	while snaps < 14 and frames < 5000:
+	while (snaps < 14 or m.gs.drive_no <= 2) and frames < 9000:
 		await wait_frames(1)
 		frames += 1
 		if m.phase == MatchController.Phase.PLAY_CALL and not m.hud.tip_open():
