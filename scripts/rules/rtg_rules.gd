@@ -311,6 +311,7 @@ static func game_config(rtg: Dictionary, difficulty: int, conditions: Dictionary
 			"conditions": conditions, "label": g["label"],
 			"extra": {"home": g["home"], "away": g["away"], "label": g["label"], "playoff": g["playoff"]},
 			"rtg": {"pos": p["pos"], "slot": SLOT[str(p["pos"])], "trust": trust / 100.0, "audibles": audibles(trust),
+				"show_tips": int(rtg["year"]) == 1 and (rtg.get("games", []) as Array).is_empty(),
 				"player": {"name": p["name"], "jersey": int(p["jersey"]), "attrs": p["attrs"], "look": p.get("look", {})}}}
 
 

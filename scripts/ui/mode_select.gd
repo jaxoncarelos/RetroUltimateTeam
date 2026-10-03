@@ -1,5 +1,5 @@
 extends Control
-## MODE SELECT: big stacked buttons with icons (Season, Quick Match, Challenges,
+## MODE SELECT: big stacked buttons with icons (Season, Quick Match, Challenges, Road to Glory,
 ## Ultimate Team), Retro Bowl style.
 
 
@@ -7,7 +7,7 @@ func _ready() -> void:
 	var ui := MetaUI.screen(self, "MODE SELECT")
 	var root: VBoxContainer = ui["root"]
 	root.alignment = BoxContainer.ALIGNMENT_CENTER
-	root.add_theme_constant_override("separation", 7)
+	root.add_theme_constant_override("separation", 5)
 	var season_label := "SEASON MODE"
 	var s := SaveManager.profile.season
 	if not s.is_empty() and s.get("phase", "") != "done":
@@ -22,26 +22,31 @@ func _ready() -> void:
 			func() -> void: SceneRouter.goto(SceneRouter.CHALLENGES))
 	_mode(root, "cards", "ULTIMATE TEAM", "OPEN PACKS, BUILD YOUR SQUAD",
 			func() -> void: SceneRouter.goto(SceneRouter.STORE))
+	var r := SaveManager.profile.rtg
+	var rtg_sub := "BE ONE PLAYER: GET DRAFTED, BECOME A LEGEND"
+	if not r.is_empty() and r.has("player"):
+		rtg_sub = "%s %s  ·  %d OVR  ·  YEAR %d" % [r["player"]["pos"], r["player"]["name"], RtgRules.player_ovr(r), int(r.get("year", 1))]
+	_mode(root, "face", "ROAD TO GLORY", rtg_sub, func() -> void: SceneRouter.goto(SceneRouter.RTG_HUB))
 
 
 func _mode(parent: Control, icon: String, title: String, sub: String, cb: Callable) -> void:
 	var row := CenterContainer.new()
 	parent.add_child(row)
-	var b := MetaUI.button("", Vector2(280, 36), cb)
+	var b := MetaUI.button("", Vector2(280, 32), cb)
 	row.add_child(b)
 	var ic := TextureRect.new()
 	ic.texture = UiSkin.icon(icon)
 	ic.size = UiSkin.icon(icon).get_size() * 2.0
 	ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	ic.position = Vector2(10, roundf((34 - ic.size.y) * 0.5))
+	ic.position = Vector2(10, roundf((30 - ic.size.y) * 0.5))
 	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ic.modulate = UiSkin.YELLOW
 	b.add_child(ic)
 	var t := MetaUI.label(title, UiSkin.WHITE)
-	t.position = Vector2(44, 7)
+	t.position = Vector2(44, 5)
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(t)
 	var st := MetaUI.label(sub, UiSkin.MUTED)
-	st.position = Vector2(44, 18)
+	st.position = Vector2(44, 16)
 	st.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(st)

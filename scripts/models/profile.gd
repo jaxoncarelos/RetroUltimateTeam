@@ -25,6 +25,8 @@ var coach := {"xp": 0, "level": 1, "perks": {}}   ## ProgressionRules (coach lev
 var login := {"day": 0, "streak": 0}   ## DailyRules (unix day of the last check-in)
 var pending_packs: Array = []    ## reward pack ids waiting to be opened (EconomyRules.open_pending)
 var pending_pick: Dictionary = {}  ## a bought draft pack waiting for your pick: {pack, options: [card ids]}
+var rtg: Dictionary = {}         ## Road to Glory career (RtgRules), {} = none yet
+var rtg_legends: Array = []      ## retired Road to Glory players (RtgRules.retire entries)
 
 
 func has_team() -> bool:
@@ -70,6 +72,7 @@ func to_dict() -> Dictionary:
 		"challenges": challenges.duplicate(true), "stats": stats.duplicate(), "sets_done": sets_done.duplicate(),
 		"objectives": objectives.duplicate(true), "coach": coach.duplicate(), "login": login.duplicate(),
 		"pending_packs": pending_packs.duplicate(), "pending_pick": pending_pick.duplicate(true),
+		"rtg": rtg.duplicate(true), "rtg_legends": rtg_legends.duplicate(true),
 	}
 
 
@@ -109,6 +112,8 @@ static func from_dict(d: Dictionary) -> Profile:
 		for o in pk["options"]:
 			opts.append(str(o))
 		p.pending_pick = {"pack": str(pk.get("pack", "")), "options": opts}
+	p.rtg = _ints_deep(data.get("rtg", {}))
+	p.rtg_legends = _ints_deep(data.get("rtg_legends", []))
 	return p
 
 

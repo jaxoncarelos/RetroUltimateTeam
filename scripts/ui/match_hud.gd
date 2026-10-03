@@ -396,6 +396,14 @@ func set_rtg_line(text: String) -> void:
 func add_rtg_pad(pad: Control) -> void:
 	_safe.add_child(pad)
 	_safe.move_child(pad, 0)
+	pad.anchor_left = 0.0
+	pad.anchor_top = 0.0
+	pad.anchor_right = 1.0
+	pad.anchor_bottom = 1.0
+	pad.offset_left = 0.0
+	pad.offset_top = 0.0
+	pad.offset_right = 0.0
+	pad.offset_bottom = 0.0
 
 
 ## The category-tabbed playbook grid (opened by the MORE card).

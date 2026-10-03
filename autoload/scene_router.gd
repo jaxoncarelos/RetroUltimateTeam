@@ -24,6 +24,7 @@ const RTG_DRAFT := "res://scenes/meta/rtg_draft.tscn"
 const RTG_POSTGAME := "res://scenes/meta/rtg_postgame.tscn"
 const RTG_UPGRADE := "res://scenes/meta/rtg_upgrade.tscn"
 const RTG_OFFSEASON := "res://scenes/meta/rtg_offseason.tscn"
+const RTG_DRILL := "res://scenes/match/rtg_drill.tscn"
 
 const WIPE_TIME := 0.22
 

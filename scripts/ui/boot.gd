@@ -5,7 +5,7 @@ extends Node
 const SANDBOX := "res://scenes/debug/drive_sandbox.tscn"
 const MATCH := "res://scenes/match/match.tscn"
 const SANDBOX_FLAGS := ["--sim=", "--autoplay", "--defend", "--sandbox", "--spam=", "--look=", "--grid", "--autosnap"]
-const MATCH_FLAGS := ["--ai-vs-ai=", "--watch", "--quick", "--home=", "--away="]
+const MATCH_FLAGS := ["--ai-vs-ai=", "--watch", "--quick", "--home=", "--away=", "--rtg-game="]
 
 
 func _ready() -> void:
@@ -65,12 +65,49 @@ func _demo_profile() -> void:
 			var sc := SeasonRules.sim_score(75, 75, rng)
 			SeasonRules.record_game(prof.season, g[0], g[1], sc[0], sc[1])
 			prof.season["week"] = int(prof.season["week"]) + 1
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--rtg="):
+			_demo_rtg(prof, a.trim_prefix("--rtg=").to_upper(), rng)
 	SaveManager.profile = prof
+
+
+## Debug: a Road to Glory career (`--rtg=WR`): drafted, two games into season 1. Add
+## `--rtg-stage=draft` (before the draft, combine done) or `--rtg-stage=offseason` (season over).
+func _demo_rtg(prof: Profile, pos: String, rng: RandomNumberGenerator) -> void:
+	if not pos in RtgRules.POSITIONS:
+		pos = "WR"
+	var stage := "season"
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--rtg-stage="):
+			stage = a.trim_prefix("--rtg-stage=")
+	var arch: String = RtgRules.ARCHETYPES[pos][0]["id"]
+	var player := RtgRules.new_player(pos, arch, "JALEN", "CARTER", 11 if pos in ["WR", "QB"] else 24,
+			{"skin": 4, "hair": "dreads", "hair_color": "black", "beard": "stubble", "visor": "tinted"})
+	prof.rtg = RtgRules.new_career(player)
+	if stage == "draft":
+		prof.rtg["combine"] = 78.0
+		return
+	RtgFlow.draft(prof.rtg, 78.0)
+	RtgFlow.sign_rookie(prof.rtg)
+	var games := 2 if stage == "season" else 40
+	for i in games:
+		var r := RtgRules.sim_game(prof.rtg, rng)
+		if r.is_empty():
+			break
+		RtgRules.apply_game(prof.rtg, r, GameData.teams, rng)
+	prof.rtg["xp"] = int(prof.rtg["xp"]) + 1500
 
 
 ## Debug configs so `--screen=X` shows something meaningful for screens that need input.
 func _demo_config(screen: String) -> Dictionary:
 	var prof := SaveManager.profile
+	if screen == "rtg_postgame" and not prof.rtg.is_empty():
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 5
+		var r := RtgRules.sim_game(prof.rtg, rng)
+		r["simulated"] = false
+		r["rtg"]["highlights"] = [{"text": "34 YD TOUCHDOWN CATCH", "pts": 97.0}, {"text": "DROPPED IT", "pts": 20.0}]
+		return {"last_result": r}
 	if not prof.has_team():
 		return {}
 	match screen:

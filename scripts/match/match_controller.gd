@@ -1026,6 +1026,12 @@ var _tips_seen: Dictionary = {}
 
 
 func _coach_tips() -> void:
+	if _rtg_on():
+		# Road to Glory: one controls tip for your position in your first game.
+		if rtg.get("show_tips", false) and not _tips_seen.has("rtg") and not _sim():
+			_tips_seen["rtg"] = true
+			hud.show_tip(RtgDrill.TIPS.get(str(rtg["pos"]), ""))
+		return
 	if Settings.tutorial_done or _sim():
 		return
 	var key := ""
