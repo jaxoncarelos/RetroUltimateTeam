@@ -37,6 +37,9 @@ func _draw() -> void:
 	var me := runner.locked
 	if runner.phase == PlayRunner.Phase.PRE_SNAP and me.team == PlayerAgent.Team.DEFENSE:
 		_draw_assignment(me)
+	if runner.phase == PlayRunner.Phase.LIVE and me.team == PlayerAgent.Team.OFFENSE and me != runner.carrier \
+			and me != runner.qb and str(me.assignment.get("type", "")) == "route":
+		_draw_route(me)
 	if runner.phase == PlayRunner.Phase.LIVE:
 		if control != null and control.tele_agent != null and is_instance_valid(control.tele_agent):
 			_draw_telegraph(control.tele_agent, control.tele_dir)
@@ -70,6 +73,30 @@ func _draw_assignment(me: PlayerAgent) -> void:
 			var r := Rect2(FieldProjection.to_screen(center - sz * 0.5), FieldProjection.to_screen(sz))
 			draw_rect(r, Color(UiSkin.YELLOW, 0.12))
 			draw_rect(r, col, false, 1.0)
+
+
+## Your route stays on the field while you run it by hand: gold while you're on it, red when
+## you've drifted off (the QB stops trusting it).
+func _draw_route(me: PlayerAgent) -> void:
+	var path: PackedVector2Array = me.assignment.get("path", PackedVector2Array())
+	if path.is_empty():
+		return
+	var on := runner.route_offset(me) <= runner.tuning.rtg_off_route
+	var col := Color(UiSkin.YELLOW, 0.75) if on else Color("#ff4b4b", 0.75)
+	var pts := PackedVector2Array([FieldProjection.to_screen(me.start_pos).round()])
+	for p in path:
+		pts.append(FieldProjection.to_screen(me.start_pos + p).round())
+	if str(me.assignment.get("end", "continue")) != "sit":
+		var a := pts[pts.size() - 2]
+		var b := pts[pts.size() - 1]
+		pts.append(b + (b - a).normalized() * 60.0)
+	draw_polyline(pts, Color(0.02, 0.04, 0.2, 0.45), 4.0)
+	draw_polyline(pts, col, 2.0)
+	for i in range(1, pts.size() - 1):
+		draw_circle(pts[i], 2.5, Color.WHITE)
+	if not on:
+		var at := FieldProjection.to_screen(me.field_pos)
+		UiSkin.draw_text_c(self, at.x, at.y + 16.0, "GET ON YOUR ROUTE", 8, Color("#ff4b4b"))
 
 
 func _draw_telegraph(o: PlayerAgent, dir: Vector2) -> void:

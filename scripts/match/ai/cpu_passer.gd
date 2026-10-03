@@ -65,6 +65,10 @@ func update(dt: float) -> Dictionary:
 	var look := QBReadLogic.evaluate(ctx, progression[read_idx])
 	if not look.is_empty() and progression[read_idx] == favorite:
 		look["openness"] = float(look["openness"]) + favor + (0.6 if calling else 0.0)
+		if favorite.human:
+			# A hand-run route: the QB throws to the route he drew; wander off it and he hesitates.
+			var off := ctx.route_offset(favorite)
+			look["openness"] = float(look["openness"]) - clampf((off - t.rtg_off_route) / 3.0, 0.0, 1.0) * t.rtg_off_route_cost
 	# A deep call is a shot: he waits for the deep man instead of dumping it short right away.
 	var patient := ctx.off_play != null and ctx.off_play.category == "DEEP" and ctx.play_time < t.cpu_deep_patience
 	var too_short := not look.is_empty() and float(look["target"].x) - ctx.los_x < t.cpu_deep_min_air

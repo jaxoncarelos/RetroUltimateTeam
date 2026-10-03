@@ -175,19 +175,61 @@ func test_buttons_follow_the_situation() -> void:
 	assert_eq(ids, ["juke", "burst", "spin", "power", "dive"])
 
 
-func test_receiver_off_script_keeps_running_when_let_go() -> void:
+func test_receiver_runs_his_route_by_hand() -> void:
 	_setup("slants", "cover3", PlayerAgent.Team.OFFENSE, "WR1")
 	var wr: PlayerAgent = runner.off_slots["WR1"]
+	var x0 := wr.field_pos.x
 	runner.snap()
+	_step(0.6)
+	assert_lt(absf(wr.field_pos.x - x0), 0.3, "no autopilot: without the stick he stays put")
 	pad.stick = Vector2(1.0, 0.0)
 	_step(0.5)
-	assert_true(wr.brain is FreeRunBrain)
-	pad.stick = Vector2.ZERO
-	var x0 := wr.field_pos.x
-	_step(0.5)
-	assert_gt(wr.field_pos.x, x0 + 2.0, "he keeps striding downfield")
+	assert_gt(wr.field_pos.x, x0 + 2.0, "the stick runs him")
 	var p := runner.predict(wr, 0.5)
 	assert_almost_eq(p.x, wr.field_pos.x + wr.velocity.x * 0.5, 0.5, "the QB reads where he is really going")
+	pad.stick = Vector2.ZERO
+	_step(0.6)
+	assert_lt(wr.velocity.length(), 1.0, "let go and he pulls up")
+
+
+func test_route_offset_measures_how_far_off_script() -> void:
+	_setup("four_verts", "cover3", PlayerAgent.Team.OFFENSE, "WR1")
+	var wr: PlayerAgent = runner.off_slots["WR1"]
+	assert_almost_eq(runner.route_offset(wr), 0.0, 0.01, "at his alignment he is on it")
+	wr.field_pos = wr.start_pos + Vector2(20.0, 0.0)
+	assert_lt(runner.route_offset(wr), 1.5, "straight up the field on a go route")
+	wr.field_pos = wr.start_pos + Vector2(10.0, 8.0)
+	assert_gt(runner.route_offset(wr), 5.0, "drifting inside is off the route")
+
+
+func test_high_point_catch_wins_contested_balls() -> void:
+	var t: GameplayTuning = runner.tuning
+	var caught := [0, 0]
+	for aggressive in [false, true]:
+		for i in 40:
+			_setup("four_verts", "cover1", PlayerAgent.Team.OFFENSE, "WR1")
+			runner.rng.seed = 500 + i
+			var wr: PlayerAgent = runner.off_slots["WR1"]
+			var cb: PlayerAgent = runner.def_slots["CB1"]
+			runner.snap()
+			ended.clear()
+			wr.field_pos = Vector2(60.0, 10.0)
+			cb.field_pos = Vector2(60.6, 10.4)   # draped on him
+			runner.throw_ball(Vector2(60.3, 10.2))
+			if aggressive:
+				runner.play_time = 0.0
+				runner.catch_pressed_at = 0.0
+			while runner.ball.state == Ball.State.AIR and ended.is_empty():
+				wr.stop()
+				cb.stop()
+				if aggressive:
+					runner.catch_pressed_at = runner.play_time
+				runner._physics_process(DT)
+			if runner.carrier == wr:
+				caught[int(aggressive)] += 1
+	gut.p("contested catches: normal %d/40, high point %d/40" % caught)
+	assert_gt(caught[1], caught[0] + 10, "tapping CATCH wins the jump ball")
+	assert_gt(caught[1], 28)
 
 
 func test_corner_jams_and_reads_breaks() -> void:

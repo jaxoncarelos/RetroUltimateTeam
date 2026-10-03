@@ -49,7 +49,7 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 |---|---|
 | Everyone | **left thumb** = floating joystick (360°, hard turns plant-and-cut) · **BURST** = short speed surge |
 | Ball carrier | **JUKE** (side = stick, else away from the tackler) · **SPIN** · **POWER** (stiff arm / truck) · **DIVE** |
-| Receiver | your route is gold; touching the stick takes over · **CALL** = QB looks your way · **CATCH** as it arrives = high-point |
+| Receiver | you run every route yourself: follow the gold line (drift off it and the QB stops trusting it) · **CALL** = QB looks your way · **CATCH** in the last ~0.6 s = go up and moss the defender |
 | Corner | stick shades your spot pre-snap (line up tight to press) · **JAM** · watch the **!** break arrow · **BALL** = leap · **TACKLE** = dive |
 | QB | right thumb: drag back to snap / aim, release to throw (as always) · left stick moves you in the pocket |
 | Pre-snap (not QB) | the coordinator's call + YOUR JOB · **AUDIBLE** (per game, more with coach trust) · **HOT ROUTE** (WR) · SNAP / READY |

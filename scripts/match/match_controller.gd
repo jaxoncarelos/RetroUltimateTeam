@@ -1976,7 +1976,7 @@ func _rtg_live_hint() -> String:
 			return "STICK TO RUN  ·  JUKE  SPIN  POWER  DIVE  ·  BURST FOR SPEED" if off_play.is_run() \
 					else "RUN YOUR ROUTE OR STAY IN TO BLOCK  ·  CALL WHEN OPEN"
 		"WR":
-			return "STICK TAKES OVER YOUR ROUTE  ·  CALL WHEN OPEN  ·  TAP CATCH AS IT ARRIVES" if not off_play.is_run() \
+			return "RUN YOUR ROUTE WITH THE STICK  ·  CALL WHEN OPEN  ·  TAP CATCH TO GO GET IT" if not off_play.is_run() \
 					else "BLOCK FOR THE BACK (OR JUST RUN YOUR MAN OFF)"
 	return "STICK TO COVER (LET GO = AUTO)  ·  WATCH FOR THE ! BREAK  ·  BALL TO LEAP  ·  TACKLE TO DIVE"
 

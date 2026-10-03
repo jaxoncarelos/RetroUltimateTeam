@@ -52,6 +52,7 @@ func test_receiver_plays_only_offense_and_gets_targets() -> void:
 	assert_true(m._coach_calls())
 	assert_eq(m.runner.lock_slot, "WR1")
 	assert_false(m.ocontrol.enabled, "the classic gestures are off for a receiver")
+	m.rtg_ctl.manual_routes = false   # nobody holds the stick here: let the AI run his routes
 	var poss := {}
 	var snaps: int = await _play(m, 16, poss)
 	assert_gte(snaps, 12)

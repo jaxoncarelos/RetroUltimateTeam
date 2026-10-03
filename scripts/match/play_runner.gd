@@ -1080,9 +1080,11 @@ func _resolve_arrival() -> void:
 		_end_play("incomplete", Vector2(los_x, ball_y), "INCOMPLETE")
 		return
 	var loft := float(throw_plan.get("loft", 0.0))
+	var box := 0.3
 	if aggressive and o == locked:
 		od = maxf(od - t.rtg_catch_reach, 0.0)   # he attacks the ball instead of waiting for it
-	if d != null and (o == null or dd + 0.3 + def_ai.contest_bonus * key_level < od):
+		box = t.rtg_catch_box_out               # and boxes the defender out
+	if d != null and (o == null or dd + box + def_ai.contest_bonus * key_level < od):
 		# The defender beat the receiver to the spot. Under a hanging ball he has time to
 		# settle under it (undercut); a bullet he can only get a hand on.
 		var p_int := RatingModel.int_prob(t, d.attr("cov"), d.attr("cth")) * (1.0 + def_ai.int_bonus * key_level)
@@ -1107,6 +1109,8 @@ func _resolve_arrival() -> void:
 	# A ball nobody is near is caught: the floor fades out as a defender gets involved.
 	var easy := clampf(1.0 - contest / t.easy_catch_contest, 0.0, 1.0)
 	p_catch = lerpf(p_catch, maxf(p_catch, t.easy_catch_floor), easy)
+	if aggressive and o == locked:
+		p_catch = maxf(p_catch, t.rtg_catch_floor)   # a high-pointed ball sticks
 	if rng.randf() < p_catch:
 		_log_pass(true, false)
 		catch_x = o.field_pos.x
@@ -1119,6 +1123,29 @@ func _resolve_arrival() -> void:
 	else:
 		_log_pass(false, false)
 		_end_play("incomplete", Vector2(los_x, ball_y), "DROPPED!" if contest < 0.3 else "BROKEN UP!")
+
+
+## Yards from `a` to the route drawn for him (his assignment path from his alignment);
+## 0 when he has no route.
+func route_offset(a: PlayerAgent) -> float:
+	var path: PackedVector2Array = a.assignment.get("path", PackedVector2Array())
+	if str(a.assignment.get("type", "")) != "route" or path.is_empty():
+		return 0.0
+	var prev := a.start_pos
+	var best := INF
+	for p in path:
+		var q := a.start_pos + p
+		best = minf(best, PassModel.seg_dist(a.field_pos, prev, q))
+		prev = q
+	if str(a.assignment.get("end", "continue")) != "sit":
+		# The route keeps going past its last point.
+		var last := a.start_pos + path[path.size() - 1]
+		var before := a.start_pos
+		if path.size() >= 2:
+			before = a.start_pos + path[path.size() - 2]
+		var dir := (last - before).normalized()
+		best = minf(best, PassModel.seg_dist(a.field_pos, last, last + dir * 40.0))
+	return best
 
 
 ## Road to Glory: the locked receiver tapped CATCH in the window before the ball arrives.

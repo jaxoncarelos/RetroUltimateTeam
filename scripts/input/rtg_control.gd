@@ -21,6 +21,9 @@ var pad: RtgPad
 var tuning: GameplayTuning
 ## 0..1 coach trust (how much the CPU QB looks for you).
 var trust := 0.5
+## Receivers run everything themselves: no auto route, no auto ball tracking; let go of the
+## stick and he pulls up. Following the drawn route keeps the QB's trust (CpuPasser).
+var manual_routes := true
 
 var took_over := false            ## steered at least once this play
 var last_dir := Vector2.RIGHT
@@ -128,9 +131,19 @@ func apply(dt: float) -> void:
 		else:
 			me.desired_dir = last_dir if took_over else Vector2(-1.0 if me.team == PlayerAgent.Team.DEFENSE else 1.0, 0.0)
 		return
+	if manual_routes and _manual_receiver(me):
+		me.human = true   # hands off the stick: he pulls up (no autopilot route)
+		me.accel_mult = tuning.rtg_accel_mult
+		me.stop()
+		return
 	# Hands off: his assignment AI plays (route, coverage, pocket, block, ball tracking).
 	me.human = false
 	me.accel_mult = 1.0
+
+
+## A receiver you play by hand (not the QB, not carrying it).
+func _manual_receiver(me: PlayerAgent) -> bool:
+	return me.team == PlayerAgent.Team.OFFENSE and me.pos_code in ["WR", "TE"] and me != runner.carrier
 
 
 func _steer(me: PlayerAgent, dir: Vector2, mag: float, carrier: bool) -> void:
@@ -207,7 +220,7 @@ func buttons() -> Array:
 		if ball.state == Ball.State.AIR:
 			var mine := runner.intended == me or me.field_pos.distance_to(ball.to) < 4.0
 			var hot := mine and ball.time_left() <= t.rtg_catch_window + 0.1
-			return [{"id": "catch", "label": "CATCH", "cd": 0.0 if runner.catch_pressed_at == -1.0 else 1.0, "hot": hot}, burst]
+			return [{"id": "catch", "label": "CATCH", "cd": 0.0 if runner.catch_pressed_at < 0.0 else 1.0, "hot": hot}, burst]
 		if runner.qb_is_passer() and runner.handoff_to == null:
 			return [{"id": "call", "label": "CALL", "cd": call_cd / t.rtg_call_cooldown,
 					"hot": runner.play_time > 1.0 and call_cd <= 0.0}, burst]
@@ -285,13 +298,13 @@ func press(id: String) -> void:
 				call_cd = t.rtg_call_cooldown
 				action.emit("I'M OPEN!", me.field_pos, true)
 		"catch":
-			if runner.ball.state == Ball.State.AIR and runner.catch_pressed_at == -1.0:
-				if runner.ball.time_left() <= t.rtg_catch_window:
-					runner.catch_pressed_at = runner.play_time
-					action.emit("HIGH POINT!", me.field_pos, true)
-				else:
-					runner.catch_pressed_at = -2.0   # an early tap is spent
-					action.emit("TOO EARLY", me.field_pos, false)
+			# Only a tap inside the window counts; an early one is simply ignored (tap again).
+			if runner.ball.state == Ball.State.AIR and runner.catch_pressed_at < 0.0 \
+					and runner.ball.time_left() <= t.rtg_catch_window:
+				runner.catch_pressed_at = runner.play_time
+				action.emit("MOSSED!" if me.field_pos.distance_to(runner.ball.to) < 3.0 else "HIGH POINT!", me.field_pos, true)
+				if me.can_act() and me.field_pos.distance_to(runner.ball.to) <= t.rtg_catch_reach + t.catch_radius + 1.0:
+					me.start_jump(t, runner.ball.to)   # go up and get it
 		"jam":
 			_jam_tried = true
 			if runner.rtg_jam(me):

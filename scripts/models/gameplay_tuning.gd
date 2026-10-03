@@ -265,9 +265,13 @@ extends Resource
 @export var rtg_stiff_stun := 0.7      ## s a stiff-armed defender is out of it
 @export var rtg_move_k := 12.0         ## rating points per sigmoid unit in move-vs-tackle contests
 @export_subgroup("Receiver")
-@export var rtg_catch_window := 0.38   ## s before arrival a CATCH tap counts (aggressive catch)
-@export var rtg_catch_reach := 0.6     ## extra catch radius on an aggressive catch
-@export var rtg_catch_contest := 0.55  ## contest multiplier on an aggressive catch
+@export var rtg_catch_window := 0.6    ## s before arrival a CATCH tap counts (aggressive catch)
+@export var rtg_catch_reach := 1.3     ## extra catch radius on an aggressive catch
+@export var rtg_catch_contest := 0.2   ## contest multiplier on an aggressive catch
+@export var rtg_catch_floor := 0.85    ## an aggressive catch is made at least this often
+@export var rtg_catch_box_out := 1.2   ## yards a defender must be closer than you to beat your high-point
+@export var rtg_off_route := 2.5       ## yards off your drawn route before the QB stops trusting it
+@export var rtg_off_route_cost := 1.6  ## yards of "openness" the QB takes off when you are well off the route
 @export var rtg_call_time := 1.2       ## s the QB looks for you after you CALL for the ball
 @export var rtg_call_cooldown := 2.5
 @export var rtg_favor_base := 0.0      ## yards of openness the CPU QB adds for the RTG receiver…

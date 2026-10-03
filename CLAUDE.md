@@ -161,6 +161,10 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    (test_rtg_career): ~73 OVR after year 1, high 80s by year 5, same for 8/17-game seasons; leaving a game early pays
    like a sim (`RtgRules.played_share`). Debug: `--rtg-game=WR [--rtg-call=hb_dive]`, `--demo-profile --rtg=CB
    [--rtg-stage=draft|offseason] --screen=rtg_hub|rtg_create|rtg_draft|rtg_upgrade|rtg_postgame|rtg_offseason`.
+24. [x] RTG playtest 1: receivers run routes fully by hand (`RtgControl.manual_routes`: no autopilot, let go = pull up;
+   live gold route, red + "GET ON YOUR ROUTE" when `PlayRunner.route_offset` > `rtg_off_route`, CpuPasser docks
+   openness off-route); easier high-point catch (window 0.6 s, early taps ignored, reach +1.3, box-out 1.2 yd, catch
+   floor 85%, leap animation): contested 2/40 -> 35/40. Every script/scene must load (test_scripts_compile).
 Next ideas (after the owner's playtest): see MORNING_NOTES.md. RTG follow-ups: kick returns, S/LB/TE positions,
    injuries, rivalries / weekly storylines. Card revamp follow-ups: CPU star
 abilities, ability UI on the lineup screen, ability-themed sets/objectives, balance pass on ability boosts.
