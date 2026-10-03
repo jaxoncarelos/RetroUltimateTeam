@@ -270,8 +270,8 @@ extends Resource
 @export var rtg_catch_contest := 0.55  ## contest multiplier on an aggressive catch
 @export var rtg_call_time := 1.2       ## s the QB looks for you after you CALL for the ball
 @export var rtg_call_cooldown := 2.5
-@export var rtg_favor_base := 0.3      ## yards of openness the CPU QB adds for the RTG receiver…
-@export var rtg_favor_trust := 1.0     ## …plus this × trust (0..1)
+@export var rtg_favor_base := 0.0      ## yards of openness the CPU QB adds for the RTG receiver…
+@export var rtg_favor_trust := 0.8     ## …plus this × trust (0..1)
 @export_subgroup("Corner")
 @export var rtg_press_range := 2.2     ## yards from your man at the snap to jam him
 @export var rtg_jam_window := 0.7      ## s after the snap JAM works

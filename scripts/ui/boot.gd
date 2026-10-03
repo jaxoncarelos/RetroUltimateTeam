@@ -69,6 +69,7 @@ func _demo_profile() -> void:
 		if a.begins_with("--rtg="):
 			_demo_rtg(prof, a.trim_prefix("--rtg=").to_upper(), rng)
 	SaveManager.profile = prof
+	GameData.register_rtg(prof)
 
 
 ## Debug: a Road to Glory career (`--rtg=WR`): drafted, two games into season 1. Add

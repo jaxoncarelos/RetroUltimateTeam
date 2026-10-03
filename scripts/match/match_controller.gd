@@ -592,6 +592,11 @@ func _start_play_call() -> void:
 		if _human_offense():
 			def_play = AIPlayCaller.pick_defense(defense_book.plays, null, situation, rng, last_def_call)
 			off_play = RtgPlay.oc_call(offense_book.plays, situation, rng, str(rtg["slot"]), float(rtg.get("trust", 0.5)))
+			for a in OS.get_cmdline_user_args():   # debug: --rtg-call=hb_dive forces the call
+				if a.begins_with("--rtg-call="):
+					for p in offense_book.plays:
+						if p.id == a.trim_prefix("--rtg-call="):
+							off_play = p
 		else:
 			off_play = PlayAdvisor.pick(offense_book.plays, situation, rng)
 			def_play = AIPlayCaller.pick_defense(defense_book.plays, null, situation, rng, last_def_call)
@@ -1542,7 +1547,7 @@ func _resume() -> void:
 	phase = _paused_from
 	_pause_menu = PauseMenu.MAIN
 	runner.set_physics_process(true)
-	hud.show_switch(_human_defense() and phase in [Phase.PLAY_CALL, Phase.LIVE]
+	hud.show_switch(_human_defense() and not _rtg_on() and phase in [Phase.PLAY_CALL, Phase.LIVE]
 			and runner.human_team == PlayerAgent.Team.DEFENSE)
 
 

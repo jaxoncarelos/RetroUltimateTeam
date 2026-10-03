@@ -272,7 +272,7 @@ static func quicksell_value(db: RosterDB, entry: Dictionary) -> int:
 ## Sells an unlocked card that isn't in the lineup. Returns coins gained (0 = refused).
 static func quicksell(profile: Profile, db: RosterDB, uid: int) -> int:
 	var e := profile.find(uid)
-	if e.is_empty() or e["locked"] or profile.in_lineup(uid):
+	if e.is_empty() or e["locked"] or profile.in_lineup(uid) or RtgRules.is_rtg_card(str(e["def"])):
 		return 0
 	var value := quicksell_value(db, e)
 	profile.remove(uid)

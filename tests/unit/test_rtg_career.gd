@@ -232,3 +232,86 @@ func test_tracker_grades() -> void:
 	g = cb.record({"type": "td", "yards": 40, "pass_thrown": true, "carrier_slot": "WR1", "target_slot": "WR1",
 			"cover_slot": "CB1"}, {"side": "defense"})
 	assert_eq(g["letter"], "F")
+
+
+func test_your_player_becomes_an_ultimate_team_card() -> void:
+	var prof := Profile.new()
+	prof.rtg = _drafted("WR")
+	assert_false(RtgFlow.sync_card(prof), "no card before a finished season")
+	prof.rtg["career"] = [{"year": 1, "stats": RtgTracker.empty_stats()}]
+	assert_true(RtgFlow.sync_card(prof))
+	var id := str(prof.rtg["id"])
+	var c: CardDef = GameData.card(id)
+	assert_not_null(c)
+	assert_eq(c.ovr, RtgRules.player_ovr(prof.rtg))
+	assert_eq(GameData.player(id).pos, "WR")
+	var entry: Dictionary = {}
+	for e in prof.cards:
+		if e["def"] == id:
+			entry = e
+	assert_true(entry["locked"])
+	entry["locked"] = false
+	assert_eq(EconomyRules.quicksell(prof, GameData.db, int(entry["uid"])), 0, "never for sale")
+	assert_false(RtgFlow.sync_card(prof), "one copy")
+	assert_false(id in GameData.db.card_ids_of_tier(c.tier), "never in packs")
+	# Retired: the legend's card stays, frozen at his peak.
+	prof.rtg["peak_ovr"] = 90
+	var legend := RtgRules.retire(prof.rtg, "CHOICE")
+	prof.rtg_legends.append(legend)
+	prof.rtg = {}
+	GameData.register_rtg(prof)
+	assert_eq(GameData.card(id).ovr, 90)
+
+
+## Spends XP like a sensible player: the best OVR gain per XP first.
+func _spend(rtg: Dictionary) -> void:
+	var pos := str(rtg["player"]["pos"])
+	while true:
+		var best := ""
+		var best_v := 1e9
+		for k in RtgRules.WEIGHTS[pos]:
+			var v := int(rtg["player"]["attrs"][k])
+			var cost := RtgRules.upgrade_cost(v)
+			if v < 99 and cost <= int(rtg["xp"]) and cost / float(RtgRules.WEIGHTS[pos][k]) < best_v:
+				best_v = cost / float(RtgRules.WEIGHTS[pos][k])
+				best = k
+		if best == "":
+			return
+		RtgRules.upgrade(rtg, best)
+
+
+## Progression pace (B games, weekly practice, XP spent well): ~10 OVR the first year, the
+## high 80s by year five; the same for 8- and 17-game seasons.
+func test_progression_pace() -> void:
+	for games in [8, 17]:
+		rng.seed = 5
+		var rtg := _career("WR")
+		var d := RtgRules.draft(rtg, 70.0, GameData.teams, RtgFlow.team_ovrs(), RtgFlow.starter_ovrs("WR1"), rng)
+		RtgRules.sign_rookie(rtg, d, GameData.teams, RtgFlow.team_ovrs(), games, rng)
+		var by_season: Array[int] = []
+		for season in 5:
+			var guard := 40
+			while str(rtg["stage"]) == "season" and guard > 0:
+				guard -= 1
+				var r := RtgRules.sim_game(rtg, rng)
+				r["simulated"] = false
+				r["rtg"]["points"] = 76.0
+				RtgRules.apply_game(rtg, r, GameData.teams, rng)
+				rtg["xp"] = int(rtg["xp"]) + int(110 * RtgRules.xp_scale(games))
+				_spend(rtg)
+			RtgRules.close_season(rtg)
+			_spend(rtg)
+			by_season.append(RtgRules.player_ovr(rtg))
+			RtgRules.next_season(rtg, GameData.teams, RtgFlow.team_ovrs(), games, rng)
+		gut.p("%d games: OVR by season %s" % [games, by_season])
+		assert_between(by_season[0], 68, 77, "rookie year")
+		assert_between(by_season[4], 84, 92, "year five")
+
+
+func test_leaving_early_pays_like_a_sim() -> void:
+	var r := {"simulated": true, "sim_started": true, "rtg": {"stats": {"plays": 2}}}
+	assert_lt(RtgRules.played_share(r), 0.2)
+	r["rtg"]["stats"]["plays"] = 30
+	assert_eq(RtgRules.played_share(r), 1.0)
+	assert_eq(RtgRules.played_share({"simulated": true}), 0.0)
+	assert_eq(RtgRules.played_share({}), 1.0)

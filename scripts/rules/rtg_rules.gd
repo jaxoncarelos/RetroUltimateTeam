@@ -140,12 +140,16 @@ static func new_player(pos: String, arch: String, first: String, last: String, j
 			"age": START_AGE, "dev": 0}
 
 
-## A fresh career (stage "draft": the combine and draft come next).
-static func new_career(player: Dictionary) -> Dictionary:
-	return {"version": VERSION, "stage": "draft", "year": 1, "player": player, "team": "", "draft": {},
+## A fresh career (stage "draft": the combine and draft come next). `uid` makes the id of
+## its Ultimate Team card ("rtg_<uid>"); "" derives one from the player.
+static func new_career(player: Dictionary, uid := "") -> Dictionary:
+	if uid == "":
+		uid = str(absi(hash(str(player.get("name", "")) + str(player.get("jersey", 0)) + str(player.get("arch", "")))))
+	return {"version": VERSION, "id": "rtg_" + uid, "stage": "draft", "year": 1, "player": player, "team": "", "draft": {},
 			"xp": 0, "xp_total": 0, "trust": START_TRUST, "season": {}, "season_stats": RtgTracker.empty_stats(),
 			"games": [], "goals": [], "career": [], "awards": [], "rings": 0, "legacy": 0,
-			"contract": {}, "offers": [], "retire_reason": "", "peak_ovr": ovr(player["pos"], player["attrs"])}
+			"contract": {}, "offers": [], "retire_reason": "", "peak_ovr": ovr(player["pos"], player["attrs"]),
+			"peak_attrs": (player["attrs"] as Dictionary).duplicate()}
 
 
 static func player_ovr(rtg: Dictionary) -> int:
@@ -159,9 +163,18 @@ static func slot_of(rtg: Dictionary) -> String:
 
 # ---------------------------------------------------------------- XP & upgrades
 
-## XP to raise an attribute from `value` to value + 1 (gets steeper at the top).
+## XP to raise an attribute from `value` to value + 1 (gets steeper at the top: a rookie gains
+## ~10 OVR his first season, a good player ~2-3 a year in his prime, 95+ takes a great career).
 static func upgrade_cost(value: int) -> int:
-	return 20 + maxi(0, value - 60) * 4 + maxi(0, value - 85) * 6
+	return 25 + maxi(0, value - 50) * 5 + maxi(0, value - 75) * 8 + maxi(0, value - 88) * 15
+
+
+## Season XP is the same whatever the season length: per-game XP × 8 / games (17 games ≈ 0.47).
+const REF_GAMES := 8.0
+
+
+static func xp_scale(games: int) -> float:
+	return clampf(REF_GAMES / maxf(games, 1.0), 0.4, 1.0)
 
 
 static func can_upgrade(rtg: Dictionary, attr: String) -> bool:
@@ -178,13 +191,48 @@ static func upgrade(rtg: Dictionary, attr: String) -> bool:
 	var v := int(p["attrs"][attr])
 	rtg["xp"] = int(rtg["xp"]) - upgrade_cost(v)
 	p["attrs"][attr] = v + 1
-	rtg["peak_ovr"] = maxi(int(rtg.get("peak_ovr", 0)), player_ovr(rtg))
+	_track_peak(rtg)
 	return true
+
+
+## Remembers the best version of him (his Legend card is frozen there).
+static func _track_peak(rtg: Dictionary) -> void:
+	var o := player_ovr(rtg)
+	if o >= int(rtg.get("peak_ovr", 0)):
+		rtg["peak_ovr"] = o
+		rtg["peak_attrs"] = (rtg["player"]["attrs"] as Dictionary).duplicate()
+
+
+# ---------------------------------------------------------------- Ultimate Team card
+
+static func is_rtg_card(card_id: String) -> bool:
+	return card_id.begins_with("rtg_")
+
+
+## The Ultimate Team card of an active career: {id, name, team, pos, jersey, ovr, attrs, look, age}
+## ({} before the draft).
+static func card_player(rtg: Dictionary) -> Dictionary:
+	if rtg.is_empty() or str(rtg.get("team", "")) == "" or not rtg.has("id"):
+		return {}
+	var p: Dictionary = rtg["player"]
+	return {"id": rtg["id"], "name": "%s %s" % [str(p["first"]).capitalize(), str(p["last"]).capitalize()],
+			"team": rtg["team"], "pos": p["pos"], "jersey": int(p["jersey"]), "ovr": player_ovr(rtg),
+			"attrs": p["attrs"], "look": p.get("look", {}), "age": int(p["age"])}
+
+
+## A legend's card: frozen at his peak.
+static func legend_card_player(l: Dictionary) -> Dictionary:
+	if not l.has("id"):
+		return {}
+	var attrs: Dictionary = l.get("peak_attrs", l.get("attrs", {}))
+	return {"id": l["id"], "name": "%s %s" % [str(l["first"]).capitalize(), str(l["last"]).capitalize()],
+			"team": l.get("team", ""), "pos": l["pos"], "jersey": int(l.get("jersey", 0)),
+			"ovr": maxi(int(l.get("peak", 0)), ovr(str(l["pos"]), attrs)), "attrs": attrs, "look": l.get("look", {}), "age": 30}
 
 
 ## XP earned by one game: base + grade + stats + win, × development trait.
 ## sim = a simmed game (a share of it).
-static func game_xp(points: float, stats: Dictionary, won: bool, dev: int, sim := false) -> int:
+static func game_xp(points: float, stats: Dictionary, won: bool, dev: int, sim := false, scale := 1.0) -> int:
 	var x := 140.0 + maxf(points - 40.0, 0.0) * 5.0
 	x += 40.0 * (int(stats.get("rush_td", 0)) + int(stats.get("rec_td", 0)) + int(stats.get("pass_td", 0)) + int(stats.get("def_td", 0)))
 	x += 50.0 * int(stats.get("ints", 0))
@@ -192,7 +240,7 @@ static func game_xp(points: float, stats: Dictionary, won: bool, dev: int, sim :
 	x += 60.0 if won else 0.0
 	if sim:
 		x *= SIM_XP_SHARE
-	return int(round(x * DEV_XP[clampi(dev, 0, DEV_XP.size() - 1)]))
+	return int(round(x * scale * DEV_XP[clampi(dev, 0, DEV_XP.size() - 1)]))
 
 
 ## Coach trust change after a game (grade points 0..100).
@@ -387,8 +435,10 @@ static func apply_game(rtg: Dictionary, r: Dictionary, teams: Dictionary, rng: R
 	var points := float(rt.get("points", SIM_GRADE_POINTS))
 	var won := int(r["pf"]) > int(r["pa"])
 	var p: Dictionary = rtg["player"]
-	var sim := bool(r.get("simulated", false)) and not bool(r.get("sim_started", false))
-	var xp := game_xp(points, stats, won, int(p.get("dev", 0)), sim)
+	var share := played_share(r)
+	var xp := int(round(game_xp(points, stats, won, int(p.get("dev", 0)), false, xp_scale(int(s.get("games", 8))))
+			* lerpf(SIM_XP_SHARE, 1.0, share)))
+	var sim := share < 1.0
 	var trust_before := int(rtg["trust"])
 	rtg["trust"] = clampi(trust_before + trust_delta(points, won), 0, 100)
 	rtg["xp"] = int(rtg["xp"]) + xp
@@ -454,6 +504,16 @@ static func _finish_playoffs_without_you(s: Dictionary, rng: RandomNumberGenerat
 		SeasonRules.advance_round(s, SeasonRules.sim_playoff_round(s, rng))
 
 
+## How much of a game you really played (1 = all of it, 0 = a SIM): a game you left early is
+## paid like a sim for the part that was simulated (~20 snaps on the field = a full game).
+static func played_share(r: Dictionary) -> float:
+	if not bool(r.get("simulated", false)):
+		return 1.0
+	if not bool(r.get("sim_started", false)):
+		return 0.0
+	return clampf(int(r.get("rtg", {}).get("stats", {}).get("plays", 0)) / 20.0, 0.0, 1.0)
+
+
 ## A simulated game for you: score from both teams' strengths, your line from sim_line.
 static func sim_game(rtg: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
 	var g := next_game(rtg)
@@ -491,7 +551,7 @@ static func season_goals(pos: String, games: int, rookie: bool) -> Array:
 		var target := maxi(1, int(round(float(d[1]) * k)))
 		if int(d[1]) >= 100:
 			target = maxi(10, int(round(target / 10.0)) * 10)
-		out.append({"stat": d[0], "target": target, "text": "%d %s" % [target, d[2]], "xp": 600, "coins": 400, "done": false})
+		out.append({"stat": d[0], "target": target, "text": "%d %s" % [target, d[2]], "xp": 400, "coins": 400, "done": false})
 	return out
 
 
@@ -505,13 +565,13 @@ static func goal_progress(rtg: Dictionary, g: Dictionary) -> int:
 
 ## Award definitions: id -> [name, legacy points, XP, coins, dev trait it lifts you to].
 const AWARDS := {
-	"roy": ["ROOKIE OF THE YEAR", 15, 1500, 1500, 1],
-	"pro_bowl": ["PRO BOWL", 10, 800, 800, 1],
-	"all_pro": ["ALL-PRO", 20, 1500, 1500, 2],
-	"opoy": ["OFFENSIVE PLAYER OF THE YEAR", 30, 2500, 2500, 3],
-	"dpoy": ["DEFENSIVE PLAYER OF THE YEAR", 30, 2500, 2500, 3],
-	"mvp": ["MVP", 40, 3000, 3000, 3],
-	"ring": ["SUPER BOWL CHAMPION", 25, 2000, 3000, 0],
+	"roy": ["ROOKIE OF THE YEAR", 15, 600, 1500, 1],
+	"pro_bowl": ["PRO BOWL", 10, 400, 800, 1],
+	"all_pro": ["ALL-PRO", 20, 700, 1500, 2],
+	"opoy": ["OFFENSIVE PLAYER OF THE YEAR", 30, 1000, 2500, 3],
+	"dpoy": ["DEFENSIVE PLAYER OF THE YEAR", 30, 1000, 2500, 3],
+	"mvp": ["MVP", 40, 1200, 3000, 3],
+	"ring": ["SUPER BOWL CHAMPION", 25, 800, 3000, 0],
 }
 
 
@@ -590,6 +650,7 @@ static func close_season(rtg: Dictionary) -> Dictionary:
 		p["dev"] = maxi(int(p.get("dev", 0)), int(a[4]))
 		(rtg["awards"] as Array).append({"year": int(rtg["year"]), "id": id, "name": a[0]})
 	var ovr_now := player_ovr(rtg)
+	_track_peak(rtg)
 	legacy += 5 if ovr_now >= 80 else (2 if ovr_now >= 70 else 0)
 	legacy += _milestones(str(p["pos"]), rtg["season_stats"])
 	rtg["legacy"] = int(rtg.get("legacy", 0)) + legacy
@@ -723,4 +784,5 @@ static func retire(rtg: Dictionary, reason: String) -> Dictionary:
 			"look": p.get("look", {}), "attrs": (p["attrs"] as Dictionary).duplicate(), "peak": int(rtg.get("peak_ovr", 0)),
 			"seasons": (rtg["career"] as Array).size(), "team": rtg["team"], "legacy": int(rtg["legacy"]),
 			"hof": int(rtg["legacy"]) >= HOF_LEGACY, "awards": counts, "rings": int(rtg.get("rings", 0)),
-			"totals": totals, "id": "rtg_%d" % absi(hash(str(p["name"]) + str(rtg.get("xp_total", 0))))}
+			"totals": totals, "id": str(rtg.get("id", "rtg_%d" % absi(hash(str(p["name"]) + str(rtg.get("xp_total", 0)))))),
+			"peak_attrs": (rtg.get("peak_attrs", p["attrs"]) as Dictionary).duplicate()}

@@ -249,11 +249,12 @@ func _practice() -> void:
 			"back": SceneRouter.RTG_HUB})
 
 
-## Practice XP: 40 + 1.6 × grade points (an A rep day ≈ 180 XP), once per week.
+## Practice XP: 30 + 1.1 × grade points (an A rep day ≈ 125 XP, × the season-length scale), once a week.
 func _apply_practice(drill: Dictionary) -> void:
 	if _practiced():
 		return
-	var xp := int(round(40.0 + 1.6 * float(drill["points"])))
+	var games := int(prof.rtg.get("season", {}).get("games", 8))
+	var xp := int(round((30.0 + 1.1 * float(drill["points"])) * RtgRules.xp_scale(games)))
 	prof.rtg["xp"] = int(prof.rtg["xp"]) + xp
 	prof.rtg["xp_total"] = int(prof.rtg.get("xp_total", 0)) + xp
 	prof.rtg["practice_key"] = _practice_key()
@@ -298,8 +299,21 @@ func _schedule_popup() -> void:
 				"W" if won else ("L" if int(g["pf"]) < int(g["pa"]) else "T"), int(g["pf"]), int(g["pa"]), g["grade"], g["line"]],
 				UiSkin.GREEN if won else UiSkin.WHITE))
 	var nxt := RtgRules.next_game(rtg)
+	var you := str(rtg["team"])
 	if not nxt.is_empty():
-		var you := str(rtg["team"])
 		col.add_child(MetaUI.label("NEXT: %s %s %s" % [nxt["label"], "VS" if nxt["home"] == you else "AT",
 				nxt["away"] if nxt["home"] == you else nxt["home"]], UiSkin.YELLOW))
+	# Your division.
+	var team: TeamData = GameData.team(you)
+	if team != null:
+		var table := SeasonRules.standings(rtg["season"], GameData.teams.keys())
+		var div: Array = []
+		for a in GameData.teams:
+			var t: TeamData = GameData.teams[a]
+			if t.conf == team.conf and t.div == team.div:
+				div.append(a)
+		var bits: Array[String] = []
+		for a in SeasonRules.rank(div, table):
+			bits.append("%s %d-%d" % [a, int(table[a]["w"]), int(table[a]["l"])])
+		col.add_child(MetaUI.label("%s %s: %s" % [team.conf, team.div.to_upper(), "  ".join(bits)], UiSkin.MUTED))
 	MetaUI.popup(self, "SEASON %d" % int(rtg["year"]), col, [["CLOSE", Callable(), true]])

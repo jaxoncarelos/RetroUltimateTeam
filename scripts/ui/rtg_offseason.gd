@@ -68,6 +68,10 @@ func _awards_panel() -> Control:
 		delay += 0.7
 	col.add_child(MetaUI.label("+%s COINS  ·  +%s XP  ·  +%d LEGACY (%d / %d HALL OF FAME)" % [CoinPill.fmt(int(_close.get("coins", 0))),
 			CoinPill.fmt(int(_close.get("xp", 0))), int(_close.get("legacy", 0)), int(rtg.get("legacy", 0)), RtgRules.HOF_LEGACY], UiSkin.GREEN))
+	if _close.get("card", false):
+		col.add_child(MetaUI.label("YOUR PLAYER CARD JOINED YOUR ULTIMATE TEAM SQUAD (%d OVR)!" % RtgRules.player_ovr(rtg), UiSkin.YELLOW))
+	elif not (rtg["career"] as Array).is_empty():
+		col.add_child(MetaUI.label("YOUR ULTIMATE TEAM CARD IS NOW %d OVR." % RtgRules.player_ovr(rtg), UiSkin.MUTED))
 	if "ring" in awards:
 		Fx.confetti.call_deferred(self, size.x, [UiSkin.YELLOW, Color.WHITE], 80)
 	return p

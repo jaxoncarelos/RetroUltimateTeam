@@ -114,6 +114,11 @@ func apply(dt: float) -> void:
 			elif not (me.brain is BallHawkBrain):
 				me.brain = FreeRunBrain.new(me, runner, dir)   # off script for the rest of the play
 		return
+	if passer and took_over:
+		# You moved him in the pocket: he stays where you left him (no walking back to the drop spot).
+		me.human = true
+		me.stop()
+		return
 	if carrier and not passer:
 		me.human = true
 		me.accel_mult = tuning.rtg_accel_mult

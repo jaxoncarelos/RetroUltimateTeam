@@ -208,6 +208,10 @@ func _draw_front(tc: Color) -> void:
 	if card != null and card.has_method("is_champ") and card.is_champ():
 		draw_rect(Rect2(3, 14, 31, 9), Color("#ffb000"))
 		draw_string(font, Vector2(5, 21), "CHAMP", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UiSkin.SHADOW)
+	elif card != null and RtgRules.is_rtg_card(card.id):
+		# Your Road to Glory player.
+		draw_rect(Rect2(3, 14, 21, 9), Color("#ff9d2e"))
+		draw_string(font, Vector2(5, 21), "RTG", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UiSkin.SHADOW)
 	elif is_prime():
 		draw_rect(Rect2(3, 14, 29, 9), Color("#29adff"))
 		draw_string(font, Vector2(5, 21), "PRIME", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color.WHITE)

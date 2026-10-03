@@ -20,6 +20,7 @@ func _ready() -> void:
 			disabled = true
 	if not disabled:
 		profile = load_profile(path)
+	GameData.register_rtg(profile)
 
 
 func _notification(what: int) -> void:

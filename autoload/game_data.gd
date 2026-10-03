@@ -57,6 +57,30 @@ func opponent_lineup(abbr: String, your_ovr: int, difficulty: int) -> Dictionary
 	return out
 
 
+## Road to Glory players as Ultimate Team cards: your active career's player (his current
+## rating) and every retired legend (frozen at his peak). They are kept out of packs (marked
+## generated) and of the real rosters. Call again whenever the career changes.
+func register_rtg(prof: Profile) -> void:
+	var specs: Array = []
+	if prof != null:
+		specs.append(RtgRules.card_player(prof.rtg))
+		for l in prof.rtg_legends:
+			specs.append(RtgRules.legend_card_player(l))
+	for spec: Dictionary in specs:
+		if spec.is_empty():
+			continue
+		var id := str(spec["id"])
+		var p := PlayerData.create(id, str(spec["name"]), str(spec["team"]), str(spec["pos"]), int(spec["jersey"]),
+				int(spec["ovr"]), spec["attrs"])
+		p.generated = true
+		p.look = spec.get("look", {})
+		p.set_development(int(spec.get("age", 25)), int(spec["ovr"]))
+		db.players[id] = p
+		db.cards[id] = CardDef.build_program(p, CardRules.PROGRAM_BASE)
+		if not p.look.is_empty():
+			ArtGen.looks[id] = p.look
+
+
 ## Match lineup of a team's real players (no rescaling) — CPU vs CPU and the sandbox.
 func real_lineup(abbr: String) -> Dictionary:
 	var entries := db.team_entries(abbr)

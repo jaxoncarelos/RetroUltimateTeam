@@ -310,7 +310,7 @@ func _player() -> Dictionary:
 
 func _create() -> void:
 	var prof := SaveManager.profile
-	prof.rtg = RtgRules.new_career(_player())
+	prof.rtg = RtgRules.new_career(_player(), str(Time.get_unix_time_from_system()))
 	SaveManager.save()
 	Sfx.play("big")
 	SceneRouter.goto(SceneRouter.RTG_DRAFT)

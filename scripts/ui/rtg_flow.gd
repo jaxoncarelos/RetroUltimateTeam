@@ -71,9 +71,8 @@ static func apply_game(prof: Profile, r: Dictionary) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var out := RtgRules.apply_game(prof.rtg, r, GameData.teams, rng)
-	var coins := GAME_COINS + int(GRADE_COINS.get(str(out["grade"]).left(1), 0))
-	if r.get("simulated", false) and not r.get("sim_started", false):
-		coins = GAME_COINS / 2
+	var share := RtgRules.played_share(r)
+	var coins := int(round((GAME_COINS + int(GRADE_COINS.get(str(out["grade"]).left(1), 0))) * lerpf(0.5, 1.0, share)))
 	for g in out["goals_done"]:
 		coins += int(g["coins"])
 	prof.coins += coins
@@ -90,6 +89,7 @@ static func close_season(prof: Profile) -> Dictionary:
 		return rtg["season_close"]
 	var res := RtgRules.close_season(rtg)
 	prof.coins += int(res["coins"])
+	res["card"] = sync_card(prof)
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	if RtgRules.contract_up(rtg):
@@ -108,6 +108,7 @@ static func next_season(prof: Profile) -> Dictionary:
 	var changes := RtgRules.next_season(rtg, GameData.teams, {}, Settings.season_games, rng)
 	# Schedule strengths after aging (your rating moves your team).
 	(rtg["season"] as Dictionary)["ovr"] = strengths(rtg)
+	GameData.register_rtg(prof)
 	SaveManager.save()
 	return changes
 
@@ -117,5 +118,23 @@ static func retire(prof: Profile, reason: String) -> Dictionary:
 	var legend := RtgRules.retire(prof.rtg, reason)
 	prof.rtg_legends.append(legend)
 	prof.rtg = {}
+	GameData.register_rtg(prof)
 	SaveManager.save()
 	return legend
+
+
+## Re-registers your Road to Glory card(s) and, after a finished season, makes sure you own
+## your player's card in Ultimate Team (locked: he is yours for good). Returns true when the
+## card was just added.
+static func sync_card(prof: Profile) -> bool:
+	GameData.register_rtg(prof)
+	var spec := RtgRules.card_player(prof.rtg)
+	if spec.is_empty() or (prof.rtg.get("career", []) as Array).is_empty():
+		return false
+	var id := str(spec["id"])
+	for c in prof.cards:
+		if str(c["def"]) == id:
+			return false
+	var uid := prof.add_card(id, int(Time.get_unix_time_from_system()))
+	prof.find(uid)["locked"] = true
+	return true

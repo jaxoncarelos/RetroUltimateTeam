@@ -17,6 +17,7 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 | 4 | Roster import, cards affect gameplay | ✅ team picker → your real players as cards |
 | 5 | Packs, economy, collection | ✅ store, packs, collection, lineup, sets, save |
 | 6 | Season, challenges, polish | ✅ season + playoffs, 11 challenges + daily, settings, SFX, coach tips |
+| 7 | Road to Glory (career as one QB/RB/WR/CB) | ✅ create, combine, draft, seasons, awards, Hall of Fame |
 
 ## Running
 
@@ -43,6 +44,16 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 | Anytime | **II** / **Esc** / Android **back** = pause (resume, defense pace, quarter length, **QUIT TO MENU** — leaving counts as a loss) · **TIMEOUT** button between plays |
 | Keyboard | `R` restarts the drive (sandbox) · `F1` AI debug overlay (three-finger tap on a phone) |
 
+### Road to Glory controls (MODE SELECT → ROAD TO GLORY)
+| Who | Controls |
+|---|---|
+| Everyone | **left thumb** = floating joystick (360°, hard turns plant-and-cut) · **BURST** = short speed surge |
+| Ball carrier | **JUKE** (side = stick, else away from the tackler) · **SPIN** · **POWER** (stiff arm / truck) · **DIVE** |
+| Receiver | your route is gold; touching the stick takes over · **CALL** = QB looks your way · **CATCH** as it arrives = high-point |
+| Corner | stick shades your spot pre-snap (line up tight to press) · **JAM** · watch the **!** break arrow · **BALL** = leap · **TACKLE** = dive |
+| QB | right thumb: drag back to snap / aim, release to throw (as always) · left stick moves you in the pocket |
+| Pre-snap (not QB) | the coordinator's call + YOUR JOB · **AUDIBLE** (per game, more with coach trust) · **HOT ROUTE** (WR) · SNAP / READY |
+
 ### Debug arguments
 ```
 godot --path . -- --demo-profile --screen=store   # any meta screen with an unsaved demo career
@@ -65,6 +76,8 @@ godot --headless --path . -- --sim=80 --verbose   # plus one line per play
 godot --headless --path . -- --sim=1000 --smart    # CPU calls plays situationally (PlayAdvisor)
 godot --headless --path . -- --sim=1000 --spam=mesh  # always call one play (defense keys on it)
 godot --headless --path . -- --sim=1000 --by-play --nokey  # per-play averages, no defensive memory
+godot --path . -- --rtg-game=RB --rtg-call=toss   # straight into a Road to Glory game (WR/RB/CB/QB)
+godot --path . -- --demo-profile --rtg=CB --screen=rtg_hub   # an unsaved RTG career (add --rtg-stage=draft|offseason)
 ```
 
 ## Tests

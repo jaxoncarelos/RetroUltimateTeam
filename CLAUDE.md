@@ -49,7 +49,8 @@ Godot 4.7 + GDScript retro football game. Design/roadmap: `PLAN.md`. Status tabl
 - `data/roster.csv` uses the `keep` importer (raw file) — keep `roster.csv.import` as is.
 - Plays/formations are `.tres`; `tools/build_playbooks.gd` regenerates (and overwrites) them.
 - Commit `.uid` files; never commit `.godot/` or `export/`.
-- Flow: boot.tscn routes → team picker (no save) / hub; debug flags → sandbox or match.
+- Flow: boot.tscn routes → team picker (no save) / hub; debug flags → sandbox or match. Road to Glory lives
+  behind MODE SELECT (rtg_* screens; its own season in `Profile.rtg`, separate from the UT season).
   `-- --reset-save` wipes the local save. Autoloads: Events, UiTheme, Settings, GameData,
   SaveManager (disabled for --sim/--ai-vs-ai/--nosave), SceneRouter.
 
@@ -144,5 +145,22 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    `sell_price` = 70% of it (CardDef.quicksell, by the card's own OVR so training doesn't inflate it). Mid
    tiers are kept low (75: 250, 85: 700, 90: 6,300, 99: 60,200) so selling doesn't fund the grind
    (test_progression_pace/test_economy curves unchanged). Pack summary: SELL button under every card.
-Next ideas (after the owner's playtest): see MORNING_NOTES.md. Card revamp follow-ups: CPU star
+23. [x] Road to Glory (owner: "get drafted, play as one skill player, full controls revamp for QB/RB/WR/CB only"; plan
+   docs/ROAD_TO_GLORY_PLAN.md). Engine: `PlayRunner.lock_slot`/`locked` (you never hand control to a teammate;
+   `human_qb()` gates the human-QB protections), `RtgPad` (multi-touch floating stick + 5 context buttons, left-handed
+   mirror) + `RtgControl` (analog movement, plant-and-cut by agility, BURST, carrier JUKE/SPIN/POWER = stiff arm or
+   truck/DIVE with `ContactResolver.move_against` + `RatingModel.move_tackle_mult`, juke "bite" on defenders, WR
+   CALL (CpuPasser favorite) / CATCH timing (`PlayRunner.aggressive_catch`), CB pre-snap shading, JAM, BALL, TACKLE,
+   break telegraph `RatingModel.telegraph_time`), `FreeRunBrain`, `RtgOverlay`, camera follows you. Tuning:
+   GameplayTuning "Road to Glory controls". Match: `MatchController.rtg` config plays only your side (CB: your offense
+   is simmed by the generalized `_sim_cpu_drive`), coordinators call (`RtgPlay.oc_call`, AUDIBLE, HOT ROUTE), CPU coach
+   handles 4th downs/PATs/timeouts, `RtgTracker` grades every play. Career: `RtgRules` (archetypes, OVR weights,
+   XP/upgrade costs, draft, seasons, goals, awards, aging, contracts, retirement/HOF), `RtgFlow`, `Profile.rtg` +
+   `rtg_legends`, screens rtg_create/draft (+`RtgDrill` combine & weekly practice)/hub/upgrade/postgame/offseason. Your
+   player is a locked, unsellable UT card (`GameData.register_rtg`, id `rtg_<uid>`, legends frozen at peak). Pace
+   (test_rtg_career): ~73 OVR after year 1, high 80s by year 5, same for 8/17-game seasons; leaving a game early pays
+   like a sim (`RtgRules.played_share`). Debug: `--rtg-game=WR [--rtg-call=hb_dive]`, `--demo-profile --rtg=CB
+   [--rtg-stage=draft|offseason] --screen=rtg_hub|rtg_create|rtg_draft|rtg_upgrade|rtg_postgame|rtg_offseason`.
+Next ideas (after the owner's playtest): see MORNING_NOTES.md. RTG follow-ups: kick returns, S/LB/TE positions,
+   injuries, rivalries / weekly storylines. Card revamp follow-ups: CPU star
 abilities, ability UI on the lineup screen, ability-themed sets/objectives, balance pass on ability boosts.

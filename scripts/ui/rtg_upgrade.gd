@@ -83,6 +83,7 @@ func _up(k: String) -> void:
 	var before := RtgRules.player_ovr(prof.rtg)
 	if not RtgRules.upgrade(prof.rtg, k):
 		return
+	GameData.register_rtg(prof)
 	SaveManager.save()
 	Sfx.play("tap")
 	_card.refresh()
