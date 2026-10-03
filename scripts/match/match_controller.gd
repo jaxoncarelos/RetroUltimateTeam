@@ -46,6 +46,19 @@ var pace: int = DefensePace.Pace.EVERY_SNAP
 ## Challenges (some are about stopping the opponent) and `--play-defense` keep playable defense.
 var play_defense := false
 var sim_games := 0                  ## >0: headless batch mode
+## Road to Glory: you are one player ({pos, slot, player: {name, jersey, attrs, look}, trust,
+## audibles}; {} = a classic match). Only your side of the ball is played, the other side's
+## drives are simulated; the coordinators call the plays unless you are the QB.
+var rtg: Dictionary = {}
+var rtg_pad: RtgPad
+var rtg_ctl: RtgControl
+var rtg_overlay: RtgOverlay
+var rtg_track: RtgTracker
+var _rtg_audibles := 0
+var _rtg_hot := 0                    ## index into RtgPlay.HOT_ORDER (0 = the called route)
+var _rtg_menu := ""                  ## "audible" while the audible picker is open
+var _rtg_options: Array[PlayDef] = []
+var _rtg_snap_at := -1.0             ## corner: the CPU offense snaps at this time (READY pressed)
 var watch := false
 var rng := RandomNumberGenerator.new()
 
@@ -85,6 +98,13 @@ func _ready() -> void:
 	pace = DefensePace.Pace.EVERY_SNAP
 	var dbg := OS.get_cmdline_user_args()
 	play_defense = dbg.has("--play-defense") or dbg.has("--human=away") or dbg.has("--drawtest")
+	rtg = config.get("rtg", {})
+	for a in dbg:
+		if a.begins_with("--rtg-game="):   # debug: straight into a Road to Glory game
+			rtg = RtgRules.debug_match_rtg(a.trim_prefix("--rtg-game=").to_upper())
+	if not rtg.is_empty():
+		home_abbr = str(config.get("home", rtg.get("team", "KC")))
+		away_abbr = str(config.get("away", rtg.get("opp", "PHI")))
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--home="):
 			home_abbr = arg.get_slice("=", 1).to_upper()
@@ -216,6 +236,56 @@ func _build_scene(home_team: TeamData, away_team: TeamData) -> void:
 	runner.carrier_changed.connect(func(a: PlayerAgent) -> void:
 		if not _sim() and runner.pass_thrown:
 			Sfx.play("catch" if a.team == PlayerAgent.Team.OFFENSE else "big"))
+	if not rtg.is_empty():
+		_build_rtg()
+
+
+## Road to Glory: the two-thumb pad, its controller, the field markings and the stat tracker.
+## The classic gestures stay off (a QB keeps the right-thumb aim / snap / pass type).
+func _build_rtg() -> void:
+	var pos := str(rtg["pos"])
+	runner.lock_slot = str(rtg["slot"])
+	rtg_track = RtgTracker.new(pos, str(rtg["slot"]))
+	rtg_pad = RtgPad.new()
+	rtg_pad.left_handed = Settings.left_handed
+	rtg_pad.blocker = hud.is_point_over_ui
+	hud.add_rtg_pad(rtg_pad)
+	rtg_ctl = RtgControl.new()
+	add_child(rtg_ctl)
+	rtg_ctl.bind(runner, rtg_pad, tuning)
+	rtg_ctl.trust = float(rtg.get("trust", 0.5))
+	rtg_overlay = RtgOverlay.new()
+	rtg_overlay.runner = runner
+	rtg_overlay.control = rtg_ctl
+	add_child(rtg_overlay)
+	rtg_ctl.action.connect(func(text: String, at: Vector2, good: bool) -> void: rtg_overlay.pop(text, at, good))
+	runner.move_event.connect(func(kind: String, at: Vector2, agent: PlayerAgent) -> void:
+		if agent == runner.locked and not _sim():
+			rtg_overlay.pop({"truck": "TRUCKED!", "stiff": "STIFF ARM!", "spin": "SPUN OFF!", "juke": "ANKLES!"}.get(kind, "BROKE IT!"), at)
+			Sfx.play("slam")
+			if Settings.shake:
+				camera.add_trauma(0.25))
+	ocontrol.enabled = pos == "QB"
+	ocontrol.aim_only = true
+	dcontrol.enabled = false
+	_rtg_audibles = int(rtg.get("audibles", 2))
+	hud.rtg_action.connect(_on_rtg_action)
+	hud.set_rtg_line(RtgTracker.line_text(pos, rtg_track.stats))
+
+
+func _rtg_on() -> bool:
+	return not rtg.is_empty()
+
+
+## Road to Glory and not the QB: the coordinators call the plays, the CPU coach handles 4th
+## downs, PATs and timeouts.
+func _coach_calls() -> bool:
+	return _rtg_on() and str(rtg["pos"]) != "QB"
+
+
+## Road to Glory: you play offense (QB / RB / WR), else defense (CB).
+func _rtg_offense() -> bool:
+	return _rtg_on() and str(rtg["pos"]) != "CB"
 
 
 ## Lineups: config overrides; else your franchise cards (if home is your franchise) vs the
@@ -224,6 +294,17 @@ func _resolve_lineups(home_abbr: String, away_abbr: String) -> void:
 	if config.has("home_lineup") and config.has("away_lineup"):
 		lineups[home_abbr] = config["home_lineup"]
 		lineups[away_abbr] = config["away_lineup"]
+		return
+	if _rtg_on():
+		# Your team's real roster with you in your slot; the opponent's real roster for the difficulty.
+		var mine := GameData.real_lineup(home_abbr)
+		var side := "offense" if _rtg_offense() else "defense"
+		var p: Dictionary = rtg["player"]
+		mine[side][str(rtg["slot"])] = {"name": str(p["name"]), "jersey": int(p.get("jersey", 0)),
+				"attrs": p["attrs"], "look": p.get("look", {})}
+		lineups[home_abbr] = mine
+		var opp_real := int(GameData.real_lineup(away_abbr)["ovr"])
+		lineups[away_abbr] = _rescaled(away_abbr, clampi(opp_real + RtgRules.difficulty_offset(int(config.get("difficulty", Settings.difficulty))), 50, 99))
 		return
 	var prof: Profile = SaveManager.profile
 	if human != "" and prof.has_team() and prof.franchise_team == home_abbr and not prof.lineup.is_empty():
@@ -283,27 +364,41 @@ func _sims_cpu_drives() -> bool:
 	return human != "" and not play_defense and not _is_challenge()
 
 
+## True when this possession is simulated as a whole drive: the CPU's drives (Retro Bowl
+## route), or in Road to Glory whichever side you don't play (a corner's own offense).
+func _sim_this_possession() -> bool:
+	if _two_point:
+		return false
+	if _rtg_on():
+		return (gs.possession == human) != _rtg_offense()
+	return _sims_cpu_drives() and gs.possession != human
+
+
 ## Team strength for simulated drives: the OVR the team plays at in this game (yours with
 ## chemistry, the opponent's after the difficulty rescale).
 func _team_strength(team: String) -> float:
 	return float(lineups.get(team, {}).get("ovr", _sim_strength(team)))
 
 
-## The CPU has the ball: simulate its whole drive (GameSim) from where it starts, run the
-## clock, show the result, then hand the ball back (kickoff after a score, punt, turnover).
+## A whole drive is simulated (GameSim) from where it starts: the CPU's drives, or your own
+## team's in Road to Glory as a corner. Runs the clock, shows the result, then hands the ball
+## over (kickoff after a score, punt, turnover).
 func _sim_cpu_drive() -> void:
 	phase = Phase.RESULT
 	hud.hide_choice()
 	hud.show_play_bar(false)
+	hud.hide_rtg_call()
 	hud.set_special_actions([] as Array[String])
 	hud.show_switch(false)
 	hud.set_hint("")
 	hud.set_abilities([])
-	var cpu := gs.possession
+	var off := gs.possession
+	var def := gs.other(off)
+	var ours := off == human
 	var start_x := gs.downs.los_x
-	var rate := GameSim.drive_rate(_team_strength(cpu), _team_strength(human), cpu == gs.home, start_x)
+	var rate := GameSim.drive_rate(_team_strength(off), _team_strength(def), off == gs.home, start_x)
 	var dlog: Array = []
-	var d := GameSim.sim_drive(gs, cpu, rate, start_x, rng, dlog)
+	var d := GameSim.sim_drive(gs, off, rate, start_x, rng, dlog)
 	if not _sim() and not dlog.is_empty():
 		dlog[0]["start_x"] = clampf(start_x - FieldGeo.OWN_GOAL, 1.0, 99.0)
 		play_log.append_array(PlayByPlay.synthesize(dlog[0], rng.randi()))
@@ -312,28 +407,34 @@ func _sim_cpu_drive() -> void:
 	gs.clock.stopped = true
 	var outcome: String = d["outcome"]
 	var end_x := clampf(float(d["end_x"]), FieldGeo.OWN_GOAL + 1.0, FieldGeo.OPP_GOAL - 1.0)
-	var name := (teams[cpu] as TeamData).team_name.to_upper()
-	var head: String = {"td": "%s TOUCHDOWN" % name, "fg": "%s FIELD GOAL" % name, "miss": "%s MISS THE FG" % name,
-			"punt": "DEFENSE HOLDS - %s PUNT" % name, "turnover": "INTERCEPTED!" if d["int"] else "FUMBLE RECOVERED!",
-			"downs": "STOPPED ON DOWNS!"}.get(outcome, name)
-	var sub := "%s DRIVE: %d PLAYS · %d YDS · %d:%02d" % [cpu, int(d["plays"]), int(d["yards"]), int(secs) / 60,
+	var name := (teams[off] as TeamData).team_name.to_upper()
+	var head: String
+	if ours:
+		head = {"td": "%s TOUCHDOWN!" % name, "fg": "%s FIELD GOAL" % name, "miss": "%s MISS THE FG" % name,
+				"punt": "%s PUNT" % name, "turnover": "%s TURN IT OVER" % name,
+				"downs": "%s STOPPED ON DOWNS" % name}.get(outcome, name)
+	else:
+		head = {"td": "%s TOUCHDOWN" % name, "fg": "%s FIELD GOAL" % name, "miss": "%s MISS THE FG" % name,
+				"punt": "DEFENSE HOLDS - %s PUNT" % name, "turnover": "INTERCEPTED!" if d["int"] else "FUMBLE RECOVERED!",
+				"downs": "STOPPED ON DOWNS!"}.get(outcome, name)
+	var sub := "%s DRIVE: %d PLAYS · %d YDS · %d:%02d" % [off, int(d["plays"]), int(d["yards"]), int(secs) / 60,
 			int(secs) % 60]
 	_update_scorebug()
 	if not _sim():
 		hud.show_banner(head, sub, 2.4)
-		var bad := outcome in ["td", "fg"]
+		var bad := (outcome in ["td", "fg"]) != ours
 		Sfx.play("bad" if bad else "big")
 		Sfx.play("groan" if bad else "cheer")
-		if outcome in ["turnover", "downs"]:
+		if not bad:
 			hud.flash(Color("#00e436"), 0.4)
 	var after_score := func() -> void:
 		if _ot_over():
 			_final()
 		elif gs.clock.expired():
-			_kickoff_pending = cpu
+			_kickoff_pending = off
 			_end_period()
 		else:
-			_kickoff(cpu)
+			_kickoff(off)
 	var after_stop := func() -> void:
 		if _ot_over():
 			_final()
@@ -350,7 +451,7 @@ func _sim_cpu_drive() -> void:
 			_after(2.6, _punt)
 		_:
 			gs.finish_drive(true, gs.clock.seconds_left)
-			gs.start_possession(human, FieldGeo.LENGTH - end_x)
+			gs.start_possession(def, FieldGeo.LENGTH - end_x)
 			_spot_y = FieldGeo.CENTER_Y
 			if not _sim():
 				camera.show_spot(gs.downs.los_x)
@@ -453,7 +554,7 @@ func _start_play_call() -> void:
 	if gs.clock.expired():
 		_end_period()
 		return
-	if _sims_cpu_drives() and gs.possession != human and not _two_point:
+	if _sim_this_possession():
 		_sim_cpu_drive()
 		return
 	phase = Phase.PLAY_CALL
@@ -466,12 +567,17 @@ func _start_play_call() -> void:
 	runner.human_team = PlayerAgent.Team.OFFENSE if _human_offense() else (
 			PlayerAgent.Team.DEFENSE if _human_defense() else -1)
 	runner.human_input = ocontrol if _human_offense() else (dcontrol if _human_defense() else null)
+	if _rtg_on():
+		runner.human_input = rtg_ctl
+	_rtg_menu = ""
+	_rtg_hot = 0
+	_rtg_snap_at = -1.0
 	_pending_runoff = 0.0 if gs.clock.stopped else gs.runoff(tuning)
 	_cpu_timeouts()
 	var situation := _situation()
 	hud.set_special_actions([] as Array[String])
 	# CPU 4th-down decisions (punt / field goal) happen before any play is shown.
-	if not _human_offense() and gs.downs.down == 4 and not _two_point:
+	if (not _human_offense() or _coach_calls()) and gs.downs.down == 4 and not _two_point:
 		var k := _kicker(gs.possession)
 		var dist := KickModel.fg_distance(gs.downs.los_x)
 		var call := AIPlayCaller.fourth_down(situation, dist, KickModel.fg_max_range(tuning, float(k.get("kpw", 75))))
@@ -481,7 +587,15 @@ func _start_play_call() -> void:
 		if call == "fg":
 			_field_goal_cpu(dist)
 			return
-	if _human_offense():
+	if _coach_calls():
+		# Road to Glory: the coordinators call it; you get the pre-snap card.
+		if _human_offense():
+			def_play = AIPlayCaller.pick_defense(defense_book.plays, null, situation, rng, last_def_call)
+			off_play = RtgPlay.oc_call(offense_book.plays, situation, rng, str(rtg["slot"]), float(rtg.get("trust", 0.5)))
+		else:
+			off_play = PlayAdvisor.pick(offense_book.plays, situation, rng)
+			def_play = AIPlayCaller.pick_defense(defense_book.plays, null, situation, rng, last_def_call)
+	elif _human_offense():
 		def_play = AIPlayCaller.pick_defense(defense_book.plays, memory, situation, rng, last_def_call)
 		var ranked := PlayAdvisor.suggest(offense_book.plays, situation, rng, memory)
 		off_play = ranked[0]
@@ -506,8 +620,12 @@ func _start_play_call() -> void:
 		_restrict_two_point_calls()
 	last_def_call = def_play
 	_setup_formation()
-	hud.show_play_bar(human != "")
-	hud.show_switch(_human_defense())
+	hud.show_play_bar(human != "" and not _coach_calls())
+	hud.show_switch(_human_defense() and not _rtg_on())
+	if _coach_calls():
+		_show_rtg_card()
+	elif _rtg_on():
+		hud.set_hint("LEFT THUMB: MOVE IN THE POCKET  ·  RIGHT: DRAG BACK TO SNAP AND AIM")
 	_update_scorebug()
 	if not _sim():
 		camera.snap_to_target()
@@ -553,7 +671,7 @@ func _offer_specials() -> void:
 ## human offense is milking the clock).
 func _cpu_timeouts() -> void:
 	for team in [gs.home, gs.away]:
-		if team == human or gs.clock.stopped:
+		if (team == human and not _coach_calls()) or gs.clock.stopped:
 			continue
 		var late := gs.clock.half_seconds_left() <= 110.0
 		if late and gs.score_diff(team) < 0 and int(gs.timeouts[team]) > 0 and _pending_runoff > 0.0:
@@ -579,6 +697,9 @@ func _setup_formation() -> void:
 	field.first_down_x = gs.downs.first_down_x
 	field.down = gs.downs.down
 	dcontrol.on_play_setup()
+	if _rtg_on():
+		_apply_hot_route()
+		rtg_ctl.on_play_setup()
 
 
 var _spot_y := FieldGeo.CENTER_Y
@@ -647,7 +768,7 @@ var _tagged: PlayerAgent = null
 
 
 func _process(delta: float) -> void:
-	if phase == Phase.LIVE and _human_defense() and runner.human_team == PlayerAgent.Team.DEFENSE:
+	if phase == Phase.LIVE and _human_defense() and runner.human_team == PlayerAgent.Team.DEFENSE and not _rtg_on():
 		var in_air := runner.ball.state == Ball.State.AIR
 		hud.set_hint(_defense_live_hint(in_air))
 	# Name + number of the player you control.
@@ -690,19 +811,29 @@ func _snap() -> void:
 	_seconds_before_play = gs.clock.seconds_left
 	gs.clock.stopped = false
 	runner.key_level = memory.key_level(off_play.id, off_play.formation.id, off_play.category) \
-			if _human_offense() else 0.0
-	var auto_sim := _human_defense() and not DefensePace.human_plays(pace, _situation())
+			if _human_offense() and not _coach_calls() else 0.0
+	var auto_sim := _human_defense() and not _rtg_on() and not DefensePace.human_plays(pace, _situation())
+	hud.hide_rtg_call()
 	if auto_sim:
 		runner.human_team = -1
 		runner.human_input = null
 	runner.snap()
-	var cpu_passing := not _human_offense() and not off_play.is_run()
+	var cpu_passing := not off_play.is_run() and (not _human_offense() or _coach_calls())
 	passer = CpuPasser.new(runner, rng) if cpu_passing else null
+	if passer != null and _rtg_on() and runner.locked != null:
+		var trust := float(rtg.get("trust", 0.5))
+		if _rtg_offense():
+			passer.set_favorite(runner.locked, tuning.rtg_favor_base + tuning.rtg_favor_trust * trust)
+		elif runner.locked.brain is ManCoverBrain:
+			# The other team tests the corner: more so while the coaches don't trust him yet.
+			passer.set_favorite((runner.locked.brain as ManCoverBrain).mark, 0.9 - 0.7 * trust)
 	if auto_sim and not _sim():
 		hud.show_switch(false)
 		_simulate_play()
 		return
-	if _human_defense():
+	if _rtg_on():
+		hud.set_hint(_rtg_live_hint())
+	elif _human_defense():
 		hud.set_hint(DEFENSE_LIVE_HINT)
 	elif _human_offense():
 		hud.set_hint("DRAG TO STEER  ·  SWIPE ← HESI  → DIVE  ↑↓ JUKE" if off_play.is_run()
@@ -725,6 +856,11 @@ func _physics_process(dt: float) -> void:
 		if _replay.step(dt):
 			_end_replay()
 		return
+	if _rtg_on() and phase == Phase.PLAY_CALL and not _sim():
+		rtg_ctl.pre_snap_step(dt)
+		if _rtg_snap_at >= 0.0 and Time.get_ticks_msec() / 1000.0 >= _rtg_snap_at:
+			_rtg_snap_at = -1.0
+			_snap()
 	if _sim() or phase != Phase.LIVE:
 		return
 	# PlayRunner steps itself; we tick the clock and drive the CPU QB / switcher.
@@ -752,7 +888,9 @@ func _on_play_ended(r: Dictionary) -> void:
 	hud.show_switch(false)
 	if int(runner.play_time) >= int(PlayRunner.WATCHDOG_SECONDS):
 		r["watchdog"] = 1
-	if _human_offense():
+	if _rtg_on():
+		_rtg_record(r)
+	if _human_offense() and not _coach_calls():
 		var gained: int = r["yards"] if r["type"] not in ["incomplete", "int", "int_td", "fumble"] else 0
 		memory.record(off_play.id, off_play.formation.id, off_play.category,
 				-10 if r["turnover"] else gained, off_play.display_name)
@@ -979,7 +1117,7 @@ func _pat_phase() -> void:
 	if phase == Phase.FINAL:
 		return
 	var team := gs.possession
-	if team == human:
+	if team == human and not _coach_calls():
 		phase = Phase.PAT_CHOICE
 		hud.show_play_bar(false)
 		hud.set_special_actions([] as Array[String])
@@ -996,6 +1134,9 @@ func _pat_phase() -> void:
 
 
 func _on_choice(index: int) -> void:
+	if _rtg_menu == "audible" and phase == Phase.PLAY_CALL:
+		_pick_audible(index)
+		return
 	match phase:
 		Phase.PAT_CHOICE:
 			if index == 0:
@@ -1015,6 +1156,8 @@ func _on_choice(index: int) -> void:
 		Phase.FINAL:
 			if index == 1 and not play_log.is_empty():
 				_open_play_by_play(_show_final_choice)
+			elif _rtg_on() and config.get("from_hub", false):
+				SceneRouter.goto(SceneRouter.RTG_POSTGAME, {"last_result": match_result()})
 			elif config.get("from_hub", false):
 				SceneRouter.goto(SceneRouter.RESULTS, {"last_result": match_result()})
 			else:
@@ -1195,7 +1338,7 @@ func match_result(forfeit := false) -> Dictionary:
 			"difficulty": int(config.get("difficulty", Settings.difficulty)),
 			"mode": str(config.get("mode", "quick")), "extra": config.get("extra", {}),
 			"came_back": _comeback, "challenge_won": _chal_won, "box": gs.box_score(mine), "opp_box": gs.box_score(opp),
-			"play_log": play_log}.merged(_sim_extra)
+			"play_log": play_log, "rtg": rtg_track.summary() if rtg_track != null else {}}.merged(_sim_extra)
 
 
 # ---------------------------------------------------------------- challenges
@@ -1339,7 +1482,10 @@ func _is_challenge() -> bool:
 func _on_pause_choice(index: int) -> void:
 	if _pause_menu == PauseMenu.CONFIRM_QUIT:
 		if index == 1:
-			_quit_to_menu()
+			if _rtg_on() and config.get("from_hub", false):
+				_sim_rest_of_game()   # Road to Glory: leaving sims the rest, your line so far counts
+			else:
+				_quit_to_menu()
 		else:
 			_show_pause_menu()
 		return
@@ -1376,6 +1522,8 @@ func _on_pause_choice(index: int) -> void:
 			_pause_menu = PauseMenu.CONFIRM_QUIT
 			if _is_challenge():
 				hud.show_choice("LEAVE THE CHALLENGE?", "YOU CAN TRY IT AGAIN ANYTIME", ["STAY", "LEAVE"] as Array[String])
+			elif _rtg_on() and config.get("from_hub", false):
+				hud.show_choice("LEAVE THE GAME?", "THE REST IS SIMULATED", ["STAY", "LEAVE"] as Array[String])
 			elif config.get("from_hub", false):
 				hud.show_choice("LEAVE THE GAME?", "IT COUNTS AS A LOSS", ["STAY", "LEAVE"] as Array[String])
 			else:
@@ -1567,6 +1715,8 @@ var _half_offer := false
 
 ## Team strength for the quick sim: your lineup (with its cards) or the real team's rating.
 func _sim_strength(abbr: String) -> int:
+	if _rtg_on() and lineups.has(abbr):
+		return int(lineups[abbr].get("ovr", GameData.db.team_ovr(abbr)))
 	var prof := SaveManager.profile
 	if abbr == human and prof != null and prof.has_team() and prof.franchise_team == abbr:
 		return Collection.team_ovr(prof, GameData.db)
@@ -1580,7 +1730,13 @@ func _sim_rest_of_game() -> void:
 	var played_box := gs.box_score(mine)
 	var played_pf := int(gs.score[mine])
 	var played_pa := int(gs.score[gs.other(mine)])
+	var left_share := gs.clock.seconds_left / maxf(GameClock.QUARTER * 4.0, 1.0) + maxf(0.0, 4.0 - gs.clock.quarter) * 0.25 \
+			if gs.clock.quarter <= 4 else 0.0
 	var summary := GameSim.finish(gs, {gs.home: _sim_strength(gs.home), gs.away: _sim_strength(gs.away)}, rng)
+	if rtg_track != null:
+		var p: Dictionary = rtg["player"]
+		rtg_track.add_sim(RtgRules.sim_line(str(rtg["pos"]), RtgRules.ovr(str(rtg["pos"]), p["attrs"]), clampf(left_share, 0.0, 1.0), rng),
+				RtgRules.SIM_GRADE_POINTS, int(round(8.0 * clampf(left_share, 0.0, 1.0))))
 	var seed_v := int(rng.randi() & 0x7fffffff)
 	var simmed := PlayByPlay.from_drives(summary.get("drive_log", []), seed_v)
 	for p in simmed:
@@ -1714,3 +1870,113 @@ func _end_replay() -> void:
 	var c := _replay_cont
 	_replay_cont = Callable()
 	c.call()
+
+
+# ---------------------------------------------------------------- road to glory
+
+## The pre-snap card while the coordinators call it: the call, your job, AUDIBLE / HOT ROUTE /
+## SNAP (offense) or READY (corner).
+func _show_rtg_card() -> void:
+	if _sim():
+		return
+	var me := runner.locked
+	if me == null:
+		return
+	var names := {}
+	for slot in runner.off_slots:
+		var o: PlayerAgent = runner.off_slots[slot]
+		names[slot] = "#%d %s" % [o.jersey, o.display_name.to_upper()] if o.jersey > 0 else o.display_name.to_upper()
+	var play := off_play if _rtg_offense() else def_play
+	var job := RtgPlay.job_text(play, str(rtg["slot"]), me.start_pos.y, runner.ball_y, names)
+	if _rtg_offense() and _rtg_hot > 0:
+		job = "HOT ROUTE: %s - GET OPEN" % RtgPlay.HOT_ORDER[_rtg_hot]
+	var actions: Array = []
+	if _rtg_offense():
+		actions.append({"id": "audible", "text": "AUDIBLE (%d)" % _rtg_audibles, "disabled": _rtg_audibles <= 0})
+		if str(me.assignment.get("type", "")) == "route" or _rtg_hot > 0:
+			actions.append({"id": "hot", "text": "ROUTE: %s" % RtgPlay.HOT_ORDER[_rtg_hot]})
+		actions.append({"id": "snap", "text": "SNAP ▶", "yellow": true})
+		hud.show_rtg_call("OC CALL: %s" % off_play.display_name.to_upper(), "YOUR JOB: " + job, actions)
+		hud.set_hint("STICK MOVES YOU  ·  BUTTONS ON THE RIGHT  ·  TAP SNAP WHEN READY")
+	else:
+		actions.append({"id": "ready", "text": "READY ▶", "yellow": true})
+		hud.show_rtg_call("DC CALL: %s" % def_play.display_name.to_upper(), "YOUR JOB: " + job, actions)
+		hud.set_hint("STICK SHADES YOUR SPOT  ·  LINE UP TIGHT TO PRESS  ·  READY WHEN SET")
+
+
+func _on_rtg_action(id: String) -> void:
+	if phase != Phase.PLAY_CALL or not _rtg_on():
+		return
+	Sfx.play("tap")
+	match id:
+		"snap":
+			if _human_offense():
+				_snap()
+		"ready":
+			if _human_defense() and _rtg_snap_at < 0.0:
+				# The offense gets set and snaps a beat later (no way to time the snap).
+				_rtg_snap_at = Time.get_ticks_msec() / 1000.0 + rng.randf_range(0.35, 1.1)
+				hud.show_rtg_call("", "", [])
+				hud.set_hint("SET...")
+		"audible":
+			if _rtg_audibles <= 0:
+				return
+			_rtg_options = RtgPlay.audibles(offense_book.plays, _situation(), str(rtg["slot"]), off_play)
+			if _rtg_options.is_empty():
+				return
+			var opts: Array[String] = []
+			for p in _rtg_options:
+				opts.append(p.display_name.to_upper())
+			opts.append("KEEP THE CALL")
+			_rtg_menu = "audible"
+			hud.show_choice("AUDIBLE", "%d LEFT THIS GAME" % _rtg_audibles, opts)
+		"hot":
+			_rtg_hot = (_rtg_hot + 1) % RtgPlay.HOT_ORDER.size()
+			_apply_hot_route()
+			_show_rtg_card()
+
+
+func _pick_audible(index: int) -> void:
+	_rtg_menu = ""
+	hud.hide_choice()
+	if index >= 0 and index < _rtg_options.size():
+		_rtg_audibles -= 1
+		off_play = _rtg_options[index]
+		_rtg_hot = 0
+		_setup_formation()
+		hud.show_banner("AUDIBLE!", off_play.display_name.to_upper(), 0.9)
+	_show_rtg_card()
+
+
+## Hot route: swap your route for the picked one (a copy of the assignment; the play is untouched).
+func _apply_hot_route() -> void:
+	var me := runner.locked
+	if me == null or me.team != PlayerAgent.Team.OFFENSE or _rtg_hot <= 0:
+		return
+	var name: String = RtgPlay.HOT_ORDER[_rtg_hot]
+	me.assignment = RtgPlay.hot_assignment(me.assignment, name, me.start_pos.y, runner.ball_y)
+
+
+func _rtg_live_hint() -> String:
+	match str(rtg["pos"]):
+		"QB":
+			return "RIGHT: DRAG BACK TO AIM, RELEASE TO THROW  ·  LEFT STICK MOVES YOU"
+		"RB":
+			return "STICK TO RUN  ·  JUKE  SPIN  POWER  DIVE  ·  BURST FOR SPEED" if off_play.is_run() \
+					else "RUN YOUR ROUTE OR STAY IN TO BLOCK  ·  CALL WHEN OPEN"
+		"WR":
+			return "STICK TAKES OVER YOUR ROUTE  ·  CALL WHEN OPEN  ·  TAP CATCH AS IT ARRIVES" if not off_play.is_run() \
+					else "BLOCK FOR THE BACK (OR JUST RUN YOUR MAN OFF)"
+	return "STICK TO COVER (LET GO = AUTO)  ·  WATCH FOR THE ! BREAK  ·  BALL TO LEAP  ·  TACKLE TO DIVE"
+
+
+## A play you were on the field for: stats, grade pop, the running line.
+func _rtg_record(r: Dictionary) -> void:
+	if rtg_track == null or _two_point:
+		return
+	var g := rtg_track.record(r, {"side": "offense" if _rtg_offense() else "defense", "run_play": off_play.is_run()})
+	if _sim():
+		return
+	if not g.is_empty():
+		hud.show_grade(str(g["letter"]), str(g["note"]))
+	hud.set_rtg_line(RtgTracker.line_text(str(rtg["pos"]), rtg_track.stats))

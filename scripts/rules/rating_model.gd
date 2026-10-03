@@ -149,3 +149,52 @@ static func pa_bite(t: GameplayTuning, awr: float) -> float:
 ## Seconds a block holds before the defender sheds it.
 static func shed_time(t: GameplayTuning, blk: float, rush: float, jitter: float) -> float:
 	return maxf(t.shed_min, t.shed_base + (blk - rush) * t.shed_per_point + jitter * t.shed_jitter)
+
+
+# ---------------------------------------------------------------- Road to Glory moves
+
+## Speed share an agility rating keeps through a hard plant-and-cut.
+static func rtg_cut_keep(t: GameplayTuning, agility: float) -> float:
+	return lerpf(t.rtg_cut_keep_min, t.rtg_cut_keep_max, _n(agility))
+
+
+## Agility for cuts by position: backs cut on elusiveness, receivers on route running,
+## defenders on coverage; acceleration always helps.
+static func agility(pos: String, attrs: Dictionary) -> float:
+	var acc := float(attrs.get("acc", 60))
+	match pos:
+		"RB", "QB":
+			return float(attrs.get("elu", 60)) * 0.6 + acc * 0.4
+		"WR", "TE":
+			return float(attrs.get("rte", 60)) * 0.6 + acc * 0.4
+		"CB", "S", "LB":
+			return float(attrs.get("cov", 60)) * 0.5 + acc * 0.5
+	return acc
+
+
+## Tackle chance multiplier of a carrier's move against a tackler (lower = harder to bring
+## down). kind: "juke" | "spin" | "stiff" | "truck". 1.0 for anything else.
+static func move_tackle_mult(t: GameplayTuning, kind: String, carrier: Dictionary, tackler: Dictionary) -> float:
+	var tak := float(tackler.get("tak", 60))
+	var elu := float(carrier.get("elu", 60))
+	var cstr := float(carrier.get("str", 60))
+	match kind:
+		"juke":
+			return 0.6 - 0.4 * sigmoid((elu - tak) / t.rtg_move_k)
+		"spin":
+			return 0.7 - 0.5 * sigmoid((elu * 0.6 + cstr * 0.4 - tak) / t.rtg_move_k)
+		"stiff":
+			return 0.75 - 0.5 * sigmoid((cstr - tak) / t.rtg_move_k)
+		"truck":
+			return 0.8 - 0.6 * sigmoid((cstr - (tak * 0.5 + float(tackler.get("str", 60)) * 0.5)) / t.rtg_move_k)
+	return 1.0
+
+
+## Seconds a defender loses his read when a carrier jukes in front of him.
+static func juke_bite(t: GameplayTuning, elu: float, awr: float) -> float:
+	return t.rtg_juke_bite * clampf(0.5 + (elu - awr) / 40.0, 0.2, 1.2)
+
+
+## Seconds of warning a corner gets before his man breaks (the read telegraph).
+static func telegraph_time(t: GameplayTuning, awr: float, rte: float) -> float:
+	return clampf(t.rtg_tele_base + (awr - rte) * t.rtg_tele_per_point, 0.08, 0.6)

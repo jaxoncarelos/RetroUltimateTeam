@@ -73,6 +73,12 @@ func target_position() -> Vector2:
 		var apex := float(runner.plan_throw(runner.aim_preview)["apex"])
 		var y := lerpf(qb.y, reticle.y, 0.5) + FieldProjection.lift(apex).y * 0.35
 		return Vector2(maxf(qb.x + LOOK_AHEAD_PX, reticle.x - lead), y)
+	var me := runner.locked
+	if me != null and is_instance_valid(me) and me != runner.carrier:
+		# Road to Glory: you are the star of the shot; the ball stays in the corner of the frame.
+		var share := 0.4 if runner.phase == PlayRunner.Phase.PRE_SNAP else 0.28
+		var p := me.field_pos.lerp(runner.focus_point(), share)
+		return FieldProjection.to_screen(p) + Vector2(LOOK_AHEAD_PX * 0.5, 0.0)
 	if runner.qb_is_passer():
 		return base + Vector2(PASS_LOOK_AHEAD_PX, 0.0)
 	return base + Vector2(LOOK_AHEAD_PX, 0.0)

@@ -243,7 +243,14 @@ func _tackles() -> void:
 ## One tackle attempt by `d` on carrier `c`. Returns true when he brings him down.
 func _roll(d: PlayerAgent, c: PlayerAgent, diving: bool, human: bool, mult := 1.0) -> bool:
 	var t := ctx.tuning
-	var p := RatingModel.tackle_prob(t, d.attr("tak"), c.attr("elu"), c.attr("str"), c.juke_timer > 0.0)
+	var juking := c.juke_timer > 0.0 and c.juke_vec == Vector2.ZERO   # the classic swipe juke
+	var p := RatingModel.tackle_prob(t, d.attr("tak"), c.attr("elu"), c.attr("str"), juking)
+	# Road to Glory moves (juke / spin / stiff arm / truck) against this tackler.
+	var move := move_against(c, d)
+	if move != "":
+		p *= RatingModel.move_tackle_mult(t, move, c.attrs, d.attrs)
+		if move == "spin":
+			c.spin_used = true
 	# Every tackle he already broke this play makes the next one likelier (legs tire, help arrives).
 	p += t.broken_tackle_bonus * ctx.broken_tackles
 	if c.hesi_timer > 0.0:
@@ -255,7 +262,7 @@ func _roll(d: PlayerAgent, c: PlayerAgent, diving: bool, human: bool, mult := 1.
 		p += t.human_tackle_bonus + (t.human_dive_bonus if diving else 0.0)
 		p += t.human_assist_bonus * _helpers(d, c)
 		cap = t.human_tackle_max
-	if ctx.human_team == PlayerAgent.Team.OFFENSE and c == ctx.qb and not ctx.pass_thrown and not ctx.scrambling:
+	if ctx.human_qb() and c == ctx.qb and not ctx.pass_thrown and not ctx.scrambling:
 		# Your QB sidesteps the first rushes: a sack is never a touch (fades out over qb_evade_time).
 		p *= lerpf(t.qb_evade_mult, 1.0, clampf(ctx.play_time / t.qb_evade_time, 0.0, 1.0))
 	p = minf(p * mult, cap)
@@ -269,11 +276,43 @@ func _roll(d: PlayerAgent, c: PlayerAgent, diving: bool, human: bool, mult := 1.
 	if not diving and d.engaged_with == null:
 		d.knock_down(t.human_missed_stun if human else t.missed_tackle_stun)
 	d.tackle_cd = t.missed_tackle_cd
-	c.velocity *= t.missed_tackle_slow
+	match move:
+		"truck":
+			d.knock_down(t.rtg_truck_stun)
+			c.velocity *= t.rtg_truck_slow
+		"stiff":
+			d.knock_down(t.rtg_stiff_stun)
+			c.velocity *= 0.9
+		"juke", "spin":
+			c.velocity *= 0.85   # he slid off: most of the speed survives
+		_:
+			c.velocity *= t.missed_tackle_slow
+	if move != "":
+		ctx.move_event.emit(move, c.field_pos, c)
 	ctx.broken_tackles += 1
-	if ctx.human_team == PlayerAgent.Team.OFFENSE and c == ctx.qb and not ctx.pass_thrown and not ctx.scrambling:
+	if ctx.human_qb() and c == ctx.qb and not ctx.pass_thrown and not ctx.scrambling:
 		ctx.qb_immune_until = ctx.play_time + t.qb_evade_immunity
 	return false
+
+
+## The carrier move that applies to a tackle by `d` ("" = none): a juke or spin against
+## anyone (a spin only once), a stiff arm against a tackler at his side, a truck head-on.
+func move_against(c: PlayerAgent, d: PlayerAgent) -> String:
+	if c.move_kind == "" or c.move_timer <= 0.0:
+		return ""
+	var head := c.velocity.normalized() if c.velocity.length() > 0.5 else Vector2(c.facing, 0.0)
+	var to_d := (d.field_pos - c.field_pos).normalized()
+	var dot := head.dot(to_d)
+	match c.move_kind:
+		"juke":
+			return "juke"
+		"spin":
+			return "" if c.spin_used else "spin"
+		"stiff":
+			return "stiff" if dot > -0.3 and dot < 0.9 else ""
+		"truck":
+			return "truck" if dot >= 0.45 else ""
+	return ""
 
 
 ## CPU teammates close enough to help wrap up the human's tackle.

@@ -38,7 +38,8 @@ func _draw() -> void:
 		if runner.human_team == PlayerAgent.Team.DEFENSE:
 			_draw_hero_path()
 	else:
-		if runner.phase == PlayRunner.Phase.PRE_SNAP and runner.human_team == PlayerAgent.Team.OFFENSE:
+		if runner.phase == PlayRunner.Phase.PRE_SNAP and runner.human_team == PlayerAgent.Team.OFFENSE \
+				and runner.human_qb():
 			_draw_snap_hint()
 		if aim_active and runner.qb_is_passer():
 			_draw_aim()
@@ -103,11 +104,18 @@ func _draw_snap_hint() -> void:
 
 
 func _draw_routes() -> void:
+	var me := runner.locked
 	for a in runner.offense:
 		var t := str(a.assignment.get("type", ""))
 		if t != "route" and t != "carry" and t != "sneak":
 			continue
 		var color := ROUTE_COLOR if t == "route" else RUN_COLOR
+		if me != null and me != runner.qb:
+			# Road to Glory: your own job in bold gold, the rest of the play faint.
+			if a == me:
+				_draw_path_bold(a.start_pos, a.assignment.get("path", PackedVector2Array()), RETICLE_COLOR)
+				continue
+			color = Color(color, 0.3)
 		var prev := FieldProjection.to_screen(a.start_pos)
 		var path: PackedVector2Array = a.assignment.get("path", PackedVector2Array())
 		for p in path:
@@ -115,6 +123,21 @@ func _draw_routes() -> void:
 			_dotted(prev, cur, color)
 			prev = cur
 		draw_rect(Rect2(prev - Vector2(1, 1), Vector2(3, 3)), color)
+
+
+## A thick path with an arrowhead (Road to Glory: your route / run lane).
+func _draw_path_bold(start: Vector2, path: PackedVector2Array, col: Color) -> void:
+	var sp := PackedVector2Array([FieldProjection.to_screen(start).round()])
+	for p in path:
+		sp.append(FieldProjection.to_screen(start + p).round())
+	if sp.size() < 2:
+		return
+	draw_polyline(sp, Color(0.02, 0.04, 0.2, 0.75), 4.0)
+	draw_polyline(sp, col, 2.0)
+	var tip := sp[sp.size() - 1]
+	var dir := (tip - sp[sp.size() - 2]).normalized()
+	var n := Vector2(-dir.y, dir.x)
+	draw_colored_polygon(PackedVector2Array([tip + dir * 5.0, tip - dir * 3.0 + n * 4.0, tip - dir * 3.0 - n * 4.0]), col)
 
 
 func _draw_aim() -> void:

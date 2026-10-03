@@ -54,6 +54,19 @@ var burst_cd := 0.0
 var duel_leverage := 0.0
 var duel_window := 0.0
 var duel_stall := 0.0
+## Road to Glory carrier moves: the active move ("juke" / "spin" / "stiff" / "truck", "" = none)
+## and how long it still counts against tackles; per-move and global cooldowns; a juke's
+## lateral velocity; whether a spin already shrugged off its one tackle.
+var move_kind := ""
+var move_timer := 0.0
+var move_cd := 0.0
+var spin_cd := 0.0
+var power_cd := 0.0
+var juke_vec := Vector2.ZERO
+var spin_used := false
+var cut_cd := 0.0
+## Burst speed multiplier for this player (0 = GameplayTuning.burst_mult).
+var burst_scale := 0.0
 var jump_timer := 0.0
 var jump_target := Vector2.ZERO
 var jump_started_at := -1.0   ## play_time of the last jump at the ball (-1 = none)
@@ -174,6 +187,42 @@ func start_juke(t: GameplayTuning, dir: float) -> bool:
 	return true
 
 
+## Road to Glory juke: hop along `lateral` (field direction). False on cooldown.
+func start_rtg_juke(t: GameplayTuning, lateral: Vector2) -> bool:
+	if juke_cd > 0.0 or move_cd > 0.0 or not can_act() or lateral == Vector2.ZERO:
+		return false
+	juke_timer = t.rtg_juke_time
+	juke_vec = lateral.normalized() * t.rtg_juke_speed
+	juke_cd = t.rtg_juke_cooldown
+	_begin_move(t, "juke", t.rtg_juke_time + 0.15)
+	return true
+
+
+## Spin move: slower for a moment, but the first tackle try during it often slides off.
+func start_spin(t: GameplayTuning) -> bool:
+	if spin_cd > 0.0 or move_cd > 0.0 or not can_act():
+		return false
+	spin_cd = t.rtg_spin_cooldown
+	spin_used = false
+	_begin_move(t, "spin", t.rtg_spin_time)
+	return true
+
+
+## Stiff arm ("stiff") or truck ("truck"): tackles during the window face the carrier's strength.
+func start_power(t: GameplayTuning, kind: String) -> bool:
+	if power_cd > 0.0 or move_cd > 0.0 or not can_act():
+		return false
+	power_cd = t.rtg_power_cooldown
+	_begin_move(t, kind, t.rtg_power_time)
+	return true
+
+
+func _begin_move(t: GameplayTuning, kind: String, time: float) -> void:
+	move_kind = kind
+	move_timer = time
+	move_cd = t.rtg_move_cooldown
+
+
 ## Hesitate: slow almost to a stop for hesi_time, then burst forward. Returns false on cooldown.
 func start_hesi(t: GameplayTuning) -> bool:
 	if hesi_cd > 0.0 or hesi_timer > 0.0 or not can_act():
@@ -188,6 +237,15 @@ func step(dt: float, t: GameplayTuning) -> void:
 	hesi_cd = maxf(0.0, hesi_cd - dt)
 	block_cd = maxf(0.0, block_cd - dt)
 	juke_cd = maxf(0.0, juke_cd - dt)
+	move_cd = maxf(0.0, move_cd - dt)
+	spin_cd = maxf(0.0, spin_cd - dt)
+	power_cd = maxf(0.0, power_cd - dt)
+	cut_cd = maxf(0.0, cut_cd - dt)
+	if move_timer > 0.0:
+		move_timer -= dt
+		if move_timer <= 0.0:
+			move_kind = ""
+			juke_vec = Vector2.ZERO
 	throw_anim = maxf(0.0, throw_anim - dt)
 	if is_down:
 		velocity = velocity.move_toward(Vector2.ZERO, t.down_slide_decel * dt)
@@ -210,7 +268,10 @@ func step(dt: float, t: GameplayTuning) -> void:
 		return
 	burst_timer = maxf(0.0, burst_timer - dt)
 	burst_cd = maxf(0.0, burst_cd - dt)
-	var target_v := desired_dir * max_speed * throttle * speed_mult * (t.burst_mult if burst_timer > 0.0 else 1.0)
+	var bm := burst_scale if burst_scale > 0.0 else t.burst_mult
+	var target_v := desired_dir * max_speed * throttle * speed_mult * (bm if burst_timer > 0.0 else 1.0)
+	if move_kind == "spin":
+		target_v *= t.rtg_spin_speed
 	if hesi_timer > 0.0:
 		var was_slow := hesi_timer > t.hesi_burst_time
 		hesi_timer = maxf(0.0, hesi_timer - dt)
@@ -230,7 +291,14 @@ func step(dt: float, t: GameplayTuning) -> void:
 	if jam_timer > 0.0:
 		jam_timer -= dt
 		target_v *= t.press_jam_speed
-	if juke_timer > 0.0:
+	if juke_timer > 0.0 and juke_vec != Vector2.ZERO:
+		# Road to Glory juke: a hop sideways off the current heading, keeping most of the speed.
+		juke_timer -= dt
+		var lat := juke_vec.normalized()
+		var fwd := velocity - lat * velocity.dot(lat)
+		target_v = fwd * t.rtg_juke_forward + juke_vec
+		velocity = target_v
+	elif juke_timer > 0.0:
 		juke_timer -= dt
 		target_v.y = juke_dir * t.juke_speed
 		velocity.y = target_v.y
@@ -244,6 +312,8 @@ func _process(_delta: float) -> void:
 	position = FieldProjection.to_screen(field_pos).round()
 	sprite.position = FieldProjection.lift(z_height).round()
 	sprite.flip_h = facing < 0.0
+	if move_kind == "spin":
+		sprite.flip_h = int(move_timer / 0.07) % 2 == 0   # a quick whirl
 	var anim := "idle"
 	if in_stance:
 		anim = "stance"

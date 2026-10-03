@@ -13,6 +13,8 @@ signal ball_thrown(target: Vector2)
 signal big_hit(at: Vector2, speed: float)
 ## A highlight moment for juice (slow-mo, camera punch): "deep_catch", "pick" or "td".
 signal big_moment(kind: String, at: Vector2)
+## Road to Glory carrier move that broke a tackle: "juke" / "spin" / "stiff" / "truck".
+signal move_event(kind: String, at: Vector2, agent: PlayerAgent)
 ## Hero (your defender) moments: "beat" / "fail" a block duel, "burst", "hurry" (for sfx / juice).
 signal hero_event(kind: String, at: Vector2)
 
@@ -33,6 +35,18 @@ var phase := Phase.IDLE
 var human_team: int = PlayerAgent.Team.OFFENSE
 ## Object with apply(dt) that steers the human-controlled agent (HumanOffenseControl).
 var human_input: Object = null
+## Road to Glory: the slot of the one player the human plays ("" = classic control). Set before
+## setup_play(); `locked` is that agent for the current play. He never hands control to a
+## teammate: other carriers on his team run on their own.
+var lock_slot := ""
+var locked: PlayerAgent = null
+## play_time of the locked receiver's last CATCH tap (-1 = none) and until when his CALL for
+## the ball holds the CPU QB's eyes.
+var catch_pressed_at := -1.0
+var ball_call_until := -1.0
+## Who covered the receiver the last pass went to (slot, "" = nobody close) and where he caught it.
+var cover_slot := ""
+var catch_x := -1.0
 
 var actors: Node2D
 var ball: Ball
@@ -163,6 +177,11 @@ func setup_play(p_off: PlayDef, p_def: PlayDef, p_los_x: float, p_ball_y: float,
 	replay_frames = []
 	qb_immune_until = -1.0
 	intended = null
+	locked = null
+	catch_pressed_at = -1.0
+	ball_call_until = -1.0
+	cover_slot = ""
+	catch_x = -1.0
 	_human_throw = false
 	_lane_checked = {}
 	_pending_result = {}
@@ -191,6 +210,12 @@ func setup_play(p_off: PlayDef, p_def: PlayDef, p_los_x: float, p_ball_y: float,
 
 	qb = off_slots.get("QB")
 	ball.place(origin)
+	if lock_slot != "" and human_team in [PlayerAgent.Team.OFFENSE, PlayerAgent.Team.DEFENSE]:
+		locked = (off_slots if human_team == PlayerAgent.Team.OFFENSE else def_slots).get(lock_slot)
+	if locked != null:
+		_set_controlled(locked)
+		phase = Phase.PRE_SNAP
+		return
 	match human_team:
 		PlayerAgent.Team.OFFENSE:
 			_set_controlled(qb)
@@ -238,7 +263,7 @@ func snap() -> void:
 	_apply_presnap_reads()
 	_blitz_pickup()
 	_pocket_time = -1.0
-	if human_team == PlayerAgent.Team.OFFENSE and not is_run_play():
+	if human_qb() and not is_run_play():
 		qb_immune_until = tuning.qb_free_time
 	if human_team == PlayerAgent.Team.DEFENSE and controlled != null and hero_path.size() >= 2:
 		controlled.brain = DrawnPathBrain.new(controlled, self, hero_path, controlled.brain)
@@ -250,7 +275,7 @@ func snap() -> void:
 		for p in qb.assignment.get("path", PackedVector2Array()):
 			lane.append(qb.start_pos + p)
 		_set_carrier(qb, lane)
-	if human_team == PlayerAgent.Team.OFFENSE:
+	if human_qb():
 		key_level = clampf(key_level * _key_scale(), 0.0, 1.0)
 	if key_level > 0.0:
 		_cheat_zones_to_routes()
@@ -402,6 +427,39 @@ func _blitz_pickup() -> void:
 		rb.brain = BlockBrain.new(rb, self, "pass")
 
 
+## True when the human throws the passes: classic offense, or Road to Glory as the QB.
+func human_qb() -> bool:
+	return human_team == PlayerAgent.Team.OFFENSE and (locked == null or locked == qb)
+
+
+## Road to Glory: the locked receiver calls for the ball (the CPU QB looks his way).
+func call_for_ball() -> void:
+	if locked != null and qb_is_passer():
+		ball_call_until = play_time + tuning.rtg_call_time
+
+
+## Road to Glory: the locked corner jams the receiver in front of him (first moments of the
+## play only, from press range). Returns true when it landed.
+func rtg_jam(d: PlayerAgent) -> bool:
+	if phase != Phase.LIVE or play_time > tuning.rtg_jam_window or not d.can_act():
+		return false
+	var best: PlayerAgent = null
+	var best_d := tuning.rtg_press_range
+	for o in offense:
+		if not o.is_eligible():
+			continue
+		var dist := o.field_pos.distance_to(d.field_pos)
+		if dist < best_d:
+			best_d = dist
+			best = o
+	if best == null:
+		return false
+	# Earlier is better: a jam right at the snap lands the full length.
+	var timing := 1.0 - clampf(play_time / tuning.rtg_jam_window, 0.0, 1.0) * 0.5
+	best.jam_timer = maxf(best.jam_timer, RatingModel.press_jam(tuning, d.attr("cov"), best.attr("rte")) * tuning.rtg_jam_mult * timing)
+	return true
+
+
 func is_run_play() -> bool:
 	return off_play != null and off_play.is_run()
 
@@ -504,8 +562,9 @@ func plan_throw(target: Vector2) -> Dictionary:
 
 ## Where a receiver will be `secs` from now if he keeps running his route at full speed.
 func predict(o: PlayerAgent, secs: float) -> Vector2:
-	if not (o.brain is RouteBrain):
-		return _on_field(o.field_pos + o.velocity * secs)
+	if o.human or not (o.brain is RouteBrain):
+		# Off script (a human steering, a freelancer): straight-line extrapolation.
+		return _on_field(o.field_pos + o.velocity * minf(secs, 1.2))
 	var rb := o.brain as RouteBrain
 	var spd := o.max_speed * o.speed_mult
 	var cur := o.velocity.length()
@@ -558,12 +617,12 @@ func throw_ball(target: Vector2) -> void:
 	ball.throw_to(qb.field_pos, landing, dur, float(throw_plan["apex"]))
 	_ball_prev = qb.field_pos
 	_lane_checked = {}
-	_human_throw = human_team == PlayerAgent.Team.OFFENSE
+	_human_throw = human_qb()
 	pass_thrown = true
 	aim_preview = Vector2.INF
 	qb.throw_anim = 0.3
 	carrier = null
-	if human_team == PlayerAgent.Team.OFFENSE:
+	if human_qb() and locked == null:
 		_set_controlled(null)
 	pass_log[["bullet", "touch", "lob"][int(throw_plan["kind"])]] += 1
 
@@ -580,7 +639,7 @@ func throw_ball(target: Vector2) -> void:
 	intended = best
 	if best != null:
 		best.brain = BallHawkBrain.new(best, self, landing, 0.0, null, true)
-		if human_team == PlayerAgent.Team.OFFENSE:
+		if human_team == PlayerAgent.Team.OFFENSE and locked == null:
 			_set_controlled(best)
 	# Defenders: zone defenders read the QB and break on the ball after their reaction;
 	# man defenders run with their man (backs to the ball) and only turn late to find it.
@@ -738,7 +797,7 @@ func _set_carrier(a: PlayerAgent, lane := PackedVector2Array()) -> void:
 	_carry_start_x = a.field_pos.x
 	ball.give_to(a)
 	a.speed_mult = tuning.carrier_speed_mult
-	if a.team == human_team:
+	if a.team == human_team and (locked == null or a == locked):
 		_set_controlled(a)
 		a.human = true
 		a.brain = null
@@ -769,7 +828,7 @@ func _process(_delta: float) -> void:
 ## ring at the ball carrier's feet, QB included (yellow = yours, red = theirs).
 func _update_markers() -> void:
 	var human_off := human_team == PlayerAgent.Team.OFFENSE
-	var show_stars := human_off and (phase == Phase.PRE_SNAP or qb_is_passer())
+	var show_stars := human_off and human_qb() and (phase == Phase.PRE_SNAP or qb_is_passer())
 	for a in agents:
 		a.star = show_stars and a.is_eligible() and a != carrier
 		var mark := Color(0, 0, 0, 0)
@@ -1007,8 +1066,13 @@ func _resolve_arrival() -> void:
 			_end_play("incomplete", Vector2(los_x, ball_y), "SWATTED!")
 			return
 	var reach := t.catch_radius + (t.human_catch_bonus if _human_throw else 0.0)
+	var aggressive := aggressive_catch()
 	var o := _nearest_catcher(offense, landing, reach, true)
+	if aggressive and (o == null or o != locked) and locked.can_act() \
+			and locked.field_pos.distance_to(landing) <= reach + t.rtg_catch_reach:
+		o = locked   # he went up and high-pointed it
 	var d := _nearest_catcher(defense, landing, t.contest_radius + t.lob_contest_extra * float(throw_plan.get("loft", 0.0)), false)
+	cover_slot = _cover_slot(o if o != null else intended, landing)
 	var od := o.field_pos.distance_to(landing) if o != null else INF
 	var dd := d.field_pos.distance_to(landing) if d != null else INF
 	if o == null and d == null:
@@ -1016,6 +1080,8 @@ func _resolve_arrival() -> void:
 		_end_play("incomplete", Vector2(los_x, ball_y), "INCOMPLETE")
 		return
 	var loft := float(throw_plan.get("loft", 0.0))
+	if aggressive and o == locked:
+		od = maxf(od - t.rtg_catch_reach, 0.0)   # he attacks the ball instead of waiting for it
 	if d != null and (o == null or dd + 0.3 + def_ai.contest_bonus * key_level < od):
 		# The defender beat the receiver to the spot. Under a hanging ball he has time to
 		# settle under it (undercut); a bullet he can only get a hand on.
@@ -1034,6 +1100,8 @@ func _resolve_arrival() -> void:
 	if d != null:
 		contest = clampf(PassModel.contest(t, landing, o.field_pos, d.field_pos, loft)
 				+ def_ai.catch_contest_bonus * key_level, 0.0, 1.0)
+		if aggressive and o == locked:
+			contest *= t.rtg_catch_contest
 	var def_cov := d.attr("cov") if d != null else 50.0
 	var p_catch := RatingModel.catch_prob(t, o.attr("cth"), contest, def_cov) * (1.0 - t.lob_catch_penalty * loft)
 	# A ball nobody is near is caught: the floor fades out as a defender gets involved.
@@ -1041,6 +1109,7 @@ func _resolve_arrival() -> void:
 	p_catch = lerpf(p_catch, maxf(p_catch, t.easy_catch_floor), easy)
 	if rng.randf() < p_catch:
 		_log_pass(true, false)
+		catch_x = o.field_pos.x
 		_set_carrier(o)
 		if landing.x - los_x >= tuning.slowmo_deep_yards:
 			big_moment.emit("deep_catch", landing)
@@ -1050,6 +1119,25 @@ func _resolve_arrival() -> void:
 	else:
 		_log_pass(false, false)
 		_end_play("incomplete", Vector2(los_x, ball_y), "DROPPED!" if contest < 0.3 else "BROKEN UP!")
+
+
+## Road to Glory: the locked receiver tapped CATCH in the window before the ball arrives.
+func aggressive_catch() -> bool:
+	return locked != null and locked.team == PlayerAgent.Team.OFFENSE and catch_pressed_at >= 0.0 \
+			and play_time - catch_pressed_at <= tuning.rtg_catch_window + 0.05
+
+
+## The defender closest to receiver `o` when the ball arrived (within 4 yds), as a slot.
+func _cover_slot(o: PlayerAgent, landing: Vector2) -> String:
+	var at := o.field_pos if o != null else landing
+	var best := ""
+	var best_d := 4.0
+	for d in defense:
+		var dd := d.field_pos.distance_to(at)
+		if dd < best_d:
+			best_d = dd
+			best = d.slot
+	return best
 
 
 func _nearest_catcher(group: Array[PlayerAgent], p: Vector2, radius: float, eligible_only: bool) -> PlayerAgent:
@@ -1094,6 +1182,11 @@ func _end_play(type: String, spot: Vector2, text: String) -> void:
 		"carrier_slot": carrier.slot if carrier != null else "",
 		"tackler_slot": last_tackler.slot if last_tackler != null else "",
 		"ball_def_slot": _nearest_defender_slot(ball.field_pos) if type == "incomplete" else "",
+		# Road to Glory stats: who the pass was for, who covered him, where he caught it.
+		"target_slot": intended.slot if pass_thrown and intended != null else "",
+		"cover_slot": cover_slot,
+		"catch_x": catch_x,
+		"drop": text == "DROPPED!",
 	}
 	_set_spot(_pending_result, spot)
 	if type == "td" or type == "int_td":

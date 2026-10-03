@@ -18,6 +18,12 @@ const SEASON := "res://scenes/meta/season.tscn"
 const CHALLENGES := "res://scenes/meta/challenges.tscn"
 const SETTINGS := "res://scenes/meta/settings.tscn"
 const COACH := "res://scenes/meta/coach.tscn"
+const RTG_HUB := "res://scenes/meta/rtg_hub.tscn"
+const RTG_CREATE := "res://scenes/meta/rtg_create.tscn"
+const RTG_DRAFT := "res://scenes/meta/rtg_draft.tscn"
+const RTG_POSTGAME := "res://scenes/meta/rtg_postgame.tscn"
+const RTG_UPGRADE := "res://scenes/meta/rtg_upgrade.tscn"
+const RTG_OFFSEASON := "res://scenes/meta/rtg_offseason.tscn"
 
 const WIPE_TIME := 0.22
 

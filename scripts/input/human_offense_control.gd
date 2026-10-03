@@ -27,6 +27,10 @@ const QB_GRAB_RADIUS := 40.0
 
 var runner: PlayRunner
 var tuning: GameplayTuning
+## Off = these gestures do nothing (Road to Glory as a non-QB uses RtgControl instead).
+var enabled := true
+## Road to Glory QB: only the snap, the aim/throw and the pass type (the stick moves him).
+var aim_only := false
 var mode := Mode.NONE
 var aim_target := Vector2.ZERO
 var steer_lateral := 0.0
@@ -53,12 +57,12 @@ func bind(p_runner: PlayRunner, input: TouchInput, p_tuning: GameplayTuning) -> 
 
 ## Only while the human has the ball team; on defense these gestures belong to HumanDefenseControl.
 func _live() -> bool:
-	return runner != null and runner.phase == PlayRunner.Phase.LIVE \
+	return enabled and runner != null and runner.phase == PlayRunner.Phase.LIVE \
 			and runner.human_team == PlayerAgent.Team.OFFENSE
 
 
 func _pre_snap() -> bool:
-	return runner != null and runner.phase == PlayRunner.Phase.PRE_SNAP \
+	return enabled and runner != null and runner.phase == PlayRunner.Phase.PRE_SNAP \
 			and runner.human_team == PlayerAgent.Team.OFFENSE
 
 
@@ -107,13 +111,13 @@ func _start_gesture(start: Vector2, pos: Vector2) -> void:
 		return
 	var d := pos - start
 	if runner.qb_is_passer():
-		if d.x > 0.0 and absf(d.x) > absf(d.y):
+		if d.x > 0.0 and absf(d.x) > absf(d.y) and not aim_only:
 			runner.start_scramble()
 			_begin_steer(pos)
 		else:
 			mode = Mode.AIM
 			_aim_anchor = start
-	elif _human_carrier() != null:
+	elif _human_carrier() != null and not aim_only:
 		_begin_steer(pos)
 	_on_dragged(start, pos)
 
@@ -132,14 +136,14 @@ func _on_dragged(start: Vector2, pos: Vector2) -> void:
 	if not _live():
 		return
 	# A run play's handoff (or a catch) arrives mid-gesture: start steering from here.
-	if mode == Mode.NONE and _snap_gesture and _human_carrier() != null:
+	if mode == Mode.NONE and _snap_gesture and _human_carrier() != null and not aim_only:
 		_begin_steer(pos)
 	match mode:
 		Mode.AIM:
 			if not runner.qb_is_passer():
 				_cancel_aim()
 				return
-			if pos.x - _aim_anchor.x > 20.0:
+			if pos.x - _aim_anchor.x > 20.0 and not aim_only:
 				# Pushed forward past the press point after the pull-back snap: scramble instead.
 				_cancel_aim()
 				runner.start_scramble()
@@ -184,7 +188,7 @@ static func swipe_name(dir: Vector2) -> String:
 
 func _on_swiped(dir: Vector2) -> void:
 	var c := _human_carrier()
-	if not _live() or c == null:
+	if not _live() or c == null or aim_only:
 		return
 	match swipe_name(dir):
 		"left":

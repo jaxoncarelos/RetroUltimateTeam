@@ -21,6 +21,8 @@ signal switch_pressed
 ## A choice panel option was picked (index into the options passed to show_choice).
 signal choice_made(index: int)
 signal tip_closed
+## Road to Glory pre-snap card button (by id: "snap", "ready", "audible", "hot").
+signal rtg_action(id: String)
 
 const WARN_COLOR := UiSkin.RED
 const BAR_SIZE := 4
@@ -78,6 +80,13 @@ var _restart: Button
 var _switch: Button
 var _reserve_switch := false
 var _buttons: Dictionary = {}
+## Road to Glory pieces: the pre-snap call card, the per-play grade pop, your stat line.
+var _rtg_card: RetroPanel
+var _rtg_title: Label
+var _rtg_job: Label
+var _rtg_row: HBoxContainer
+var _grade: Label
+var _rtg_line: Label
 
 
 func _ready() -> void:
@@ -273,6 +282,8 @@ func _ready() -> void:
 	_choice_buttons.add_theme_constant_override("separation", 4)
 	cbox.add_child(_choice_buttons)
 
+	_build_rtg()
+
 	_restart = MetaUI.yellow("NEW DRIVE", Vector2(96, 24), func() -> void: restart_pressed.emit())
 	_anchor(_restart, Vector2(0.5, 0.5), Rect2(-48, 10, 96, 24))
 	_restart.visible = false
@@ -289,6 +300,102 @@ static func _anchor(c: Control, anchor: Vector2, r: Rect2) -> void:
 	c.offset_top = r.position.y
 	c.offset_right = r.end.x
 	c.offset_bottom = r.end.y
+
+
+## Road to Glory: the pre-snap call card (bottom centre), the grade pop and the stat line.
+func _build_rtg() -> void:
+	_rtg_card = RetroPanel.new("", UiSkin.PANEL, 4)
+	_anchor(_rtg_card, Vector2(0.5, 1.0), Rect2(-150, -(BAR_H + 4 + 58), 300, 58))
+	_rtg_card.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_rtg_card.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_rtg_card.visible = false
+	_safe.add_child(_rtg_card)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 2)
+	_rtg_card.add_child(col)
+	_rtg_title = Label.new()
+	_rtg_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rtg_title.add_theme_color_override("font_color", UiSkin.YELLOW)
+	col.add_child(_rtg_title)
+	_rtg_job = Label.new()
+	_rtg_job.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rtg_job.custom_minimum_size = Vector2(288, 0)
+	_rtg_job.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(_rtg_job)
+	_rtg_row = HBoxContainer.new()
+	_rtg_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_rtg_row.add_theme_constant_override("separation", 5)
+	col.add_child(_rtg_row)
+	_grade = Label.new()
+	_anchor(_grade, Vector2(1.0, 0.0), Rect2(-120, 30, 116, 30))
+	_grade.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_grade.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_grade.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_grade.add_theme_stylebox_override("normal", UiSkin.panel_box(Color(0.03, 0.04, 0.12, 0.88), UiSkin.YELLOW, 2))
+	_grade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_grade.visible = false
+	_safe.add_child(_grade)
+	_rtg_line = Label.new()
+	_anchor(_rtg_line, Vector2(0.0, 0.0), Rect2(32, 4, 170, 13))
+	_rtg_line.add_theme_stylebox_override("normal", UiSkin.panel_box(Color(0.03, 0.04, 0.12, 0.8), Color(1, 1, 1, 0.25), 1))
+	_rtg_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_rtg_line.visible = false
+	_safe.add_child(_rtg_line)
+
+
+## The pre-snap card: call name, your job, buttons [{id, text, yellow}]. Empty title hides it.
+func show_rtg_call(title: String, job: String, actions: Array) -> void:
+	_rtg_card.visible = title != ""
+	if title == "":
+		return
+	_rtg_title.text = title
+	_rtg_job.text = job
+	for c in _rtg_row.get_children():
+		_rtg_row.remove_child(c)
+		c.queue_free()
+	for a in actions:
+		var id := str(a["id"])
+		var cb := func() -> void: rtg_action.emit(id)
+		var b := MetaUI.yellow(str(a["text"]), Vector2(84, 22), cb) if a.get("yellow", false) \
+				else MetaUI.button(str(a["text"]), Vector2(84, 22), cb)
+		b.disabled = a.get("disabled", false)
+		_rtg_row.add_child(b)
+	_rtg_card.reset_size.call_deferred()
+
+
+func hide_rtg_call() -> void:
+	_rtg_card.visible = false
+
+
+func rtg_call_open() -> bool:
+	return _rtg_card.visible
+
+
+## Per-play grade pop: "B+  12 YD CATCH" (tier 2 green, 1 white, 0 red), fades out.
+func show_grade(letter: String, note: String) -> void:
+	var tier := RtgTracker.tier(letter)
+	_grade.text = "%s  %s " % [note, letter]
+	_grade.add_theme_color_override("font_color", [UiSkin.RED, Color.WHITE, UiSkin.GREEN][tier])
+	_grade.visible = true
+	_grade.modulate.a = 1.0
+	_grade.pivot_offset = Vector2(_grade.size.x, _grade.size.y * 0.5)
+	_grade.scale = Vector2(1.4, 1.4)
+	var tw := create_tween()
+	tw.tween_property(_grade, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(2.0)
+	tw.tween_property(_grade, "modulate:a", 0.0, 0.35)
+
+
+## Your running stat line (top left, next to pause). "" hides it.
+func set_rtg_line(text: String) -> void:
+	_rtg_line.visible = text != ""
+	_rtg_line.text = " " + text
+
+
+## Road to Glory controls layer (RtgPad) inside the safe area, under banners and panels.
+func add_rtg_pad(pad: Control) -> void:
+	_safe.add_child(pad)
+	_safe.move_child(pad, 0)
 
 
 ## The category-tabbed playbook grid (opened by the MORE card).
@@ -698,6 +805,8 @@ func is_point_over_ui(p: Vector2) -> bool:
 		for b in _play_bar.get_children():
 			if b is Control and b.get_global_rect().has_point(p):
 				return true
+	if _rtg_card.visible and _rtg_card.get_global_rect().grow(2).has_point(p):
+		return true
 	return false
 
 
@@ -851,6 +960,9 @@ class _NameTags:
 		var r: PlayRunner = hud.runner
 		if r == null or not is_instance_valid(r):
 			return
+		if r.locked != null and is_instance_valid(r.locked):
+			_draw_defender(r, true)   # Road to Glory: a YOU pill over your player, either side
+			return
 		if r.human_team == PlayerAgent.Team.DEFENSE:
 			_draw_defender(r)
 			return
@@ -868,14 +980,16 @@ class _NameTags:
 			UiSkin.draw_text(self, box.position + Vector2(3, 8), t, 8, Color.WHITE)
 
 	## Yellow pill "#54 F.WARNER" with a little pointer over the defender you control.
-	func _draw_defender(r: PlayRunner) -> void:
-		var a := r.controlled
+	func _draw_defender(r: PlayRunner, rtg := false) -> void:
+		var a := r.locked if rtg else r.controlled
 		if a == null or not is_instance_valid(a) or r.phase not in [PlayRunner.Phase.PRE_SNAP, PlayRunner.Phase.LIVE]:
 			return
-		if a == r.carrier:
+		if a == r.carrier and not rtg:
 			return   # returning an interception: the carrier arrow marks him
 		var at := a.get_global_transform_with_canvas().origin
 		var t := "#%d %s" % [a.jersey, _short(a.display_name)] if a.jersey > 0 else _short(a.display_name)
+		if rtg:
+			t = "YOU  " + t
 		var w := PixelFont.text_width(t) + 6
 		var box := Rect2(roundf(at.x - w * 0.5), roundf(at.y - 40 + a.z_height * -6.0), w, 10)
 		draw_rect(box.grow(1), Color(0.03, 0.04, 0.06, 0.9))

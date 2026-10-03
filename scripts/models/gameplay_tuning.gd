@@ -234,3 +234,49 @@ extends Resource
 @export var hesi_tackle_mult := 0.6    ## tackle chance multiplier on the carrier during hesi + burst
 @export var dive_distance := 2.0
 @export var dive_time := 0.35
+
+@export_group("Road to Glory controls")
+@export var rtg_stick_dead := 0.14     ## stick share (0..1) ignored around the center
+@export var rtg_stick_radius := 34.0   ## px from the base to full stick
+@export var rtg_accel_mult := 1.6      ## your player changes speed/direction this much faster while you steer
+@export var rtg_cut_angle := 70.0      ## degrees: a turn this sharp at speed is a plant-and-cut
+@export var rtg_cut_min_speed := 3.0   ## yd/s needed for a plant-and-cut
+@export var rtg_cut_keep_min := 0.5    ## speed kept through a cut at agility 0…
+@export var rtg_cut_keep_max := 0.92   ## …and at agility 99
+@export var rtg_cut_cooldown := 0.22
+@export var rtg_burst_mult := 1.16     ## BURST speed multiplier…
+@export var rtg_burst_time := 0.9      ## …for this long…
+@export var rtg_burst_cooldown := 3.5  ## …then this long to recharge
+@export_subgroup("Ball carrier moves")
+@export var rtg_move_cooldown := 0.35  ## global gap between any two moves
+@export var rtg_juke_speed := 8.5      ## lateral yd/s of a juke
+@export var rtg_juke_time := 0.2
+@export var rtg_juke_forward := 0.75   ## share of forward speed kept through a juke
+@export var rtg_juke_cooldown := 1.0
+@export var rtg_juke_bite := 0.45      ## s a defender in front loses his read on a juke (scaled by ELU vs AWR)
+@export var rtg_juke_bite_range := 4.5 ## yards: defenders this close can bite
+@export var rtg_spin_time := 0.45
+@export var rtg_spin_speed := 0.8      ## speed multiplier while spinning
+@export var rtg_spin_cooldown := 1.6
+@export var rtg_power_time := 0.5      ## stiff arm / truck window
+@export var rtg_power_cooldown := 1.6
+@export var rtg_truck_slow := 0.6      ## speed kept after trucking a tackler
+@export var rtg_truck_stun := 1.0      ## s a trucked defender is down
+@export var rtg_stiff_stun := 0.7      ## s a stiff-armed defender is out of it
+@export var rtg_move_k := 12.0         ## rating points per sigmoid unit in move-vs-tackle contests
+@export_subgroup("Receiver")
+@export var rtg_catch_window := 0.38   ## s before arrival a CATCH tap counts (aggressive catch)
+@export var rtg_catch_reach := 0.6     ## extra catch radius on an aggressive catch
+@export var rtg_catch_contest := 0.55  ## contest multiplier on an aggressive catch
+@export var rtg_call_time := 1.2       ## s the QB looks for you after you CALL for the ball
+@export var rtg_call_cooldown := 2.5
+@export var rtg_favor_base := 0.3      ## yards of openness the CPU QB adds for the RTG receiver…
+@export var rtg_favor_trust := 1.0     ## …plus this × trust (0..1)
+@export_subgroup("Corner")
+@export var rtg_press_range := 2.2     ## yards from your man at the snap to jam him
+@export var rtg_jam_window := 0.7      ## s after the snap JAM works
+@export var rtg_jam_mult := 1.35       ## jam length × this on a JAM tap (plus timing)
+@export var rtg_tele_base := 0.28      ## s of warning before your man's break at equal AWR/RTE…
+@export var rtg_tele_per_point := 0.008 ## …plus this per point of your AWR over his RTE
+@export var rtg_align_speed := 6.0     ## yd/s pre-snap alignment moves
+@export var rtg_align_max_y := 7.0     ## yards you can shade from your spot pre-snap

@@ -15,6 +15,10 @@ var read_timer := 0.0
 var read_interval := 0.4
 var noise := 1.0
 var decided := false
+## Road to Glory: the receiver this QB likes (your player, or the man your corner covers) is
+## read first and judged `favor` yards more open; a CALL for the ball turns his eyes to him.
+var favorite: PlayerAgent = null
+var favor := 0.0
 
 
 func _init(p_ctx: PlayRunner, p_rng: RandomNumberGenerator) -> void:
@@ -32,6 +36,16 @@ func _init(p_ctx: PlayRunner, p_rng: RandomNumberGenerator) -> void:
 	read_timer = read_interval
 
 
+## Puts `a` first in the progression and adds `bonus` yards of openness to him.
+func set_favorite(a: PlayerAgent, bonus: float) -> void:
+	favorite = a
+	favor = bonus
+	if a != null and progression.has(a):
+		progression.erase(a)
+		progression.push_front(a)
+		read_idx = 0
+
+
 ## Returns the throw it made ({receiver, target, openness}) or {}.
 func update(dt: float) -> Dictionary:
 	if decided or not ctx.qb_is_passer() or progression.is_empty():
@@ -41,11 +55,16 @@ func update(dt: float) -> Dictionary:
 	if ctx.play_time < t.cpu_min_throw_time + drop * 0.12:
 		return {}
 	read_timer -= dt
-	if read_timer <= 0.0:
+	var calling := favorite != null and ctx.ball_call_until > ctx.play_time and progression.has(favorite)
+	if calling:
+		read_idx = progression.find(favorite)   # he heard the call: eyes on your man
+	elif read_timer <= 0.0:
 		read_timer = read_interval
 		read_idx = (read_idx + 1) % progression.size()
 	ctx.qb_target_hint = progression[read_idx]
 	var look := QBReadLogic.evaluate(ctx, progression[read_idx])
+	if not look.is_empty() and progression[read_idx] == favorite:
+		look["openness"] = float(look["openness"]) + favor + (0.6 if calling else 0.0)
 	# A deep call is a shot: he waits for the deep man instead of dumping it short right away.
 	var patient := ctx.off_play != null and ctx.off_play.category == "DEEP" and ctx.play_time < t.cpu_deep_patience
 	var too_short := not look.is_empty() and float(look["target"].x) - ctx.los_x < t.cpu_deep_min_air

@@ -23,6 +23,8 @@ signal ready_tapped
 var runner: PlayRunner
 var tuning: GameplayTuning
 var switcher: DefenseSwitcher
+## Off = these gestures do nothing (Road to Glory uses RtgControl instead).
+var enabled := true
 var _dragging := false
 var _anchor := Vector2.ZERO
 var _stick := Vector2.ZERO      ## field-space direction * throttle (0..1)
@@ -52,7 +54,7 @@ func bind(p_runner: PlayRunner, input: TouchInput, p_tuning: GameplayTuning) -> 
 
 
 func _active() -> bool:
-	return runner != null and runner.human_team == PlayerAgent.Team.DEFENSE
+	return enabled and runner != null and runner.human_team == PlayerAgent.Team.DEFENSE
 
 
 func _live() -> bool:
