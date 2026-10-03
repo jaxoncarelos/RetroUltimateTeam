@@ -103,7 +103,7 @@ func _positions() -> void:
 			_advance())
 		row.add_child(b)
 		var col := _tile_col(b)
-		var sel := pos == _pos
+		var sel: bool = pos == _pos
 		col.add_child(_sprite(pos))
 		col.add_child(MetaUI.label(pos, UiSkin.NAVY_DEEP if sel else UiSkin.YELLOW, 16, HORIZONTAL_ALIGNMENT_CENTER))
 		col.add_child(MetaUI.label(RtgRules.POS_NAMES[pos], UiSkin.NAVY_DEEP if sel else UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_CENTER))
