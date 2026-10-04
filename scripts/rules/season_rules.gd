@@ -10,6 +10,20 @@ extends RefCounted
 ##                      champion, you_out}, rewards_log: [...]}
 
 const ROUND_NAMES := ["", "WILD CARD", "DIVISIONAL", "CONFERENCE", "SUPER BOWL"]
+## Lowest difficulty (TeamRating.DIFFICULTY index) per playoff round: the floor rises every round
+## and the Super Bowl is always played on LEGEND.
+const PLAYOFF_MIN_DIFFICULTY := [0, 0, 1, 2, 3]
+
+
+## Difficulty floor for a game labelled `label` ("SUPER BOWL" -> 3; regular season -> 0).
+static func min_difficulty(label: String) -> int:
+	var r := ROUND_NAMES.find(label)
+	return PLAYOFF_MIN_DIFFICULTY[r] if r > 0 else 0
+
+
+## The difficulty a game is played on: your setting, raised to the game's floor.
+static func game_difficulty(chosen: int, label: String) -> int:
+	return maxi(chosen, min_difficulty(label))
 
 
 static func new_season(teams: Dictionary, you: String, games: int, strengths: Dictionary, rng: RandomNumberGenerator,

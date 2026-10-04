@@ -53,7 +53,8 @@ static func season_game_config(prof: Profile) -> Dictionary:
 static func _cfg(prof: Profile, g: Array, label: String) -> Dictionary:
 	var you := prof.franchise_team
 	var opp: String = g[1] if g[0] == you else g[0]
-	return {"home": you, "away": opp, "from_hub": true, "difficulty": Settings.difficulty, "mode": "season",
+	return {"home": you, "away": opp, "from_hub": true, "difficulty": SeasonRules.game_difficulty(Settings.difficulty, label),
+			"min_difficulty": SeasonRules.min_difficulty(label), "mode": "season",
 			"conditions": roll_conditions(g[0]),
 			"label": label, "extra": {"home": g[0], "away": g[1], "label": label}}
 

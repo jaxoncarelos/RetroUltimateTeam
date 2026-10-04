@@ -189,7 +189,8 @@ func _next_game_panel() -> Control:
 	col.add_child(MetaUI.label(str(g["label"]), UiSkin.YELLOW))
 	col.add_child(MetaUI.label("%s %s" % ["VS" if g["home"] == you else "AT", t.team_name.to_upper()], UiSkin.WHITE))
 	var orec: Dictionary = table.get(opp, {"w": 0, "l": 0})
-	col.add_child(MetaUI.label("(%d-%d)  ·  %s" % [int(orec["w"]), int(orec["l"]), TeamRating.DIFFICULTY[Settings.difficulty][0]], UiSkin.MUTED))
+	col.add_child(MetaUI.label("(%d-%d)  ·  %s" % [int(orec["w"]), int(orec["l"]),
+			TeamRating.DIFFICULTY[SeasonRules.game_difficulty(Settings.difficulty, str(g["label"]))][0]], UiSkin.MUTED))
 	return p
 
 
@@ -218,7 +219,9 @@ func _play() -> void:
 	var t: TeamData = GameData.team(str(cfg["away"]))
 	var body := MetaUI.label("%s  ·  %s %s\nDIFFICULTY: %s  ·  PLAY IT FOR FULL XP, OR SIM FOR LESS" % [cfg["label"],
 			"VS" if cfg["extra"]["home"] == prof.rtg["team"] else "AT", t.team_name.to_upper(),
-			TeamRating.DIFFICULTY[Settings.difficulty][0]], UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_CENTER)
+			TeamRating.DIFFICULTY[int(cfg["difficulty"])][0]
+			+ (" (PLAYOFF MINIMUM)" if int(cfg["difficulty"]) > Settings.difficulty else "")], UiSkin.WHITE, 8,
+			HORIZONTAL_ALIGNMENT_CENTER)
 	MetaUI.popup(self, "GAME DAY", body, [["SIM GAME", _sim_game], ["PLAY ▶", func() -> void:
 		SceneRouter.goto(SceneRouter.MATCH, cfg), true]])
 

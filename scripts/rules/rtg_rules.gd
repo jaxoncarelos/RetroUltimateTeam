@@ -355,7 +355,8 @@ static func game_config(rtg: Dictionary, difficulty: int, conditions: Dictionary
 	var opp: String = g["away"] if g["home"] == you else g["home"]
 	var p: Dictionary = rtg["player"]
 	var trust := int(rtg.get("trust", START_TRUST))
-	return {"home": you, "away": opp, "from_hub": true, "difficulty": difficulty, "mode": "rtg",
+	return {"home": you, "away": opp, "from_hub": true, "difficulty": SeasonRules.game_difficulty(difficulty, str(g["label"])),
+			"min_difficulty": SeasonRules.min_difficulty(str(g["label"])), "mode": "rtg",
 			"conditions": conditions, "label": g["label"],
 			"extra": {"home": g["home"], "away": g["away"], "label": g["label"], "playoff": g["playoff"]},
 			"rtg": {"pos": p["pos"], "slot": SLOT[str(p["pos"])], "trust": trust / 100.0, "audibles": audibles(trust),

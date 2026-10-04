@@ -170,6 +170,7 @@ func _build_scene(home_team: TeamData, away_team: TeamData) -> void:
 		wfx.setup(conditions, self)
 	runner.def_ai = def_ai
 	runner.rng = rng
+	runner.difficulty = _difficulty()
 	routes = PlayOverlay.new()
 	routes.kind = PlayOverlay.Kind.ROUTES
 	routes.runner = runner
@@ -396,13 +397,14 @@ func _sim_cpu_drive() -> void:
 	var def := gs.other(off)
 	var ours := off == human
 	var start_x := gs.downs.los_x
-	var rate := GameSim.drive_rate(_team_strength(off), _team_strength(def), off == gs.home, start_x)
+	var bonus := 0.0 if ours or human == "" else DefenseAITuning.by_difficulty(def_ai.drive_pts_by_difficulty, _difficulty(), 0.0)
+	var rate := GameSim.drive_rate(_team_strength(off), _team_strength(def), off == gs.home, start_x, bonus)
 	var dlog: Array = []
 	var d := GameSim.sim_drive(gs, off, rate, start_x, rng, dlog)
 	if not _sim() and not dlog.is_empty():
 		dlog[0]["start_x"] = clampf(start_x - FieldGeo.OWN_GOAL, 1.0, 99.0)
 		play_log.append_array(PlayByPlay.synthesize(dlog[0], rng.randi()))
-	var secs := minf(float(d["plays"]) * rng.randf_range(24.0, 34.0), gs.clock.seconds_left)
+	var secs := minf(float(d["plays"]) * _sim_play_secs(off), gs.clock.seconds_left)
 	gs.clock.seconds_left -= secs
 	gs.clock.stopped = true
 	var outcome: String = d["outcome"]
@@ -580,7 +582,8 @@ func _start_play_call() -> void:
 	if (not _human_offense() or _coach_calls()) and gs.downs.down == 4 and not _two_point:
 		var k := _kicker(gs.possession)
 		var dist := KickModel.fg_distance(gs.downs.los_x)
-		var call := AIPlayCaller.fourth_down(situation, dist, KickModel.fg_max_range(tuning, float(k.get("kpw", 75))))
+		var call := AIPlayCaller.fourth_down(situation, dist, KickModel.fg_max_range(tuning, float(k.get("kpw", 75))),
+				_coach_iq(gs.possession))
 		if call == "punt":
 			_punt()
 			return
@@ -601,7 +604,8 @@ func _start_play_call() -> void:
 			off_play = PlayAdvisor.pick(offense_book.plays, situation, rng)
 			def_play = AIPlayCaller.pick_defense(defense_book.plays, null, situation, rng, last_def_call)
 	elif _human_offense():
-		def_play = AIPlayCaller.pick_defense(defense_book.plays, memory, situation, rng, last_def_call)
+		def_play = AIPlayCaller.pick_defense(defense_book.plays, memory, situation, rng, last_def_call,
+				DefenseAITuning.by_difficulty(def_ai.call_iq_by_difficulty, _difficulty()))
 		var ranked := PlayAdvisor.suggest(offense_book.plays, situation, rng, memory)
 		off_play = ranked[0]
 		hud.set_play_options(ranked, offense_book.plays)
@@ -672,11 +676,37 @@ func _offer_specials() -> void:
 	hud.set_special_actions(actions)
 
 
+## Seconds per play of a simulated drive: a sharp coach (coach iq >= 0.85) bleeds the clock when
+## ahead late and hurries when behind; everyone else plays at a normal pace.
+func _sim_play_secs(off: String) -> float:
+	var late := gs.clock.half_seconds_left() <= 300.0 or (gs.clock.quarter >= 4 and gs.clock.seconds_left <= 480.0)
+	if late and _coach_iq(off) >= 0.85:
+		var lead := gs.score_diff(off)
+		if lead > 0:
+			return rng.randf_range(33.0, 40.0)
+		if lead < 0:
+			return rng.randf_range(15.0, 22.0)
+	return rng.randf_range(24.0, 34.0)
+
+
+## This match's difficulty (TeamRating.DIFFICULTY index; playoff floors are already in the config).
+func _difficulty() -> int:
+	return int(config.get("difficulty", Settings.difficulty))
+
+
+## How sharp `team`'s coach is (4th downs, 2-point tries, timeouts, clock): the CPU opponent
+## of a human scales with difficulty; your own Road to Glory coach and CPU-vs-CPU are average.
+func _coach_iq(team: String) -> float:
+	if human == "" or team == human:
+		return 0.7
+	return DefenseAITuning.by_difficulty(def_ai.coach_iq_by_difficulty, _difficulty(), 0.7)
+
+
 ## CPU uses timeouts to save time late in a half when trailing (and on defense, when the
 ## human offense is milking the clock).
 func _cpu_timeouts() -> void:
 	for team in [gs.home, gs.away]:
-		if (team == human and not _coach_calls()) or gs.clock.stopped:
+		if (team == human and not _coach_calls()) or gs.clock.stopped or _coach_iq(team) < 0.4:
 			continue
 		var late := gs.clock.half_seconds_left() <= 110.0
 		if late and gs.score_diff(team) < 0 and int(gs.timeouts[team]) > 0 and _pending_runoff > 0.0:
@@ -1138,7 +1168,7 @@ func _pat_phase() -> void:
 				["KICK PAT (1)", "GO FOR 2"] as Array[String])
 		return
 	var diff := gs.score_diff(team)
-	if AIPlayCaller.go_for_two(diff, gs.clock.quarter):
+	if AIPlayCaller.go_for_two(diff, gs.clock.quarter, _coach_iq(team)):
 		_begin_two_point()
 	else:
 		var k := _kicker(team)

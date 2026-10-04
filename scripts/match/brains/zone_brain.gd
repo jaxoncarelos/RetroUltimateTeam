@@ -48,7 +48,7 @@ func score(o: PlayerAgent) -> float:
 		# Underneath zones carry a vertical only so far, then hand him to the deep help.
 		d += ctx.tuning.zone_underneath_penalty
 	if o == ctx.qb_target_hint and ctx.qb_is_passer():
-		d -= 3.0 * clampf((agent.attr("awr") - 60.0) / 39.0, 0.0, 1.0)   # he reads the QB's eyes
+		d -= 3.0 * clampf((agent.attr("awr") - 60.0) / 39.0, 0.0, 1.0) * ctx.eyes_mult()   # he reads the QB's eyes
 	return d
 
 

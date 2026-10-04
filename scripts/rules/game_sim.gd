@@ -118,8 +118,9 @@ static func _pick(p: Dictionary, rng: RandomNumberGenerator) -> String:
 ## Expected points per drive for an offense rated `off_ovr` against a defense rated `def_ovr`
 ## (same prior as finish()), scaled by where the drive starts (field x, offense attacking +x):
 ## a short field scores more, a drive from the 5 less.
-static func drive_rate(off_ovr: float, def_ovr: float, home: bool, start_x: float) -> float:
-	var prior := clampf(22.0 + (off_ovr - def_ovr + (1.5 if home else -1.5)) * RATING_PTS, 8.0, 40.0) \
+## `bonus_pts` = points per game from smarter play calling (a CPU coach on a hard difficulty).
+static func drive_rate(off_ovr: float, def_ovr: float, home: bool, start_x: float, bonus_pts := 0.0) -> float:
+	var prior := clampf(22.0 + bonus_pts + (off_ovr - def_ovr + (1.5 if home else -1.5)) * RATING_PTS, 8.0, 40.0) \
 			/ (POSSESSIONS_PER_GAME * 0.5)
 	return maxf(0.25, prior * clampf(1.0 + (start_x - FIELD_START) / FIELD_SCALE, 0.55, 1.9))
 

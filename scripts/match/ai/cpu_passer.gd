@@ -56,7 +56,7 @@ func _init(p_ctx: PlayRunner, p_rng: RandomNumberGenerator) -> void:
 
 
 func _smart() -> float:
-	return clampf((ctx.qb.attr("awr") - 60.0) / 39.0, 0.0, 1.0)
+	return clampf((ctx.qb.attr("awr") + ctx.cpu_qb_iq() - 60.0) / 39.0, 0.0, 1.0)
 
 
 ## Order in the progression (lower = earlier).

@@ -29,6 +29,7 @@ var def_ai: DefenseAITuning = DefenseAITuning.new()
 ## 0..1: how strongly the CPU defense is keyed on this offensive call (DefenseMemory).
 ## Set after setup_play(), before snap().
 var key_level := 0.0
+var difficulty := -1   ## TeamRating.DIFFICULTY index for this match (-1 = Settings); see skill()
 var rng := RandomNumberGenerator.new()
 var phase := Phase.IDLE
 ## Team the human controls (PlayerAgent.Team), or -1 for none (autoplay / CPU vs CPU).
@@ -275,6 +276,11 @@ func snap() -> void:
 		for p in qb.assignment.get("path", PackedVector2Array()):
 			lane.append(qb.start_pos + p)
 		_set_carrier(qb, lane)
+	if human_team == PlayerAgent.Team.OFFENSE:
+		# The CPU defense's read speed scales with difficulty (Rookie defenders are a beat late).
+		var react := DefenseAITuning.by_difficulty(def_ai.react_mult_by_difficulty, skill())
+		for d in defense:
+			d.reaction *= react
 	if human_qb():
 		key_level = clampf(key_level * _key_scale(), 0.0, 1.0)
 	if key_level > 0.0:
@@ -286,13 +292,32 @@ func snap() -> void:
 	Events.play_started.emit(off_play.display_name)
 
 
-## Keying strength vs the human for the current difficulty (Settings autoload if present).
+## Keying strength vs the human for the current difficulty.
 func _key_scale() -> float:
-	var scales := def_ai.key_scale_by_difficulty
+	return DefenseAITuning.by_difficulty(def_ai.key_scale_by_difficulty, skill())
+
+
+## Difficulty (TeamRating.DIFFICULTY index) of this match: `difficulty` when the match set it,
+## else the Settings autoload's, else PRO.
+func skill() -> int:
+	if difficulty >= 0:
+		return difficulty
 	var settings: Node = get_tree().root.get_node_or_null("Settings") if is_inside_tree() else null
-	if settings == null or scales.is_empty():
+	return int(settings.get("difficulty")) if settings != null else 1
+
+
+## How strongly CPU zone defenders read the QB's eyes (only scaled against a human offense).
+func eyes_mult() -> float:
+	if human_team != PlayerAgent.Team.OFFENSE:
 		return 1.0
-	return scales[clampi(int(settings.get("difficulty")), 0, scales.size() - 1)]
+	return DefenseAITuning.by_difficulty(def_ai.eyes_by_difficulty, skill())
+
+
+## Awareness points added to a CPU quarterback's decisions when he plays against you.
+func cpu_qb_iq() -> float:
+	if human_team != PlayerAgent.Team.DEFENSE:
+		return 0.0
+	return DefenseAITuning.by_difficulty(def_ai.qb_iq_by_difficulty, skill(), 0.0)
 
 
 func _brain_for(a: PlayerAgent) -> Brain:

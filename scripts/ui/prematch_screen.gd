@@ -17,7 +17,7 @@ func _ready() -> void:
 	cfg = SceneRouter.take_config()
 	if cfg.is_empty():
 		cfg = GameFlow.next_game_config(prof)
-	cfg["difficulty"] = Settings.difficulty
+	cfg["difficulty"] = _diff()
 	var title: String = cfg.get("label", "QUICK MATCH")
 	_ui = MetaUI.screen(self, title)
 	if cfg.get("mode", "quick") != "challenge":
@@ -99,7 +99,7 @@ func _set_opp(my_ovr: int) -> void:
 	var abbr: String = cfg.get("away", "PHI")
 	var entries := GameData.db.team_entries(abbr)
 	var real := TeamRating.team_ovr(entries)
-	var eff := TeamRating.opponent_effective_ovr(my_ovr, Settings.difficulty, real, GameData.league_avg_ovr())
+	var eff := TeamRating.opponent_effective_ovr(my_ovr, _diff(), real, GameData.league_avg_ovr())
 	_opp_view.ovr = eff
 	_opp_view.stars = MetaUI.side_stars(TeamRating.rescale_entries(entries, real, eff))
 	_opp_view.queue_redraw()
@@ -107,7 +107,7 @@ func _set_opp(my_ovr: int) -> void:
 
 func _fill_rewards() -> void:
 	MetaUI.clear(_reward_col)
-	var mult: float = TeamRating.DIFFICULTY[Settings.difficulty][2]
+	var mult: float = TeamRating.DIFFICULTY[_diff()][2]
 	var streak := int(prof.stats.get("win_streak", 0))
 	var lines := [["WIN", "+%d" % int(round(EconomyRules.WIN_COINS * mult)), UiSkin.YELLOW],
 			["LOSS", "+%d" % int(round(EconomyRules.LOSS_COINS * mult)), UiSkin.WHITE],
@@ -133,14 +133,21 @@ func _fill_rewards() -> void:
 
 
 func _refresh_diff() -> void:
-	var d: Array = TeamRating.DIFFICULTY[Settings.difficulty]
+	var d: Array = TeamRating.DIFFICULTY[_diff()]
 	_diff_btn.text = "DIFFICULTY: %s  (x%.2f)" % [d[0], d[2]]
+	if _diff() > Settings.difficulty:
+		_diff_btn.text = "%s: %s MINIMUM (x%.2f)" % [str(cfg.get("label", "PLAYOFFS")), d[0], d[2]]
+
+
+## Your difficulty, raised to this game's floor (playoff rounds: SeasonRules.PLAYOFF_MIN_DIFFICULTY).
+func _diff() -> int:
+	return maxi(Settings.difficulty, int(cfg.get("min_difficulty", 0)))
 
 
 func _cycle_difficulty() -> void:
 	Settings.difficulty = (Settings.difficulty + 1) % TeamRating.DIFFICULTY.size()
 	Settings.save_settings()
-	cfg["difficulty"] = Settings.difficulty
+	cfg["difficulty"] = _diff()
 	_refresh_diff()
 	_set_opp(Collection.team_ovr(prof, GameData.db))
 	_fill_rewards()

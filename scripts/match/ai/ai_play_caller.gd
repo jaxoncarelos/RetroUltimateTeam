@@ -34,13 +34,14 @@ static func defense_situation_mult(p: PlayDef, situation: Dictionary) -> float:
 	return m
 
 
-## Weights for every defensive call (same order as `plays`).
+## Weights for every defensive call (same order as `plays`). `iq` (difficulty) is an exponent
+## on the read of your tendencies: 0 ignores them, 1 = as designed, above 1 jumps on the counter.
 static func defense_weights(plays: Array[PlayDef], memory: DefenseMemory, situation: Dictionary,
-		last_call: PlayDef = null) -> PackedFloat32Array:
+		last_call: PlayDef = null, iq := 1.0) -> PackedFloat32Array:
 	var expected := expected_categories(situation)
 	var out := PackedFloat32Array()
 	for p in plays:
-		var w := memory.counter_weight(p.counters, expected) if memory != null else 1.0
+		var w := pow(memory.counter_weight(p.counters, expected), iq) if memory != null else 1.0
 		w *= defense_situation_mult(p, situation)
 		if memory != null and p.category == "BLITZ" and "goal_line" not in p.tags and "RUN" not in p.counters:
 			w *= memory.tuning.blitz_weight
@@ -51,19 +52,29 @@ static func defense_weights(plays: Array[PlayDef], memory: DefenseMemory, situat
 
 
 static func pick_defense(plays: Array[PlayDef], memory: DefenseMemory, situation: Dictionary,
-		rng: RandomNumberGenerator, last_call: PlayDef = null) -> PlayDef:
-	var w := defense_weights(plays, memory, situation, last_call)
+		rng: RandomNumberGenerator, last_call: PlayDef = null, iq := 1.0) -> PlayDef:
+	var w := defense_weights(plays, memory, situation, last_call, iq)
 	return plays[weighted_index(w, rng)]
 
 
-## CPU 4th-down call: "go", "fg" or "punt". fg_dist/fg_max in yards.
-static func fourth_down(situation: Dictionary, fg_dist: float, fg_max: float) -> String:
+## CPU 4th-down call: "go", "fg" or "punt". fg_dist/fg_max in yards. `iq` = coach smarts
+## (DefenseAITuning.coach_iq_by_difficulty): a timid coach (< 0.4) punts unless desperate and
+## only kicks chip shots; a sharp one (>= 0.85) goes for it on short yardage past his own 40
+## and in the no-man's land just outside field goal range.
+static func fourth_down(situation: Dictionary, fg_dist: float, fg_max: float, iq := 0.7) -> String:
 	var to_go := int(situation.get("to_go", 10))
 	var los_x := float(situation.get("los_x", 35.0))
 	var diff := int(situation.get("score_diff", 0))
 	var secs := float(situation.get("seconds_left", 999.0))
-	var in_range := fg_dist <= fg_max - 2.0
+	var in_range := fg_dist <= fg_max - (6.0 if iq < 0.4 else 2.0)
 	var late := secs < 240.0
+	if iq >= 0.85 and not (late and diff > 0):
+		if to_go <= 2 and los_x >= FieldGeo.OWN_GOAL + 40.0:
+			return "go"
+		if to_go <= 4 and not in_range and los_x >= FieldGeo.OWN_GOAL + 60.0:
+			return "go"
+	if iq < 0.4 and not (late and diff < 0):
+		return "fg" if in_range else "punt"
 	if late and diff < 0:
 		# Trailing late: kick only if a FG ties or wins, otherwise keep the ball.
 		if in_range and diff >= -3:
@@ -79,8 +90,8 @@ static func fourth_down(situation: Dictionary, fg_dist: float, fg_max: float) ->
 
 
 ## CPU after a touchdown: go for two? `diff` = score difference after the 6 points.
-static func go_for_two(diff: int, quarter: int) -> bool:
-	if quarter < 4:
+static func go_for_two(diff: int, quarter: int, iq := 0.7) -> bool:
+	if quarter < 4 or iq < 0.4:
 		return false
 	return diff in [-2, -5, -10, 1, 5]
 

@@ -185,6 +185,14 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    at small odds in Silver+ (`legend_chance`), Throwback (5%/card), Team pack (your franchise's legends). New Pro pack
    (6 cards, Gold+ and X-Factor). Bundles (`PackDef.bundle`) queue packs in `pending_packs`; pack opening shows NEXT
    PACK first. Ribbons from `PackDef.tag` / bundle savings. test_store. Debug: `--screen=store --tab=0..4`.
+28. [x] Difficulty v2 (owner: "each playoff round raises the minimum difficulty, Super Bowl on the highest; scale
+   decisions, not just overall"): `SeasonRules.PLAYOFF_MIN_DIFFICULTY` (WC any, DIV PRO+, CONF ALL-PRO+, SB LEGEND),
+   `game_difficulty` in GameFlow season configs + RtgRules.game_config (`min_difficulty` in the config; prematch shows
+   "SUPER BOWL: LEGEND MINIMUM"). Decisions (DefenseAITuning "Difficulty: decisions", only for the CPU side vs you):
+   defense call iq (exponent on DefenseMemory counters), defender reaction mult, zone QB-eyes reading
+   (`PlayRunner.eyes_mult`), CPU QB awareness (`cpu_qb_iq` -> CpuPasser._smart), coach iq (4th down / 2-pt /
+   timeouts: `AIPlayCaller.fourth_down(..., iq)`), simmed CPU drives (+pts prior, clock bleed/hurry when sharp).
+   `PlayRunner.difficulty`/`skill()` replaces reading Settings. test_difficulty.
 Next ideas (after the owner's playtest): see MORNING_NOTES.md. RTG follow-ups: kick returns, S/LB/TE positions,
    injuries, rivalries / weekly storylines. Card revamp follow-ups: CPU star
 abilities, ability UI on the lineup screen, ability-themed sets/objectives, balance pass on ability boosts.
