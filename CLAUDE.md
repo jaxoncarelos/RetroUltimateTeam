@@ -193,6 +193,12 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    (`PlayRunner.eyes_mult`), CPU QB awareness (`cpu_qb_iq` -> CpuPasser._smart), coach iq (4th down / 2-pt /
    timeouts: `AIPlayCaller.fourth_down(..., iq)`), simmed CPU drives (+pts prior, clock bleed/hurry when sharp).
    `PlayRunner.difficulty`/`skill()` replaces reading Settings. test_difficulty.
+29. [x] Dive risk (owner: "CPU dives and pops right up to dive again; QB sneak + dive = 6 yds every time"): a defender's
+   dive starts `dive_cooldown` (2.6 s, `PlayerAgent.can_dive`, CPU auto-dive + human/RTG dives respect it) and a miss keeps
+   him down `dive_recover` 1.1 s (was 0.45). A diving carrier keeps `carrier_dive_keep` (0.45) of his speed and lands on
+   the first defender in front (`PlayRunner._check_dive_stop`, `dive_stop_radius`). test_dive.
+2026-10-04 RTG QB run fix: the locked QB no longer carries/steers before a pending handoff (`RtgControl.apply`), and a
+   failed mesh lets the QB keep it instead of teleporting the ball (`_check_handoff`).
 Next ideas (after the owner's playtest): see MORNING_NOTES.md. RTG follow-ups: kick returns, S/LB/TE positions,
    injuries, rivalries / weekly storylines. Card revamp follow-ups: CPU star
 abilities, ability UI on the lineup screen, ability-themed sets/objectives, balance pass on ability boosts.

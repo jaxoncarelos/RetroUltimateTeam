@@ -324,7 +324,7 @@ func press(id: String) -> void:
 					me.brain = BallHawkBrain.new(me, runner, runner.ball.to, 0.0, me.brain)
 		"tackle":
 			var c := runner.carrier
-			if c != null and c.team != me.team and me.can_act() \
+			if c != null and c.team != me.team and me.can_dive() \
 					and me.field_pos.distance_to(c.field_pos) <= t.human_dive_range:
 				me.start_dive(t, c.field_pos + c.velocity * 0.12 - me.field_pos, t.dive_recover)
 

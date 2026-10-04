@@ -232,7 +232,7 @@ func _tackles() -> void:
 			reach = t.human_dive_tackle_range if diving else t.human_tackle_range
 		if dist > reach:
 			# CPU defenders close the last yard with a dive.
-			if not diving and not d.human and dist < t.cpu_dive_range:
+			if not diving and not d.human and dist < t.cpu_dive_range and d.dive_cd <= 0.0:
 				d.start_dive(t, c.field_pos + c.velocity * 0.15 - d.field_pos, t.dive_recover)
 				stats["dives"] += 1
 			continue

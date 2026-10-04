@@ -933,6 +933,7 @@ func _physics_process(dt: float) -> void:
 	for a in agents:
 		a.step(dt, tuning)
 	contact.resolve(dt)
+	_check_dive_stop()
 	_check_handoff()
 	if record_replay:
 		_record_frame()
@@ -944,6 +945,24 @@ func _physics_process(dt: float) -> void:
 	if phase == Phase.LIVE and play_time > WATCHDOG_SECONDS:
 		var spot := carrier.field_pos if carrier != null else Vector2(los_x, ball_y)
 		_end_play("tackle", spot, "WHISTLE")
+
+
+## A diving ball carrier lands on the first defender in front of him (the nose tackle in the
+## pile, a tackler): a dive gains the last yard or two, it never flies over people. (He can
+## dive behind his own blockers: that is the QB sneak's push.)
+func _check_dive_stop() -> void:
+	var c := carrier
+	if c == null or c.dive_timer <= 0.0 or c.velocity.length() < 0.5:
+		return
+	var dir := c.velocity.normalized()
+	for a in (defense if c.team == PlayerAgent.Team.OFFENSE else offense):
+		if a.is_down:
+			continue
+		var rel := a.field_pos - c.field_pos
+		if rel.length() < tuning.dive_stop_radius and rel.dot(dir) > 0.0:
+			c.velocity = Vector2.ZERO
+			c.dive_timer = minf(c.dive_timer, 0.01)
+			return
 
 
 func _check_handoff() -> void:

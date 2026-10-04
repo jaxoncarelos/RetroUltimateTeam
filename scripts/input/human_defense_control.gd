@@ -116,7 +116,7 @@ func try_dive() -> bool:
 	var c := runner.carrier
 	if not _live() or me == null or _returning() or c == null or c.team != PlayerAgent.Team.OFFENSE:
 		return false
-	if me.field_pos.distance_to(c.field_pos) > tuning.human_dive_range or not me.can_act():
+	if me.field_pos.distance_to(c.field_pos) > tuning.human_dive_range or not me.can_dive():
 		return false
 	me.start_dive(tuning, c.field_pos + c.velocity * 0.12 - me.field_pos, tuning.dive_recover)
 	return true

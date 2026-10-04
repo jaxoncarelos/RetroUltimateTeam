@@ -107,7 +107,8 @@ extends Resource
 @export var cpu_dive_range := 1.9      ## CPU defenders launch a dive tackle inside this range
 @export var dive_tackle_range := 1.3 
 @export var dive_tackle_bonus := 0.08
-@export var dive_recover := 0.45       ## seconds a defender stays down after a dive
+@export var dive_recover := 1.1        ## seconds a defender stays down after a dive that missed
+@export var dive_cooldown := 2.6       ## s after a defender's dive before he can dive again
 @export var open_field_shed_mult := 0.35 ## blocks after the catch/handoff hold this much shorter
 @export var engage_range := 1.2
 @export var run_engage_range := 1.6    ## run blockers latch on from a bit farther
@@ -235,6 +236,8 @@ extends Resource
 @export var hesi_tackle_mult := 0.6    ## tackle chance multiplier on the carrier during hesi + burst
 @export var dive_distance := 2.0
 @export var dive_time := 0.35
+@export var carrier_dive_keep := 0.45  ## share of his running speed a diving ball carrier keeps (+ the lunge)
+@export var dive_stop_radius := 0.9    ## a diving carrier lands on the first body this close in front of him
 
 @export_group("Road to Glory controls")
 @export var rtg_stick_dead := 0.14     ## stick share (0..1) ignored around the center

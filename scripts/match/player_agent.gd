@@ -51,6 +51,7 @@ var jam_timer := 0.0   ## seconds of slowed release (press coverage)
 var accel_mult := 1.0
 var burst_timer := 0.0
 var burst_cd := 0.0
+var dive_cd := 0.0       ## a defender who dove can't dive again until this runs out
 var duel_leverage := 0.0
 var duel_window := 0.0
 var duel_stall := 0.0
@@ -153,13 +154,24 @@ func knock_down(duration := -1.0) -> void:
 	engaged_with = null
 
 
-## recover < 0: the diver stays down (a ball carrier's dive ends the play).
+## recover < 0: the diver stays down (a ball carrier's dive ends the play). A defender's
+## dive (recover >= 0) is a commitment: a miss leaves him on the ground for `recover`
+## seconds and he can't dive again for dive_cooldown.
 func start_dive(t: GameplayTuning, dir: Vector2, recover := -1.0) -> void:
 	dive_timer = t.dive_time
 	dive_recover = recover
-	# A dive is a lunge: current running speed plus a burst, so it can close from behind.
-	velocity = dir.normalized() * (velocity.length() + t.dive_distance / t.dive_time)
+	# A dive is a lunge: running speed plus a burst, so a tackler can close from behind; a ball
+	# carrier keeps less of his speed (falling forward for the last yard or two, not flying).
+	var keep := 1.0 if recover >= 0.0 else t.carrier_dive_keep
+	velocity = dir.normalized() * (velocity.length() * keep + t.dive_distance / t.dive_time)
 	engaged_with = null
+	if recover >= 0.0:
+		dive_cd = t.dive_cooldown
+
+
+## Can he launch a dive tackle now?
+func can_dive() -> bool:
+	return can_act() and dive_cd <= 0.0
 
 
 ## Defender leaps at a thrown ball (swat / pick attempt).
@@ -268,6 +280,7 @@ func step(dt: float, t: GameplayTuning) -> void:
 		return
 	burst_timer = maxf(0.0, burst_timer - dt)
 	burst_cd = maxf(0.0, burst_cd - dt)
+	dive_cd = maxf(0.0, dive_cd - dt)
 	var bm := burst_scale if burst_scale > 0.0 else t.burst_mult
 	var target_v := desired_dir * max_speed * throttle * speed_mult * (bm if burst_timer > 0.0 else 1.0)
 	if move_kind == "spin":
