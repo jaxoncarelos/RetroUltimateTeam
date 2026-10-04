@@ -284,3 +284,21 @@ extends Resource
 @export var rtg_tele_per_point := 0.008 ## …plus this per point of your AWR over his RTE
 @export var rtg_align_speed := 6.0     ## yd/s pre-snap alignment moves
 @export var rtg_align_max_y := 7.0     ## yards you can shade from your spot pre-snap
+
+@export_group("CPU quarterback brain")
+@export var qb_int_cost := 32.0          ## yards an interception is worth in the throw value
+@export var qb_min_value_start := 7.0    ## expected yards a throw must be worth at the start of the read…
+@export var qb_min_value_end := 1.2      ## …falling to this by qb_patience seconds
+@export var qb_patience := 3.0
+@export var qb_max_int_smart := 0.025    ## the most INT risk a 99-awareness QB accepts…
+@export var qb_max_int_dumb := 0.08      ## …and a 60-awareness one
+@export var qb_desperate_mult := 2.0     ## max INT risk × this when trailing late
+@export var qb_ready_depth := 7.0        ## a vertical route is "ready" at this depth past the line
+@export var qb_anticipation := 0.35      ## s a 99-awareness QB throws before the break
+@export var qb_human_slop := 0.7         ## yards of extra margin a hand-run (RTG) receiver needs
+@export var qb_call_slop := 0.5          ## …less this when he CALLs for it
+@export var qb_min_comp := 0.5           ## never throws a ball less likely caught than this (desperate: 0.3)
+@export var qb_scramble_speed := 76.0    ## QBs with this speed or more scramble out of trouble
+@export var qb_throwaway_pressure := 0.7 ## pressure that makes him throw it away when nothing is there
+@export var qb_hot_time := 0.9           ## s: vs. an unblocked blitz he throws hot this early
+@export var qb_yac_per_sec := 5.0        ## YAC estimate: yards per second of space at the catch

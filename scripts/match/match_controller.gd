@@ -824,6 +824,8 @@ func _snap() -> void:
 		runner.human_input = null
 	runner.snap()
 	var cpu_passing := not off_play.is_run() and (not _human_offense() or _coach_calls())
+	# Trailing late, the CPU QB takes more chances (CpuPasser.int_cap).
+	runner.set_meta("desperate", gs.clock.quarter >= 4 and gs.clock.seconds_left < 240.0 and gs.score_diff(gs.possession) < 0)
 	passer = CpuPasser.new(runner, rng) if cpu_passing else null
 	if passer != null and _rtg_on() and runner.locked != null:
 		var trust := float(rtg.get("trust", 0.5))

@@ -626,6 +626,11 @@ func throw_ball(target: Vector2) -> void:
 		_set_controlled(null)
 	pass_log[["bullet", "touch", "lob"][int(throw_plan["kind"])]] += 1
 
+	if landing.y < -1.5 or landing.y > FieldGeo.WIDTH + 1.5:
+		# Thrown away out of bounds: nobody chases it.
+		intended = null
+		ball_thrown.emit(landing)
+		return
 	# The receiver who can get there with the least to spare tracks the ball to its landing.
 	var best: PlayerAgent = null
 	var best_d := INF
@@ -1051,6 +1056,10 @@ func _log_pass(caught: bool, picked: bool) -> void:
 func _resolve_arrival() -> void:
 	var landing := ball.to
 	var t := tuning
+	if landing.y < -1.5 or landing.y > FieldGeo.WIDTH + 1.5:
+		_log_pass(false, false)
+		_end_play("incomplete", Vector2(los_x, ball_y), "THROWN AWAY")
+		return
 	var j := _jumper_near(landing)
 	if j != null:
 		var err := absf((play_time - j.jump_started_at) - t.jump_time * 0.5)
