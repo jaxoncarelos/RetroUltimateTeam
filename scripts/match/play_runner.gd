@@ -409,6 +409,40 @@ func pocket_assignments() -> Dictionary:
 	return _pocket_cache
 
 
+var _zone_cache: Dictionary = {}
+var _zone_time := -1.0
+
+
+## Zone coverage for this frame: zone defender -> the receiver he takes. Greedy matching on
+## each defender's score (ZoneBrain.score: distance, deep / underneath priorities, the QB's
+## eyes), so each receiver gets one zone defender and no two chase the same man while
+## another is free.
+func zone_matches() -> Dictionary:
+	if is_equal_approx(_zone_time, play_time):
+		return _zone_cache
+	_zone_time = play_time
+	_zone_cache = {}
+	var pairs: Array = []
+	for d in defense:
+		if not (d.brain is ZoneBrain) or d.is_down:
+			continue
+		var zb := d.brain as ZoneBrain
+		for o in offense:
+			var sc := zb.score(o)
+			if sc < INF:
+				pairs.append([sc, d, o])
+	pairs.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+	var taken := {}
+	for pr in pairs:
+		var d: PlayerAgent = pr[1]
+		var o: PlayerAgent = pr[2]
+		if _zone_cache.has(d) or taken.has(o):
+			continue
+		_zone_cache[d] = o
+		taken[o] = true
+	return _zone_cache
+
+
 ## Blitz pickup: when the defense rushes more men than the offense has pass blockers, the
 ## back stays in to block instead of running his route.
 func _blitz_pickup() -> void:
@@ -611,6 +645,8 @@ func throw_ball(target: Vector2) -> void:
 		return
 	var dist := qb.field_pos.distance_to(target)
 	var err := RatingModel.aim_error(tuning, qb.attr("tha"), qb.attr("awr"), dist, pressure_on_qb())
+	if not human_qb():
+		err *= tuning.cpu_aim_error_mult
 	var landing := target + Vector2.from_angle(rng.randf() * TAU) * err * sqrt(rng.randf())
 	throw_plan = plan_throw(landing)
 	var dur := float(throw_plan["dur"])

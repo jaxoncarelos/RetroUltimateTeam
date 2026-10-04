@@ -11,8 +11,8 @@ extends Resource
 @export var reaction_fast := 0.10      ## seconds at awareness 99
 @export var cut_keep_min := 0.45       ## velocity kept through a route cut at route running 0
 @export var cut_keep_max := 0.9        ## … at route running 99
-@export var carrier_speed_mult := 0.94 ## ball carriers run a bit slower than their top speed
-@export var pursuit_speed_mult := 1.07 ## pursuing defenders run a bit faster (effort + angles)
+@export var carrier_speed_mult := 0.96 ## ball carriers run a bit slower than their top speed
+@export var pursuit_speed_mult := 1.06 ## pursuing defenders run a bit faster (effort + angles)
 
 @export_group("Passing")
 @export var throw_speed_base := 20.0   ## yd/s
@@ -210,6 +210,7 @@ extends Resource
 @export var run_engaged_slack := 0.5   ## yards of extra space an engaged (blocked) defender counts for
 @export var run_progress_weight := 0.38 ## preference for lanes that gain ground over lanes that just have space
 @export var run_lane_stick := 1.5      ## how strongly he sticks to the designed lane while it is open
+@export var run_shield_slack := 2.0    ## yards of extra space when a blocker stands between a defender and the lane
 
 @export_group("Feel")
 @export var slowmo_scale := 0.35       ## Engine.time_scale during a highlight (deep catch, pick, TD, big hit)
@@ -286,19 +287,20 @@ extends Resource
 @export var rtg_align_max_y := 7.0     ## yards you can shade from your spot pre-snap
 
 @export_group("CPU quarterback brain")
-@export var qb_int_cost := 32.0          ## yards an interception is worth in the throw value
-@export var qb_min_value_start := 7.0    ## expected yards a throw must be worth at the start of the read…
-@export var qb_min_value_end := 1.2      ## …falling to this by qb_patience seconds
+@export var qb_int_cost := 14.0          ## value lost on an interception (ThrowRisk.worth scale: ~30 yards)
+@export var qb_min_value_start := 5.0    ## value (ThrowRisk.worth of expected yards) a throw must have at the start of the read…
+@export var qb_min_value_end := 1.0      ## …falling to this by qb_patience seconds
 @export var qb_patience := 3.0
-@export var qb_max_int_smart := 0.025    ## the most INT risk a 99-awareness QB accepts…
-@export var qb_max_int_dumb := 0.08      ## …and a 60-awareness one
+@export var qb_max_int_smart := 0.04     ## the most INT risk a 99-awareness QB accepts…
+@export var qb_max_int_dumb := 0.10      ## …and a 60-awareness one
 @export var qb_desperate_mult := 2.0     ## max INT risk × this when trailing late
 @export var qb_ready_depth := 7.0        ## a vertical route is "ready" at this depth past the line
 @export var qb_anticipation := 0.35      ## s a 99-awareness QB throws before the break
 @export var qb_human_slop := 0.7         ## yards of extra margin a hand-run (RTG) receiver needs
 @export var qb_call_slop := 0.5          ## …less this when he CALLs for it
-@export var qb_min_comp := 0.5           ## never throws a ball less likely caught than this (desperate: 0.3)
+@export var qb_min_comp := 0.42          ## never throws a ball less likely caught than this (desperate: 0.3)
 @export var qb_scramble_speed := 76.0    ## QBs with this speed or more scramble out of trouble
 @export var qb_throwaway_pressure := 0.7 ## pressure that makes him throw it away when nothing is there
 @export var qb_hot_time := 0.9           ## s: vs. an unblocked blitz he throws hot this early
 @export var qb_yac_per_sec := 5.0        ## YAC estimate: yards per second of space at the catch
+@export var cpu_aim_error_mult := 2.2    ## CPU quarterbacks miss like people do: their aim error × this

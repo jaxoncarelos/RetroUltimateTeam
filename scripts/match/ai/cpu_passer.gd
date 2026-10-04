@@ -217,8 +217,8 @@ func update(dt: float) -> Dictionary:
 			decided = true
 			ctx.start_scramble()
 			return {"receiver": null, "scramble": true}
-		if pressure >= 0.9 or out_of_time:
-			return _throw_away()
+		if pressure >= t.qb_throwaway_pressure + 0.1 * (1.0 - _smart()) or out_of_time:
+			return _throw_away()   # live for the next down
 	return {}
 
 

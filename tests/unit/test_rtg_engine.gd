@@ -101,8 +101,9 @@ func test_running_back_gets_the_handoff_and_the_stick() -> void:
 func test_receiver_on_a_run_play_does_not_take_the_ball() -> void:
 	_setup("hb_dive", "cover3", PlayerAgent.Team.OFFENSE, "WR1")
 	runner.snap()
-	_step(1.5)
 	var rb: PlayerAgent = runner.off_slots["RB"]
+	_until_handoff(rb)
+	runner._physics_process(DT)
 	assert_eq(runner.carrier, rb)
 	assert_false(rb.human, "the back runs on his own")
 	assert_true(rb.brain is RunnerBrain)

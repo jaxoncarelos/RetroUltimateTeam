@@ -173,6 +173,8 @@ func test_man_defender_flips_and_trails_a_go_route() -> void:
 func test_well_placed_lob_vs_man_is_usually_caught() -> void:
 	var caught := 0
 	var n := 24
+	var keep := t.cpu_aim_error_mult
+	t.cpu_aim_error_mult = 1.0   # placement, not the CPU's shaky arm
 	for seed in n:
 		var r := _runner(100 + seed)
 		var ended := []
@@ -185,27 +187,34 @@ func test_well_placed_lob_vs_man_is_usually_caught() -> void:
 		var res := _run_out(r, ended)
 		if res.get("type", "") in ["tackle", "td", "out"]:
 			caught += 1
+	t.cpu_aim_error_mult = keep
 	assert_between(float(caught) / n, 0.45, 0.95, "caught %d/%d" % [caught, n])
 
 
-## An underthrown lob that lands on the trailing defender gets undercut: rarely caught.
+## An underthrown lob that lands on the trailing defender gets played by him (broken up or
+## picked) clearly more often than a well-placed one on the same snaps.
 func test_underthrown_lob_gets_undercut() -> void:
-	var caught := 0
+	var defended := [0, 0]
 	var n := 24
-	for seed in n:
-		var r := _runner(200 + seed)
-		var ended := []
-		r.play_ended.connect(func(res: Dictionary) -> void: ended.append(res))
-		_setup(r, "four_verts", "cover0")
-		for i in 72:
-			r._physics_process(DT)
-		var cb: PlayerAgent = r.def_slots["CB1"]
-		var plan := r.plan_throw(cb.field_pos)
-		r.throw_ball(r.predict(cb.brain.mark, 0.0).lerp(cb.field_pos, 1.0) + cb.velocity * float(plan["dur"]) * 0.8)
-		var res := _run_out(r, ended)
-		if res.get("type", "") in ["tackle", "td", "out"]:
-			caught += 1
-	assert_lt(float(caught) / n, 0.45, "caught %d/%d" % [caught, n])
+	for under in [false, true]:
+		for seed in n:
+			var r := _runner(200 + seed)
+			var ended := []
+			r.play_ended.connect(func(res: Dictionary) -> void: ended.append(res))
+			_setup(r, "four_verts", "cover0")
+			for i in 72:
+				r._physics_process(DT)
+			var cb: PlayerAgent = r.def_slots["CB1"]
+			if under:
+				var plan := r.plan_throw(cb.field_pos)
+				r.throw_ball(cb.field_pos + cb.velocity * float(plan["dur"]) * 0.8)
+			else:
+				r.throw_ball(r.lead_point(r.off_slots["WR1"]))
+			var res := _run_out(r, ended)
+			if res.get("text", "") in ["BROKEN UP!", "INTERCEPTED!", "SWATTED!", "TIPPED!"] or res.get("type", "") in ["int", "int_td"]:
+				defended[int(under)] += 1
+	assert_gt(defended[1], defended[0], "defended: underthrown %d/%d vs well placed %d/%d" % [defended[1], n, defended[0], n])
+	assert_gt(float(defended[1]) / n, 0.35, "a ball thrown onto the defender is often played")
 
 
 func test_aim_assist_pulls_reticle_onto_receiver() -> void:

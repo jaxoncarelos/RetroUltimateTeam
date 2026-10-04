@@ -44,6 +44,8 @@ func think() -> void:
 			if d.is_down:
 				continue
 			var slack := t.run_engaged_slack if d.engaged_with != null else 0.0
+			if d.engaged_with == null and _shielded(d, near):
+				slack += t.run_shield_slack   # a blocker stands between him and that lane
 			space = minf(space, minf(d.field_pos.distance_to(near), d.field_pos.distance_to(far) + 1.0) + slack)
 		# Stick to the designed lane unless it is clearly filled; keep the current heading
 		# (hysteresis) so the runner doesn't wobble between equal lanes.
@@ -54,6 +56,18 @@ func think() -> void:
 		if score > best_score:
 			best_score = score
 			aim = agent.field_pos + dir * 4.0
+
+
+## True when one of the carrier's blockers stands between defender `d` and the point `p`
+## (he will have to get past him: run off the blocker's hip).
+func _shielded(d: PlayerAgent, p: Vector2) -> bool:
+	var mates := ctx.offense if agent.team == PlayerAgent.Team.OFFENSE else ctx.defense
+	for m in mates:
+		if m == agent or m.is_down or not (m.brain is BlockBrain):
+			continue
+		if PassModel.seg_dist(m.field_pos, d.field_pos, p) < 1.2 and m.field_pos.distance_to(d.field_pos) < 4.0:
+			return true
+	return false
 
 
 func act(_dt: float) -> void:

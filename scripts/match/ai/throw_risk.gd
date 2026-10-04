@@ -51,11 +51,11 @@ static func evaluate(ctx: PlayRunner, o: PlayerAgent, spot: Vector2, slop := 0.0
 	var apex := float(plan["apex"])
 	var loft := float(plan["loft"])
 	var dist := qb.field_pos.distance_to(spot)
-	var err := RatingModel.aim_error(t, qb.attr("tha"), qb.attr("awr"), dist, ctx.pressure_on_qb())
+	var err := RatingModel.aim_error(t, qb.attr("tha"), qb.attr("awr"), dist, ctx.pressure_on_qb()) * t.cpu_aim_error_mult
 	var r_speed := maxf(o.max_speed * maxf(o.speed_mult, 0.9), 4.0)
 	# How far from the spot the receiver still is when it lands (he runs at it; aim error and an
 	# unreadable route add to it).
-	var rec_d := maxf(o.field_pos.distance_to(spot) - r_speed * flight, 0.0) + slop + err * 0.6
+	var rec_d := maxf(o.field_pos.distance_to(spot) - r_speed * flight, 0.0) + slop + err * 0.35
 	var cr := t.contest_radius + t.lob_contest_extra * loft
 	var def_d := INF
 	var catch_d: PlayerAgent = null
@@ -117,7 +117,15 @@ static func evaluate(ctx: PlayRunner, o: PlayerAgent, spot: Vector2, slop := 0.0
 	var yac := clampf(adv, 0.0, 1.6) * t.qb_yac_per_sec
 	var yards := air + yac
 	return {"spot": spot, "receiver": o, "plan": plan, "p_comp": p_comp, "p_int": p_int, "yards": yards,
-			"value": p_comp * yards - p_int * t.qb_int_cost, "adv": adv, "late": rec_d, "def_d": def_d}
+			"value": p_comp * worth(yards) - p_int * t.qb_int_cost, "adv": adv, "late": rec_d, "def_d": def_d}
+
+
+## How much a gain is worth to a play caller: more yards are better, with diminishing returns
+## (take what the defense gives; a 30-yard shot isn't five times a 6-yard completion).
+static func worth(yards: float) -> float:
+	if yards <= 0.0:
+		return yards
+	return 8.0 * log(1.0 + yards / 8.0)
 
 
 static func _sig(x: float) -> float:

@@ -33,15 +33,17 @@ func _lineup(form: FormationDef, ovr: int) -> Dictionary:
 func _new_stats() -> Dictionary:
 	return {"plays": 0, "att": 0, "comp": 0, "int": 0, "sack": 0, "pass_yds": 0, "runs": 0, "run_yds": 0,
 			"stuffs": 0, "explosive": 0, "throwaway": 0, "throw_time": 0.0, "sep": 0.0, "sep_n": 0, "td": 0,
-			"my_tgt": 0, "my_comp": 0, "my_int": 0, "my_yds": 0, "lane_int": 0}
+			"my_tgt": 0, "my_comp": 0, "my_int": 0, "my_yds": 0, "lane_int": 0, "air": 0.0, "broken": 0}
 
 
 ## One batch. mode: "cpu" | "wr_bot" | "wr_idle" | "runs".
 var calib: Array = []
+var by_def: Dictionary = {}   ## def play id -> [att, comp, sep_sum, yds, int]
 
 
 func _batch(mode: String, n := N) -> Dictionary:
 	calib = [[0, 0, 0, 0.0], [0, 0, 0, 0.0], [0, 0, 0, 0.0], [0, 0, 0, 0.0], [0, 0, 0, 0.0]]
+	by_def = {}
 	var st := _new_stats()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 4242
@@ -117,6 +119,15 @@ func _batch(mode: String, n := N) -> Dictionary:
 				break
 		if not ended.is_empty():
 			_tally(st, ended[0], off, thrown_at, rtg)
+			var r1: Dictionary = ended[0]
+			if r1["pass_thrown"]:
+				if not by_def.has(def.id):
+					by_def[def.id] = [0, 0, 0.0, 0, 0]
+				var bd: Array = by_def[def.id]
+				bd[0] += 1
+				bd[1] += 1 if str(r1["type"]) not in ["incomplete", "int", "int_td"] else 0
+				bd[3] += int(r1["yards"]) if str(r1["type"]) not in ["incomplete", "int", "int_td"] else 0
+				bd[4] += 1 if str(r1["type"]) in ["int", "int_td"] else 0
 			if passer != null and not passer.thrown.is_empty():
 				var tp: Dictionary = passer.thrown
 				var r0: Dictionary = ended[0]
@@ -150,6 +161,8 @@ func _tally(st: Dictionary, r: Dictionary, off: PlayDef, thrown_at: float, rtg: 
 		elif type not in ["incomplete"]:
 			st["comp"] += 1
 			st["pass_yds"] += yards
+			st["air"] += float(r.get("air_yards", 0.0))
+			st["broken"] += int(r.get("broken_tackles", 0))
 		if rtg and str(r.get("target_slot", "")) == "WR1":
 			st["my_tgt"] += 1
 			if type in ["int", "int_td"]:
@@ -176,6 +189,8 @@ static func line(name: String, s: Dictionary) -> String:
 		100.0 * s["sack"] / dropbacks, s["throwaway"], s["throw_time"] / att, s["sep"] / maxf(s["sep_n"], 1),
 		s["runs"], float(s["run_yds"]) / maxf(s["runs"], 1), 100.0 * s["stuffs"] / maxf(s["runs"], 1),
 		100.0 * s["explosive"] / maxf(s["runs"], 1), s["td"], s["lane_int"]]
+	if int(s["comp"]) > 0:
+		txt += " | air %.1f yac %.1f per comp, broken %.2f" % [s["air"] / s["comp"], (s["pass_yds"] - s["air"]) / s["comp"], float(s["broken"]) / s["comp"]]
 	if int(s["my_tgt"]) > 0 or name.begins_with("wr"):
 		txt += " | YOU tgt %d (%.0f%% of att) comp %d INT %d yds %d" % [s["my_tgt"], 100.0 * s["my_tgt"] / att,
 				s["my_comp"], s["my_int"], s["my_yds"]]
@@ -188,12 +203,18 @@ func test_lab() -> void:
 		if only != "" and not mode in only.split(","):
 			continue
 		gut.p(line(mode, _batch(mode)))
+		gut.p("   " + PlayRunner.pass_log_text())
 		var cl: Array[String] = []
 		for i in 5:
 			var c: Array = calib[i]
 			if int(c[0]) > 0:
 				cl.append("p%.1f-%.1f: n%d comp %.0f%% int %.0f%% (pred %.0f%%)" % [i * 0.2, i * 0.2 + 0.2, c[0], 100.0 * c[1] / c[0], 100.0 * c[2] / c[0], 100.0 * c[3] / c[0]])
 		gut.p("   calib " + " | ".join(cl))
+		var dl: Array[String] = []
+		for k in by_def:
+			var a: Array = by_def[k]
+			dl.append("%s %d/%d %.1fypa i%d" % [k, a[1], a[0], float(a[3]) / maxf(a[0], 1), a[4]])
+		gut.p("   by coverage: " + "  ".join(dl))
 	assert_true(true)
 
 

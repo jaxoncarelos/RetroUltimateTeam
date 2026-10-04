@@ -127,7 +127,10 @@ func test_run_play_same_touch_steers_after_handoff() -> void:
 	var start := _qb_view()
 	touch.pressed.emit(start)
 	touch.drag_started.emit(start, start + Vector2(-30, 0))
-	_step(60)
+	for i in 60:
+		_step(1)
+		if runner.carrier != null and runner.carrier.slot == "RB":
+			break
 	assert_eq(runner.carrier.slot, "RB")
 	touch.dragged.emit(start, start + Vector2(0, 40))
 	assert_eq(control.mode, HumanOffenseControl.Mode.STEER)
