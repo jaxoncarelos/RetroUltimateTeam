@@ -40,6 +40,11 @@ static func oc_call(plays: Array[PlayDef], situation: Dictionary, rng: RandomNum
 	if rng.randf() >= 0.3 + 0.35 * clampf(trust, 0.0, 1.0):
 		return pick
 	var mine := featured(plays, situation, slot)
+	if slot.begins_with("RB"):
+		# Feeding the back means handing it to him; his routes come after.
+		var runs: Array[PlayDef] = mine.filter(func(p: PlayDef) -> bool: return p.is_run())
+		if not runs.is_empty() and rng.randf() < 0.75:
+			mine = runs
 	if mine.is_empty():
 		return pick
 	# Mostly the best of them, sometimes the next ones (no robot coordinator).

@@ -18,6 +18,8 @@ The full design and roadmap live in [PLAN.md](PLAN.md).
 | 5 | Packs, economy, collection | ✅ store, packs, collection, lineup, sets, save |
 | 6 | Season, challenges, polish | ✅ season + playoffs, 11 challenges + daily, settings, SFX, coach tips |
 | 7 | Road to Glory (career as one QB/RB/WR/CB) | ✅ create, combine, draft, seasons, awards, Hall of Fame |
+| 8 | AI overhaul (QB reads + risk model, coverage, pursuit) | ✅ `docs/AI_OVERHAUL_PLAN.md`, lab `tests/lab/lab_ai.gd` |
+| 9 | Legends (vintage cards: 90 retired greats) | ✅ Legends + Legend Draft packs, rare in Elite/Gold |
 
 ## Running
 

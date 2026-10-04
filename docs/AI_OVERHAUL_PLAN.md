@@ -5,7 +5,7 @@ WR the QB constantly throws picks. Make it feel like actual intelligent people."
 
 ## Where it stands (AI lab, `tests/lab/lab_ai.gd`, 300 plays each, 78 offense vs 84 defense)
 
-| | today | real-football target |
+| | before | real-football target |
 |---|---|---|
 | CPU QB completion | 47 % | 62–68 % |
 | INT per attempt | 5.0 % | ≤ 2.5 % (picks come from bad reads under pressure / tipped balls) |
@@ -83,3 +83,8 @@ the QB's eyes; pursuit all aims at one spot; the ball carrier's vision ignores h
 wr_idle / runs, ratings via `LAB_OFF`, `LAB_DEF`, `LAB_ROOKIE`. Every change is checked against the
 targets above; unit tests lock the key behaviours (no throws into a defender's lane, throwaways under
 pressure, hot reads vs. the blitz, the INT rate in a batch, ypc range).
+
+## Result (2026-10-04, lab 300 plays)
+CPU QB 72 % comp, 1.3 % INT, deep (20+ air) 43 % comp, ttt 2.0 s, sep 3.3 yd, throwaways ~8 %; RTG WR (bot runs
+the drawn route) targeted 51 % of throws, 85 % caught, 1 INT in 297. Run game 3.3–4.7 ypc depending on ratings.
+Still to do: §4 option routes + scramble drill, §5 offense game plan, pocket climbing.

@@ -165,6 +165,19 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    live gold route, red + "GET ON YOUR ROUTE" when `PlayRunner.route_offset` > `rtg_off_route`, CpuPasser docks
    openness off-route); easier high-point catch (window 0.6 s, early taps ignored, reach +1.3, box-out 1.2 yd, catch
    floor 85%, leap animation): contested 2/40 -> 35/40. Every script/scene must load (test_scripts_compile).
+25. [x] AI overhaul (owner: "when I play WR the QB constantly throws picks"; plan docs/AI_OVERHAUL_PLAN.md): CPU QB =
+   `CpuPasser` progression (hot read vs. blitz, read order by concept, routes "ready" at the break, anticipation) +
+   `ThrowRisk` (pure: per-defender break time/arrival, lane picks, p_comp/p_int, value = p_comp*worth(yds) - p_int*cost;
+   bar drops with time/pressure, INT cap by awareness, desperate late), checkdown/throwaway (out of bounds = "THROWN
+   AWAY")/scramble; CPU aim error x`cpu_aim_error_mult`. Man coverage mirrors (cushion, hip flip, `trail_gap` by matchup,
+   break read by rte-cov); zone `PlayRunner.zone_matches()` (one defender per receiver, QB eyes); `PursuitBrain`
+   intercept angles + leverage; runner counts blockers (`run_shield_slack`). Tuning group "CPU quarterback brain".
+   Lab (`LAB=cpu,wr_bot,wr_wild,runs -gdir=res://tests/lab -gprefix=lab_ai`): 47%->72% comp, INT 5%->1.3%, deep 43%;
+   RTG WR ~50% of targets, ~0 picks. Not done yet: receiver option routes / scramble drill, offense game plan.
+26. [x] Legends: `data/legends.csv` (90 vintage greats, era column, `keep` importer), `RosterDB.load_legends`,
+   `CardRules.PROGRAM_LEGEND` (id `<player>_legend`, value x1.25, no development), packs legends (45,000, 1 legend
+   guaranteed) + legend_draft (keep 1 of 3), Elite 2%/card, Gold 0.2%; jade LGND card style, sets/milestones.
+   Debug: `--demo-profile --legends`, `--screen=store --tab=4`, `--screen=pack_open --pack=legends`.
 Next ideas (after the owner's playtest): see MORNING_NOTES.md. RTG follow-ups: kick returns, S/LB/TE positions,
    injuries, rivalries / weekly storylines. Card revamp follow-ups: CPU star
 abilities, ability UI on the lineup screen, ability-themed sets/objectives, balance pass on ability boosts.
