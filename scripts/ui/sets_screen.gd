@@ -1,5 +1,6 @@
 extends Control
-## SETS: trade spare cards (unlocked, not starting) for packs or an Elite franchise star.
+## SETS: trade spare cards (unlocked, not starting, never Legends) for packs, an Elite
+## franchise star or a LEGEND DRAFT (a pick-one reward opens the draft screen).
 ## One framed tile per set, store-shelf style: a stack of the cards it eats ("x10"), an
 ## arrow, the reward pack, a progress bar (have / need), times completed and a COMPLETE
 ## button that turns yellow and pulses once you have enough.
@@ -14,7 +15,7 @@ func _ready() -> void:
 	root.add_theme_constant_override("separation", 4)
 	_shelf = HBoxContainer.new()
 	_shelf.alignment = BoxContainer.ALIGNMENT_CENTER
-	_shelf.add_theme_constant_override("separation", 8)
+	_shelf.add_theme_constant_override("separation", 6)
 	_shelf.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(_shelf)
 	root.add_child(MetaUI.label("ONLY UNLOCKED BENCH CARDS ARE TRADED - LOCK A CARD TO KEEP IT SAFE", UiSkin.MUTED, 8,
@@ -48,7 +49,8 @@ func _tile(s: Dictionary) -> Control:
 	var elite: bool = s["reward"] == "franchise_elite"
 	var title := "FRANCHISE SET" if franchise else "%s SET" % CardRules.NAMES[tier]
 	var p := RetroPanel.new(title, UiSkin.PANEL, 5)
-	p.custom_minimum_size = Vector2(146, 0)
+	var narrow := EconomyRules.SETS.size() > 3
+	p.custom_minimum_size = Vector2(124 if narrow else 146, 0)
 	p.title_color = CardView.tier_color(tier).lightened(0.2)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 3)
@@ -74,8 +76,14 @@ func _tile(s: Dictionary) -> Control:
 	art.glow = 0.6 if have >= need else 0.0
 	trade.add_child(art)
 	var what := "%d %s%s CARDS" % [need, "FRANCHISE " if franchise else "", CardRules.NAMES[tier]]
+	if narrow:
+		what = "%d %s%s" % [need, "FRANCHISE " if franchise else "", CardRules.NAMES[tier]]
 	col.add_child(MetaUI.label(what, UiSkin.WHITE, 8, HORIZONTAL_ALIGNMENT_CENTER))
 	var reward := "AN ELITE STAR OF YOUR TEAM" if elite else "FOR A %s" % PackCatalog.get_pack(str(s["reward"])).display_name
+	if narrow:
+		reward = "FOR A STAR" if elite else "FOR A " + PackCatalog.get_pack(str(s["reward"])).display_name.replace(" PACK", "")
+	if not elite and PackCatalog.get_pack(str(s["reward"])).legend_guarantee > 0:
+		reward = "FOR A LEGEND (1 OF 3)"
 	col.add_child(MetaUI.label(reward, UiSkin.MUTED, 8, HORIZONTAL_ALIGNMENT_CENTER))
 	# Progress.
 	var ph := HBoxContainer.new()
@@ -119,6 +127,13 @@ func _complete(s: Dictionary) -> void:
 		var pack := PackCatalog.get_pack(reward)
 		uids = EconomyRules.grant_pack(prof, pack, GameData.db, rng, int(Time.get_unix_time_from_system()))
 		title = pack.display_name
+		if pack.pick:
+			# Pick-one reward (Legend Draft): it was queued; open it first, on the draft screen.
+			prof.pending_packs.push_front(prof.pending_packs.pop_back())
+			var cfg := GameFlow.open_pending_config(prof, "res://scenes/meta/sets.tscn")
+			if not cfg.is_empty():
+				SceneRouter.goto(cfg["scene"], cfg)
+				return
 	SaveManager.save()
 	SceneRouter.goto("res://scenes/meta/pack_open.tscn", {"uids": uids, "title": title,
 			"back": "res://scenes/meta/sets.tscn"})

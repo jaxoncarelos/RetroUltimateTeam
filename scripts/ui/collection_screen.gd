@@ -1,11 +1,11 @@
 extends Control
 ## SQUAD (Retro Bowl roster style): pages of 5x2 cards with arrows, "CARDS n / m", filters
-## (position / tier / franchise) in the bottom nav, OFFENSE / DEFENSE stars. Starters have
+## (position / tier or LEGEND / franchise) in the bottom nav, OFFENSE / DEFENSE stars. Starters have
 ## a yellow outline. Tap a card for its detail: big card, ratings, development (potential +
 ## XP bar), quick sell, train with a duplicate, lock.
 
 const POS_FILTERS := ["ALL", "QB", "RB", "WR", "TE", "OL", "DL", "LB", "CB", "S", "K"]
-const TIER_FILTERS := ["ALL", "BRONZE", "SILVER", "GOLD", "ELITE"]
+const TIER_FILTERS := ["ALL", "BRONZE", "SILVER", "GOLD", "ELITE", "LEGEND"]   ## LEGEND = the program
 const PER_PAGE := 10
 
 var _ui: Dictionary
@@ -100,9 +100,12 @@ func _refresh() -> void:
 		var p: PlayerData = GameData.player(c.player_id)
 		if _pos > 0 and p.pos != POS_FILTERS[_pos]:
 			continue
-		if _tier > 0 and Collection.card_tier(GameData.db, e) != _tier - 1:
+		if _tier == TIER_FILTERS.size() - 1:
+			if not c.is_legend():
+				continue
+		elif _tier > 0 and Collection.card_tier(GameData.db, e) != _tier - 1:
 			continue
-		if _franchise_only and p.team != prof.franchise_team:
+		if _franchise_only and (p.team != prof.franchise_team or c.is_legend()):
 			continue
 		_list.append([Collection.card_ovr(GameData.db, e), e, c])
 	_list.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0])
@@ -213,7 +216,14 @@ func _show_detail(v: CardView) -> void:
 	row.add_child(col)
 	var p: PlayerData = v.player
 	col.add_child(MetaUI.label(p.name.to_upper(), UiSkin.YELLOW, 8))
-	col.add_child(MetaUI.label("%s  #%d  %s  AGE %d" % [p.pos, p.jersey, p.team, int(info.get("age", 0))], UiSkin.MUTED))
+	if v.card.is_legend():
+		# Retired great: his era and iconic franchise instead of an age.
+		var lt: TeamData = GameData.team(p.team)
+		col.add_child(MetaUI.label("%s  #%d  %s LEGEND" % [p.pos, p.jersey, p.era], UiSkin.MUTED))
+		col.add_child(MetaUI.label("ICONIC TEAM: %s" % (("%s %s" % [lt.city, lt.team_name]).to_upper() if lt != null
+				else p.team), CardRules.PROGRAM_COLORS["legend"].lightened(0.3)))
+	else:
+		col.add_child(MetaUI.label("%s  #%d  %s  AGE %d" % [p.pos, p.jersey, p.team, int(info.get("age", 0))], UiSkin.MUTED))
 	if v.card.is_core():
 		var real: CardDef = GameData.card(CardRules.card_id(v.card.player_id))
 		if real != null:
@@ -246,7 +256,8 @@ func _show_detail(v: CardView) -> void:
 		dh.add_child(MetaUI.label(" XP", UiSkin.MUTED))
 		col.add_child(dh)
 	else:
-		col.add_child(MetaUI.label("FULLY DEVELOPED", UiSkin.MUTED))
+		col.add_child(MetaUI.label("ALL-TIME GREAT - NO CHEMISTRY" if v.card.is_legend() else "FULLY DEVELOPED",
+				UiSkin.MUTED))
 	var starter: bool = info.get("in_lineup", false)
 	var copies := 0
 	for e in prof.cards:

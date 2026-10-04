@@ -3,7 +3,9 @@ extends Control
 ## Code-drawn 56x80 player card (times `card_scale`), Retro Bowl roster style with an
 ## ultimate-team twist: tier-colored art panel with the portrait (ArtGen), position chip,
 ## big OVR, navy name plate with star rating and a team-color strip. Gold and Elite cards
-## get an animated sheen (Elite also sparkles). face_down shows the pack card back.
+## get an animated sheen (Elite also sparkles). LEGEND cards (retired greats) are jade with a
+## "LGND" chip, the Elite sheen and sparkles whatever their tier. face_down shows the pack
+## card back (in the tier color, so a legend stays a surprise).
 
 signal tapped(view: CardView)
 
@@ -76,6 +78,10 @@ func is_prime() -> bool:
 	return card != null and card.has_method("is_prime") and card.is_prime()
 
 
+func is_legend() -> bool:
+	return card != null and card.is_legend()
+
+
 func is_xfactor() -> bool:
 	return card != null and card.ability != "" and not card.is_champ()
 
@@ -107,7 +113,7 @@ func _process(delta: float) -> void:
 	_t += delta
 	if flash > 0.0:
 		flash = maxf(0.0, flash - delta * 1.6)
-	if flash > 0.0 or (not face_down and (tier() >= CardRules.Tier.GOLD or is_xfactor())) or glow > 0.0:
+	if flash > 0.0 or (not face_down and (tier() >= CardRules.Tier.GOLD or is_xfactor() or is_legend())) or glow > 0.0:
 		queue_redraw()
 
 
@@ -126,11 +132,12 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2(s, s))
 	var r := Rect2(0, 0, W, H)
 	draw_rect(r, UiSkin.SHADOW)
-	draw_rect(r.grow(-1), tc.lightened(0.25))
+	var fc: Color = CardRules.PROGRAM_COLORS["legend"] if is_legend() and not face_down else tc
+	draw_rect(r.grow(-1), fc.lightened(0.25))
 	if face_down:
 		_draw_back(tc)
 	elif card != null and player != null:
-		_draw_front(tc)
+		_draw_front(fc)
 	if selected:
 		draw_rect(r.grow(1), UiSkin.YELLOW, false, 2.0)
 	if dim:
@@ -154,6 +161,8 @@ func _draw_back(tc: Color) -> void:
 func _draw_front(tc: Color) -> void:
 	var font := PixelFont.get_font()
 	var t := tier()
+	if is_legend():
+		t = CardRules.Tier.ELITE   # legends always get the full sheen + sparkles
 	# Art panel: two-tone tier gradient with scanlines.
 	var art := Rect2(2, 2, W - 4, ART_H - 2)
 	var top := tc.lightened(0.35)
@@ -208,6 +217,14 @@ func _draw_front(tc: Color) -> void:
 	if card != null and card.has_method("is_champ") and card.is_champ():
 		draw_rect(Rect2(3, 14, 31, 9), Color("#ffb000"))
 		draw_string(font, Vector2(5, 21), "CHAMP", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UiSkin.SHADOW)
+	elif is_legend():
+		# Retired all-time great: jade chip + his era under it.
+		draw_rect(Rect2(3, 14, 25, 9), CardRules.PROGRAM_COLORS["legend"].darkened(0.35))
+		draw_string(font, Vector2(5, 21), "LGND", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color.WHITE)
+		if player.era != "":
+			var era := "'" + player.era.right(3).to_upper()
+			draw_rect(Rect2(3, 24, PixelFont.text_width(era) + 4, 9), UiSkin.SHADOW)
+			draw_string(font, Vector2(5, 31), era, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color("#f2e6c2"))
 	elif card != null and RtgRules.is_rtg_card(card.id):
 		# Your Road to Glory player.
 		draw_rect(Rect2(3, 14, 21, 9), Color("#ff9d2e"))

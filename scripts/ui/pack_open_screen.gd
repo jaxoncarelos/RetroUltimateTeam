@@ -7,6 +7,8 @@ extends Control
 ## The best card gets a "walkout": spotlights sweep in the tier color, then its position,
 ## team (helmet + colors), OVR and, for X-Factor cards, the ability are revealed one by one
 ## before the card flips in with particles, glow and a screen shake scaled to its rarity.
+## A LEGEND card (retired great) always gets the walkout, with its own jade "LEGEND" sting
+## (era + "ALL-TIME GREAT") before the flip.
 ## The rest wait face-down in the summary grid: tap each to flip it (or FLIP ALL), with
 ## NEW / duplicate + quick-sell value, QUICK SELL DUPES, OPEN ANOTHER and CONTINUE. SKIP
 ## jumps to the summary at any time. The cards were already saved when the pack was
@@ -65,7 +67,11 @@ func _ready() -> void:
 			continue
 		_entries.append(e)
 		_dupe[int(uid)] = owned_before.has(e["def"])
+	# Best first; a Legend is always the headline (walkout) card.
 	_entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var la := _is_legend_entry(a)
+		if la != _is_legend_entry(b):
+			return la
 		return Collection.card_ovr(GameData.db, a) > Collection.card_ovr(GameData.db, b))
 	_build()
 	if OS.get_cmdline_user_args().has("--summary"):   # debug: skip to the card summary
@@ -123,6 +129,11 @@ func _build() -> void:
 	_skip_btn.offset_top = 5 + SafeArea.top()
 	_skip_btn.offset_bottom = 25 + SafeArea.top()
 	add_child(_skip_btn)
+
+
+static func _is_legend_entry(e: Dictionary) -> bool:
+	var c: CardDef = GameData.card(str(e.get("def", "")))
+	return c != null and c.is_legend()
 
 
 func _best_tier() -> int:
@@ -312,6 +323,10 @@ func _walkout() -> void:
 		await _xfactor_sting(card)
 		if _skip:
 			return
+	if card.is_legend():
+		await _legend_sting(p)
+		if _skip:
+			return
 	# 4) The card flips in.
 	_hero = CardView.new(card, e, 2)
 	_hero.face_down = true
@@ -342,6 +357,9 @@ func _walkout() -> void:
 	if card.is_xfactor():
 		nm.text += "  -  ⚡ " + str(AbilityRules.get_def(card.ability).get("name", ""))
 		nm.add_theme_color_override("font_color", CardRules.PROGRAM_COLORS["xf"].lightened(0.35))
+	elif card.is_legend():
+		nm.text += "  -  %s LEGEND" % p.era
+		nm.add_theme_color_override("font_color", CardRules.PROGRAM_COLORS["legend"].lightened(0.35))
 	step = Step.REVEALED
 	_hero_seen = true
 	_prompt.text = "TAP TO SEE ALL %d CARDS" % _entries.size() if _entries.size() > 1 else "TAP TO CONTINUE"
@@ -447,6 +465,32 @@ func _xfactor_sting(card: CardDef) -> void:
 				14, 90.0, 0.5, 1.5)
 	await _wait(1.5)
 	for n in [t, nm, tx]:
+		_fade_out(n)
+
+
+## Legend stinger: the stage turns jade, "LEGEND" slams in over his era and a gold
+## "ALL-TIME GREAT", with fireworks.
+func _legend_sting(p: PlayerData) -> void:
+	var lc: Color = CardRules.PROGRAM_COLORS["legend"]
+	_stage.color = lc
+	_stage.rays = 1.0
+	Sfx.play("elite")
+	Fx.flash(self, Color(lc.lightened(0.5), 0.6), 0.4)
+	Fx.shake(_content, 6.0, 0.35)
+	var t := _big_text("LEGEND", 5, lc)
+	_slam(t, Vector2(0, -22))
+	var era := MetaUI.label("%s  -  ALL-TIME GREAT" % p.era if p.era != "" else "ALL-TIME GREAT", UiSkin.YELLOW, 16,
+			HORIZONTAL_ALIGNMENT_CENTER)
+	era.position = Vector2(0, _vp().y * 0.5 + 14)
+	era.size = Vector2(_vp().x, 18)
+	_content.add_child(era)
+	_walk_nodes.append(era)
+	Fx.fireworks(_content, Rect2(40, 30, _vp().x - 80, _vp().y * 0.5), [lc, UiSkin.YELLOW, Color.WHITE], 6, 1.5)
+	for i in 3:
+		Fx.burst(_content, Vector2(randf_range(60, _vp().x - 60), randf_range(50, _vp().y - 60)), lc.lightened(0.2),
+				14, 90.0, 0.5, 1.5)
+	await _wait(1.6)
+	for n in [t, era]:
 		_fade_out(n)
 
 
@@ -694,6 +738,9 @@ func _reveal_card(v: CardView) -> void:
 	if v.is_xfactor():
 		Sfx.play("xf")
 		Fx.burst(self, v.global_position + v.size * 0.5, CardRules.PROGRAM_COLORS["xf"], 16, 80.0, 0.6, 1.0)
+	if v.is_legend():
+		Sfx.play("elite")
+		Fx.burst(self, v.global_position + v.size * 0.5, CardRules.PROGRAM_COLORS["legend"], 24, 100.0, 0.7, 1.5)
 	var tag: Label = v.get_meta("tag")
 	tag.create_tween().tween_property(tag, "modulate:a", 1.0, 0.15)
 	var sell: Button = v.get_meta("sell")

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="PackDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/pack_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "legend_draft"
+display_name = "LEGEND DRAFT"
+blurb = "3 FACE-DOWN LEGENDS - KEEP ONE"
+price = 55000
+card_count = 3
+odds = PackedFloat32Array(0.0, 0.0, 0.5, 0.5)
+guarantee_tier = -1
+positions = Array[String]([])
+team = ""
+color = Color(0.0784, 0.6275, 0.5020, 1)
+pick = true
+legend_guarantee = 3

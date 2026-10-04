@@ -27,6 +27,10 @@ const IN_TIER_FALLOFF := 0.12    ## higher OVR inside a tier is rarer: weight 1/
 ## Elite tier: every OVR point above 90 multiplies the weight by this (a 95 is ~4x rarer
 ## than a 90, a 99 ~13x), so a 99 is the pull of a career.
 const ELITE_FALLOFF := 0.75
+## Legend cards: every OVR point above LEGEND_BASE_OVR multiplies the weight by this (a 99
+## legend is ~1 in 80 legend pulls).
+const LEGEND_FALLOFF := 0.8
+const LEGEND_BASE_OVR := 86
 
 ## Sets: trade cards in for rewards. needs = {tier, count, franchise_only}; reward = pack id
 ## or "franchise_elite" (a star card of one of your franchise's real players).
@@ -37,6 +41,8 @@ const SETS := [
 			"reward": "gold"},
 	{"id": "franchise_elite", "name": "3 FRANCHISE GOLDS -> FRANCHISE STAR", "tier": 2, "count": 3,
 			"franchise_only": true, "reward": "franchise_elite"},
+	{"id": "elite_to_legend", "name": "4 ELITES -> LEGEND DRAFT", "tier": 3, "count": 4, "franchise_only": false,
+			"reward": "legend_draft"},
 ]
 
 
@@ -83,7 +89,8 @@ static func weak_positions(profile: Profile, db: RosterDB) -> Array[String]:
 
 
 ## Card ids a pack contains (not yet added to the profile). The best `xf_guarantee` cards
-## are X-Factor versions when the pack's filters allow one.
+## are X-Factor versions when the pack's filters allow one; the best `legend_guarantee`
+## cards (and any card that hits `legend_chance`) are LEGEND cards.
 static func open_pack(pack: PackDef, profile: Profile, db: RosterDB, rng: RandomNumberGenerator) -> Array[String]:
 	var weak := weak_positions(profile, db)
 	var out: Array[String] = []
@@ -92,6 +99,14 @@ static func open_pack(pack: PackDef, profile: Profile, db: RosterDB, rng: Random
 		var tier := tiers[i]
 		var xf_only := i >= tiers.size() - pack.xf_guarantee
 		var id := ""
+		var legend := i >= tiers.size() - pack.legend_guarantee
+		if not legend and pack.legend_chance > 0.0:
+			legend = rng.randf() < pack.legend_chance
+		if legend:
+			id = pick_legend(pack, db, rng, weak)
+			if id != "":
+				out.append(id)
+				continue
 		# Filtered packs (a team's roster) may lack a tier: try lower tiers, then higher.
 		for want_xf in ([true, false] if xf_only else [false]):
 			for t in [tier, tier - 1, tier - 2, tier - 3, tier + 1, tier + 2]:
@@ -146,6 +161,22 @@ static func pick_card(tier: int, pack: PackDef, profile: Profile, db: RosterDB, 
 		weights.append(w)
 	if ids.is_empty():
 		return ""
+	return ids[AIPlayCaller.weighted_index(weights, rng)]
+
+
+## A random LEGEND card that fits the pack's positions (higher OVR rarer: LEGEND_FALLOFF;
+## weak positions likelier). "" when none fits.
+static func pick_legend(pack: PackDef, db: RosterDB, rng: RandomNumberGenerator, weak: Array[String] = []) -> String:
+	var ids := db.legend_card_ids(Array(pack.positions))
+	if ids.is_empty():
+		return ""
+	var weights := PackedFloat32Array()
+	for cid in ids:
+		var c: CardDef = db.cards[cid]
+		var w := pow(LEGEND_FALLOFF, maxi(0, c.ovr - LEGEND_BASE_OVR))
+		if db.players[c.player_id].pos in weak:
+			w *= WEAK_POS_WEIGHT
+		weights.append(w)
 	return ids[AIPlayCaller.weighted_index(weights, rng)]
 
 
@@ -224,10 +255,13 @@ static func grant_pack(profile: Profile, pack: PackDef, db: RosterDB, rng: Rando
 ## Stats, objectives and coach XP for an opened pack.
 static func _record_opened(profile: Profile, pack: PackDef, ids: Array[String], db: RosterDB, unix_time: int) -> void:
 	var elite := 0
+	var legends := 0
 	for id in ids:
 		var c: CardDef = db.cards[id]
 		if c.tier >= CardRules.Tier.ELITE:
 			elite += 1
+		if c.is_legend():
+			legends += 1
 	profile.stats["packs_opened"] += 1
 	var obj_t := unix_time if unix_time > 0 else -1
 	ObjectiveRules.record_event(profile, "packs_opened", 1, obj_t)
@@ -235,6 +269,8 @@ static func _record_opened(profile: Profile, pack: PackDef, ids: Array[String], 
 		ObjectiveRules.record_event(profile, "packs_" + pack.id, 1, obj_t)
 	if elite > 0:
 		ObjectiveRules.record_event(profile, "pulls_elite", elite, obj_t)
+	if legends > 0:
+		ObjectiveRules.record_event(profile, "pulls_legend", legends, obj_t)
 	ProgressionRules.add_xp(profile, ProgressionRules.XP_PACK)
 
 
@@ -406,12 +442,12 @@ static func train(profile: Profile, db: RosterDB, target_uid: int, fodder_uid: i
 	return true
 
 
-## Cards that could go into a set (right tier, unlocked, not starting).
+## Cards that could go into a set (right tier, unlocked, not starting; never a Legend).
 static func set_candidates(profile: Profile, db: RosterDB, set_def: Dictionary) -> Array[int]:
 	var out: Array[int] = []
 	for e in profile.cards:
 		var c: CardDef = db.cards.get(e["def"])
-		if c == null or c.tier != int(set_def["tier"]) or e["locked"] or profile.in_lineup(int(e["uid"])):
+		if c == null or c.is_legend() or c.tier != int(set_def["tier"]) or e["locked"] or profile.in_lineup(int(e["uid"])):
 			continue
 		if set_def["franchise_only"] and db.players[c.player_id].team != profile.franchise_team:
 			continue

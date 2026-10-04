@@ -66,7 +66,7 @@ static func fill_players(db: RosterDB, abbr: String, pos: String, count: int) ->
 	var pool: Array = []
 	for pid in db.players:
 		var p: PlayerData = db.players[pid]
-		if p.generated or p.team == abbr or p.pos != pos:
+		if p.generated or p.legend or p.team == abbr or p.pos != pos:
 			continue
 		pool.append(p)
 	pool.sort_custom(func(a: PlayerData, b: PlayerData) -> bool:
@@ -131,7 +131,8 @@ static func dev_room(db: RosterDB, entry: Dictionary) -> int:
 
 ## Everything the UI shows about an owned card:
 ## {uid, def, player_id, name, short, pos, team, jersey, age, ovr, base_ovr, tier, program,
-##  ability, pot, dev, boost, xp, xp_next (0 = maxed), locked, in_lineup, prospect, retired}
+##  ability, pot, dev, boost, xp, xp_next (0 = maxed), locked, in_lineup, prospect, retired,
+##  legend, era ("" unless a legend)}
 static func card_info(profile: Profile, db: RosterDB, entry: Dictionary) -> Dictionary:
 	var c: CardDef = db.cards.get(entry.get("def", ""))
 	var uid := int(entry.get("uid", 0))
@@ -145,7 +146,8 @@ static func card_info(profile: Profile, db: RosterDB, entry: Dictionary) -> Dict
 			"tier": card_tier(db, entry), "program": c.program, "ability": c.ability, "pot": card_pot(db, entry), "dev": dev,
 			"boost": int(entry.get("boost", 0)), "xp": int(entry.get("xp", 0)),
 			"xp_next": CardRules.xp_to_next(dev) if room > 0 else 0, "locked": bool(entry.get("locked", false)),
-			"in_lineup": profile.in_lineup(uid), "prospect": room > 0, "retired": false}
+			"in_lineup": profile.in_lineup(uid), "prospect": room > 0, "retired": false, "legend": c.is_legend(),
+			"era": p.era}
 
 
 ## Adds development XP to one owned card; levels it up (+1 OVR each) while XP allows and
@@ -222,12 +224,12 @@ static func team_ovr(profile: Profile, db: RosterDB) -> int:
 
 
 ## Franchise Chemistry (PLAN.md §5): +0.5 OVR per starter who really plays for your
-## franchise, max +3.
+## franchise, max +3. Legends never count (their team is only their iconic franchise).
 static func chemistry(profile: Profile, db: RosterDB) -> float:
 	var n := 0
 	for slot in profile.lineup:
 		var e := profile.find(int(profile.lineup[slot]))
 		var c: CardDef = db.cards.get(e.get("def", ""))
-		if c != null and db.players[c.player_id].team == profile.franchise_team:
+		if c != null and not c.is_legend() and db.players[c.player_id].team == profile.franchise_team:
 			n += 1
 	return minf(n * 0.5, 3.0)
