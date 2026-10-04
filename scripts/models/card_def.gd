@@ -2,7 +2,8 @@ class_name CardDef
 extends RefCounted
 ## A collectible card of a player. The base card ("mahomes_patrick") has the player's real
 ## OVR; the rare Prime program ("mahomes_patrick_prime") is +CardRules.PRIME_BONUS. The tier
-## (Bronze/Silver/Gold/Elite) is derived from the OVR. Owned copies can develop further
+## (Bronze/Silver/Gold/Elite) is derived from the OVR. Retired legends have one LEGEND card
+## ("rice_jerry_legend") at their peak rating that never develops. Owned copies can develop further
 ## (Profile card entry "dev"/"boost", see Collection.card_ovr).
 
 var id := ""
@@ -35,6 +36,8 @@ static func build_program(p: PlayerData, program: String) -> CardDef:
 			c.id = CardRules.xf_id(p.id)
 		CardRules.PROGRAM_CORE:
 			c.id = CardRules.core_id(p.id)
+		CardRules.PROGRAM_LEGEND:
+			c.id = CardRules.legend_id(p.id)
 		_:
 			c.id = CardRules.card_id(p.id)
 	if program in [CardRules.PROGRAM_XFACTOR, CardRules.PROGRAM_CHAMP]:
@@ -43,7 +46,7 @@ static func build_program(p: PlayerData, program: String) -> CardDef:
 	c.tier = CardRules.tier_for_ovr(c.ovr)
 	c.attrs = CardRules.card_attrs(p.attrs, p.ovr, c.ovr)
 	c.quicksell = CardRules.sell_price(c.ovr, program)
-	c.pot = maxi(c.ovr, p.pot + (c.ovr - p.ovr))
+	c.pot = c.ovr if program == CardRules.PROGRAM_LEGEND else maxi(c.ovr, p.pot + (c.ovr - p.ovr))
 	c.age = p.age
 	return c
 
@@ -62,3 +65,7 @@ func is_xfactor() -> bool:
 
 func is_core() -> bool:
 	return program == CardRules.PROGRAM_CORE
+
+
+func is_legend() -> bool:
+	return program == CardRules.PROGRAM_LEGEND

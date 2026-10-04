@@ -1,6 +1,7 @@
 extends Control
 ## STORE: shelves of foil packs behind tabs: CLASSIC (Bronze / Silver / Gold / Elite),
-## SPECIAL (Mystery, Draft pick-1-of-3, X-Factor) and POSITION packs. Tap a pack for its
+## SPECIAL (Mystery, Draft pick-1-of-3, X-Factor), POSITION packs and LEGENDS (retired
+## all-time greats: Legends pack, Legend Draft). Tap a pack for its
 ## odds; BUY spends the coins and adds the cards in one saved step, then the pack opening
 ## plays (a Draft pack goes to the pick screen; an unfinished pick blocks new purchases).
 ## Unaffordable packs say how many coins are missing and point to objectives.
@@ -104,6 +105,8 @@ func _pack_tile(pack: PackDef) -> Control:
 		g = "KEEP 1 OF %d" % pack.card_count
 	elif not pack.mystery.is_empty():
 		g = "??? CARDS"
+	elif pack.legend_guarantee > 0:
+		g += " - %d LEGEND" % pack.legend_guarantee
 	elif pack.xf_guarantee > 0:
 		g += " - %d X-FACTOR" % pack.xf_guarantee
 	elif pack.guarantee_tier >= 0:
@@ -145,13 +148,15 @@ func _show_odds(pack: PackDef) -> void:
 	for l in lines:
 		var h := HBoxContainer.new()
 		var t: int = CardRules.NAMES.find(l[0])
-		var a := MetaUI.label(str(l[0]), CardView.tier_color(maxi(t, 0)).lightened(0.2))
+		var lc: Color = CardRules.PROGRAM_COLORS["legend"] if l[0] == "LEGEND" else CardView.tier_color(maxi(t, 0))
+		var a := MetaUI.label(str(l[0]), lc.lightened(0.2))
 		a.custom_minimum_size = Vector2(120, 0)
 		h.add_child(a)
-		var bar := BarMeter.new(float(l[1]) / 100.0, Vector2(100, 8), CardView.tier_color(maxi(t, 0)))
+		var bar := BarMeter.new(float(l[1]) / 100.0, Vector2(100, 8), lc)
 		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		h.add_child(bar)
-		h.add_child(MetaUI.label("  %d%%" % int(l[1]), UiSkin.WHITE))
+		var pct := float(l[1])
+		h.add_child(MetaUI.label("  %s%%" % (str(snappedf(pct, 0.1)) if pct < 1.0 else str(int(round(pct)))), UiSkin.WHITE))
 		col.add_child(h)
 	var btns: Array = [["CLOSE", Callable()]]
 	if EconomyRules.can_buy(SaveManager.profile, pack):

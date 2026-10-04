@@ -5,9 +5,12 @@ extends RefCounted
 ## beard/visor columns the look), reports bad rows instead of
 ## crashing, fills a team's thin spots with generated depth players only as a last resort,
 ## and builds the card catalog (one base card per player + Prime cards for stars).
+## data/legends.csv (same format + an `era` column) adds retired legends: kept off every
+## real team (not in `by_team`), each with a single LEGEND card (CardRules.PROGRAM_LEGEND).
 ## Node-free (unit-tested).
 
 const ROSTER_PATH := "res://data/roster.csv"
+const LEGENDS_PATH := "res://data/legends.csv"
 const POSITIONS := ["QB", "RB", "WR", "TE", "OL", "DL", "LB", "CB", "S", "K"]
 ## Players each team needs per position to fill a lineup (+ a little depth).
 const NEEDED := {"QB": 1, "RB": 1, "WR": 2, "TE": 1, "OL": 4, "DL": 3, "LB": 2, "CB": 2, "S": 2, "K": 1}
@@ -15,13 +18,15 @@ const JERSEY_RANGES := {"QB": [2, 19], "RB": [20, 39], "WR": [10, 19], "TE": [80
 		"DL": [90, 99], "LB": [40, 59], "CB": [20, 39], "S": [20, 49], "K": [1, 9]}
 
 var players: Dictionary = {}     ## id -> PlayerData
-var by_team: Dictionary = {}     ## abbr -> Array[PlayerData]
+var by_team: Dictionary = {}     ## abbr -> Array[PlayerData] (real players only, never legends)
+var legends: Array[PlayerData] = []   ## retired legends (data/legends.csv), also in `players`
 var cards: Dictionary = {}       ## card id -> CardDef
 var errors: Array[String] = []
 
 
-## Parses CSV text; valid rows are added, invalid ones recorded in `errors`.
-func parse(text: String, team_abbrs: Array = []) -> void:
+## Parses CSV text; valid rows are added, invalid ones recorded in `errors`. `legend`: the
+## rows are retired legends (legends.csv): flagged, no development, kept out of `by_team`.
+func parse(text: String, team_abbrs: Array = [], legend := false) -> void:
 	var header := PackedStringArray()
 	var line_no := 0
 	for raw in text.split("\n"):
@@ -63,8 +68,15 @@ func parse(text: String, team_abbrs: Array = []) -> void:
 				clampi(int(row["ovr"]), 40, 99), explicit)
 		var age_s: String = row.get("age", "")
 		var pot_s: String = row.get("pot", "")
-		p.set_development(int(age_s) if age_s.is_valid_int() else 0, int(pot_s) if pot_s.is_valid_int() else 0)
 		p.look = PlayerData.parse_look(row)
+		if legend:
+			p.legend = true
+			p.era = str(row.get("era", ""))
+			p.set_development(0, p.ovr)
+			players[p.id] = p
+			legends.append(p)
+			continue
+		p.set_development(int(age_s) if age_s.is_valid_int() else 0, int(pot_s) if pot_s.is_valid_int() else 0)
 		_add(p)
 
 
@@ -74,6 +86,15 @@ func load_file(path := ROSTER_PATH, team_abbrs: Array = []) -> void:
 		errors.append("cannot open %s" % path)
 		return
 	parse(f.get_as_text(), team_abbrs)
+
+
+## Loads the retired legends (call after the roster so a clashing id is reported, not lost).
+func load_legends(path := LEGENDS_PATH, team_abbrs: Array = []) -> void:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		errors.append("cannot open %s" % path)
+		return
+	parse(f.get_as_text(), team_abbrs, true)
 
 
 func _add(p: PlayerData) -> void:
@@ -126,11 +147,16 @@ func fill_depth(team_abbrs: Array) -> void:
 ## Base card of every player (generated depth included, so a thin team can still field a
 ## lineup; packs never pull them) plus a Prime card for real stars (CardRules.has_prime) and
 ## an X-Factor ability card for good players (CardRules.has_xfactor) and a common Core
-## (lower-rated) card for every 80+ player (CardRules.has_core).
+## (lower-rated) card for every 80+ player (CardRules.has_core). A legend gets only his
+## LEGEND card.
 func build_catalog() -> void:
 	cards.clear()
 	for id in players:
 		var p: PlayerData = players[id]
+		if p.legend:
+			var lg := CardDef.build_program(p, CardRules.PROGRAM_LEGEND)
+			cards[lg.id] = lg
+			continue
 		var b := CardDef.build_program(p, CardRules.PROGRAM_BASE)
 		cards[b.id] = b
 		if not p.generated and CardRules.has_prime(p.ovr):
@@ -150,13 +176,25 @@ func build_catalog() -> void:
 			cards[ch.id] = ch
 
 
-## Card ids at `tier` (derived from card OVR), real players only.
+## Card ids at `tier` (derived from card OVR), real players only (no legends: packs pull
+## those separately, see legend_card_ids).
 func card_ids_of_tier(tier: int) -> Array[String]:
 	var out: Array[String] = []
 	for cid in cards:
 		var c: CardDef = cards[cid]
-		if c.tier == tier and not c.is_champ() and not players[c.player_id].generated:
+		if c.tier == tier and not c.is_champ() and not c.is_legend() and not players[c.player_id].generated:
 			out.append(cid)
+	return out
+
+
+## LEGEND card ids, optionally only at these positions.
+func legend_card_ids(positions: Array = []) -> Array[String]:
+	var out: Array[String] = []
+	for p in legends:
+		if positions.is_empty() or p.pos in positions:
+			var cid := CardRules.legend_id(p.id)
+			if cards.has(cid):
+				out.append(cid)
 	return out
 
 

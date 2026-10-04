@@ -7,9 +7,10 @@ const SHELVES := [
 	["CLASSIC", ["bronze", "silver", "gold", "elite"]],
 	["SPECIAL", ["mystery", "draft", "xfactor"]],
 	["POSITION", ["qb", "receiver", "defense", "trenches"]],
+	["LEGENDS", ["legends", "legend_draft"]],
 ]
 const STORE := ["bronze", "silver", "gold", "elite", "mystery", "draft", "xfactor", "qb", "receiver", "defense",
-		"trenches"]
+		"trenches", "legends", "legend_draft"]
 const REWARD_ONLY := ["starter", "franchise"]
 
 
@@ -25,9 +26,15 @@ static func store_packs() -> Array[PackDef]:
 	return out
 
 
-## Odds lines for the store UI: [[tier name, percent int], ...] (tiers with 0% skipped).
+## Odds lines for the store UI: [[tier name, percent int], ...] (tiers with 0% skipped). A
+## legends-only pack lists just "LEGEND 100"; legend chances show as a "LEGEND" line (per
+## card, one decimal when under 1%).
 static func odds_lines(pack: PackDef) -> Array:
 	var out := []
+	if pack.legend_guarantee >= pack.card_count:
+		return [["LEGEND", 100]]
+	if pack.legend_chance > 0.0:
+		out.append(["LEGEND", snappedf(pack.legend_chance * 100.0, 0.1)])
 	for t in pack.odds.size():
 		if pack.odds[t] > 0.0:
 			out.append([CardRules.NAMES[t], int(round(pack.odds[t] * 100.0))])
@@ -50,6 +57,10 @@ static func summary(pack: PackDef) -> String:
 		return "SECRETLY ONE OF: " + ", ".join(PackedStringArray(Array(pack.mystery).map(
 				func(id: String) -> String: return id.to_upper())))
 	var parts: Array[String] = ["KEEP 1 OF %d" % pack.card_count if pack.pick else "%d CARDS" % pack.card_count]
+	if pack.legend_guarantee >= pack.card_count:
+		parts.append("ALL LEGENDS")
+	elif pack.legend_guarantee > 0:
+		parts.append("%d LEGEND" % pack.legend_guarantee)
 	if pack.xf_guarantee > 0:
 		parts.append("%d X-FACTOR" % pack.xf_guarantee)
 	if pack.guarantee_tier >= 0:

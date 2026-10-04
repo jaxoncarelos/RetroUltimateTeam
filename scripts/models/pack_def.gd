@@ -24,5 +24,9 @@ extends Resource
 ## Mystery pack: it is secretly one of these packs (weights sum to 1), revealed on opening.
 @export var mystery: Array[String] = []
 @export var mystery_weights := PackedFloat32Array()
+## Per card: chance it is a LEGEND card instead (retired greats, EconomyRules.pick_legend).
+@export var legend_chance := 0.0
+## The best this many cards are LEGEND cards (all of them = a legends-only pack/draft).
+@export var legend_guarantee := 0
 ## One-line store pitch ("" = the card count / guarantee summary).
 @export var blurb := ""

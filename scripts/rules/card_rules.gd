@@ -7,7 +7,8 @@ extends RefCounted
 ## Young players have potential (pot) and develop with XP (Collection.award_xp).
 ## Card ids: base = the player id ("mahomes_patrick"); prime = "<player id>_prime";
 ## X-Factor = "<player id>_xf" (+2 OVR and an AbilityRules ability); Core = "<player id>_core"
-## (the common, lower-rated version: core_ovr).
+## (the common, lower-rated version: core_ovr); Legend = "<legend player id>_legend" (a retired
+## all-time great from data/legends.csv: his only card, real peak rating, no development).
 ## Pure logic.
 
 enum Tier { BRONZE, SILVER, GOLD, ELITE }
@@ -33,9 +34,13 @@ const PROGRAM_XFACTOR := "xf"
 ## pack usually gives you a 77 Josh Allen and his real 96 card is a rare pull. The real-rating
 ## card of a player who has a Core version shows a "PRO" chip.
 const PROGRAM_CORE := "core"
-const PROGRAM_NAMES := {"base": "", "prime": "PRIME", "champ": "CHAMP", "xf": "X-FACTOR", "core": ""}
+## Legend: a retired all-time great (data/legends.csv), the only card of that player. Pulled
+## from the LEGENDS shelf, rarely from Elite/Gold packs (EconomyRules.pick_legend).
+const PROGRAM_LEGEND := "legend"
+const PROGRAM_NAMES := {"base": "", "prime": "PRIME", "champ": "CHAMP", "xf": "X-FACTOR", "core": "",
+		"legend": "LEGEND"}
 const PROGRAM_COLORS := {"base": Color(1, 1, 1, 0), "prime": Color("#29adff"), "champ": Color("#ffb000"),
-		"xf": Color("#ff2b6e"), "core": Color(1, 1, 1, 0)}
+		"xf": Color("#ff2b6e"), "core": Color(1, 1, 1, 0), "legend": Color("#1fd1a5")}
 const CORE_MIN_OVR := 80          ## players at or above this get a Core card
 const CORE_LOW := 56              ## core OVR of a real 55 ...
 const CORE_HIGH := 81             ## ... and of a real 99 (linear in between)
@@ -119,7 +124,9 @@ const VALUE_CURVE := [[50, 10], [60, 20], [65, 30], [69, 50], [70, 120], [75, 35
 		[85, 1000], [89, 1800], [90, 9000], [92, 18000], [95, 40000], [99, 86000]]
 const SELL_SHARE := 0.7
 ## Program premium on the value (X-Factor ability, Prime).
-const PROGRAM_VALUE := {"xf": 1.4, "prime": 1.2}
+## Legends: rare all-time greats, worth a premium (a 90 legend sells for ~7,900, a 99 ~75,000:
+## LEGEND packs still sell back for well under their price, see test_legends).
+const PROGRAM_VALUE := {"xf": 1.4, "prime": 1.2, "legend": 1.25}
 
 
 static func card_value(ovr: int, program := PROGRAM_BASE) -> int:
@@ -177,6 +184,10 @@ static func core_id(player_id: String) -> String:
 	return player_id + "_core"
 
 
+static func legend_id(player_id: String) -> String:
+	return player_id + "_legend"
+
+
 ## "mahomes_patrick_prime" -> ["mahomes_patrick", "prime"]; "mahomes_patrick" -> [.., "base"].
 static func split_card_id(card: String) -> Array:
 	if card.ends_with("_champ"):
@@ -187,6 +198,8 @@ static func split_card_id(card: String) -> Array:
 		return [card.left(card.length() - 3), PROGRAM_XFACTOR]
 	if card.ends_with("_core"):
 		return [card.left(card.length() - 5), PROGRAM_CORE]
+	if card.ends_with("_legend"):
+		return [card.left(card.length() - 7), PROGRAM_LEGEND]
 	return [card, PROGRAM_BASE]
 
 

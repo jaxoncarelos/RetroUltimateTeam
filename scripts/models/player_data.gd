@@ -13,6 +13,10 @@ var attrs: Dictionary = {}
 var generated := false   ## depth filler created by GameData (not in the CSV)
 var age := 0             ## 0 = unknown
 var pot := 60            ## potential (development ceiling); = ovr for veterans
+## Retired all-time great from data/legends.csv: only a LEGEND card, never on a real team
+## (`team` is his iconic franchise, for card colors only).
+var legend := false
+var era := ""            ## legends: decade of his peak ("1990s")
 ## Appearance for portraits/sprites (roster.csv skin/hair/hair_color/beard/visor). Only the
 ## known keys are present: {"skin": 1-6 light->dark, "hair", "hair_color", "beard", "visor"}.
 ## Missing keys fall back to the seeded random look (ArtGen).

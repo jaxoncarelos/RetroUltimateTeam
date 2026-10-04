@@ -53,6 +53,12 @@ func _demo_profile() -> void:
 			if GameData.db.cards.has(CardRules.xf_id(pid)):
 				prof.add_card(CardRules.xf_id(pid))
 		Collection.auto_lineup(prof, GameData.db)
+	if OS.get_cmdline_user_args().has("--legends"):
+		# A few LEGEND cards (retired greats), starting: Rice + Megatron, Barry, LT, Deion, Reggie.
+		for pid in ["rice_jerry", "johnson_calvin", "sanders_barry", "taylor_lawrence", "sanders_deion", "white_reggie"]:
+			if GameData.db.cards.has(CardRules.legend_id(pid)):
+				prof.add_card(CardRules.legend_id(pid))
+		Collection.auto_lineup(prof, GameData.db)
 	if OS.get_cmdline_user_args().has("--champ"):
 		EconomyRules.champion_reward(prof, GameData.db)
 	if OS.get_cmdline_user_args().has("--season"):

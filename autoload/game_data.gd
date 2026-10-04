@@ -1,5 +1,5 @@
 extends Node
-## Loads roster.csv + teams.json once at boot. Lookups for players, teams, cards and lineups.
+## Loads roster.csv + legends.csv (retired greats, LEGEND cards only) + teams.json once at boot. Lookups for players, teams, cards and lineups.
 ## Bad roster rows are reported with push_warning, never crash the game.
 
 var teams: Dictionary = {}   ## abbr -> TeamData
@@ -10,8 +10,9 @@ var _league_avg := -1
 func _ready() -> void:
 	teams = TeamData.load_all()
 	db.load_file(RosterDB.ROSTER_PATH, teams.keys())
+	db.load_legends(RosterDB.LEGENDS_PATH, teams.keys())
 	for e in db.errors:
-		push_warning("roster.csv: " + e)
+		push_warning("roster.csv / legends.csv: " + e)
 	db.fill_depth(teams.keys())
 	db.build_catalog()
 	ArtGen.register_looks(db.players)

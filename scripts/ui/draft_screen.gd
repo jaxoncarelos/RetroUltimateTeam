@@ -1,7 +1,8 @@
 extends Control
 ## Draft-style packs (DRAFT PACK, QB / SKILL / DEFENSE / TRENCHES DRAFT): face-down
 ## prospects you only get hints about (each card glows in its tier color and shows its
-## position, or its team when they all play the same position; X-Factor cards crackle pink). Tap one, KEEP IT, and
+## position, or its team when they all play the same position; X-Factor cards crackle pink,
+## Legends (LEGEND DRAFT) also show their era). Tap one, KEEP IT, and
 ## it flips with the usual celebration; then the other two flip over to show what you
 ## passed on. The options were saved when the pack was bought (Profile.pending_pick), so
 ## leaving here and coming back offers the same three.
@@ -79,6 +80,8 @@ func _build() -> void:
 		var chip := "?"
 		if p != null:
 			chip = p.team if by_team else p.pos
+			if p.legend and p.era != "":
+				chip += " '" + p.era.right(3).to_upper()
 		var hint := MetaUI.label("%s%s" % [chip, "  ⚡" if c != null and c.is_xfactor() else ""],
 				Color.WHITE, 16, HORIZONTAL_ALIGNMENT_CENTER)
 		slot.add_child(hint)
@@ -166,3 +169,7 @@ func _flip(v: CardView, big: bool) -> void:
 		Sfx.play("elite" if tier >= CardRules.Tier.ELITE else ("big" if tier >= CardRules.Tier.GOLD else "reveal"))
 		if tier >= CardRules.Tier.GOLD:
 			Fx.confetti(self, size.x, [tc, Color.WHITE], 40)
+		if v.is_legend():
+			var lc: Color = CardRules.PROGRAM_COLORS["legend"]
+			Fx.burst(self, v.global_position + v.size * 0.5, lc.lightened(0.2), 40, 140.0, 0.9, 2.0)
+			Fx.fireworks(self, Rect2(40, 30, size.x - 80, size.y * 0.5), [lc, UiSkin.YELLOW, Color.WHITE], 5, 1.4)
