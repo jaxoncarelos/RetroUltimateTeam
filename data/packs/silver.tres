@@ -13,3 +13,4 @@ guarantee_tier = 1
 positions = Array[String]([])
 team = ""
 color = Color(0.7608, 0.7647, 0.7804, 1)
+legend_chance = 0.0005

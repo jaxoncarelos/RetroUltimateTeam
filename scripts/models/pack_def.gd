@@ -30,3 +30,11 @@ extends Resource
 @export var legend_guarantee := 0
 ## One-line store pitch ("" = the card count / guarantee summary).
 @export var blurb := ""
+## LEGEND cards in this pack only come from these decades (legends.csv `era`, empty = any).
+@export var eras: Array[String] = []
+## Bundle: buying it queues these packs (Profile.pending_packs) instead of opening cards.
+@export var bundle: Array[String] = []
+## Store ribbon ("NEW", "BEST VALUE"; "" = none).
+@export var tag := ""
+## Name on the foil band ("" = display_name without " PACK" / " DRAFT").
+@export var art_label := ""

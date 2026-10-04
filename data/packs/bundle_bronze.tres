@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="PackDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/pack_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "bundle_bronze"
+display_name = "BRONZE BUNDLE"
+price = 3300
+card_count = 5
+odds = PackedFloat32Array(0.8, 0.18, 0.02, 0.0)
+guarantee_tier = -1
+positions = Array[String]([])
+team = ""
+color = Color(0.7216, 0.4353, 0.2353, 1)
+bundle = Array[String](["bronze", "bronze", "bronze", "bronze", "bronze"])
+tag = ""
+blurb = "5 BRONZE PACKS"

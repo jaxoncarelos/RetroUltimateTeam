@@ -5,13 +5,14 @@
 [resource]
 script = ExtResource("1")
 id = "legends"
-display_name = "LEGENDS PACK"
-blurb = "1 RETIRED ALL-TIME GREAT GUARANTEED"
+display_name = "HALL OF FAME PACK"
+blurb = "1 ALL-TIME GREAT + 4 OF TODAY'S BEST"
 price = 45000
-card_count = 4
+card_count = 5
 odds = PackedFloat32Array(0.0, 0.5, 0.45, 0.05)
 guarantee_tier = -1
 positions = Array[String]([])
 team = ""
 color = Color(0.1216, 0.8196, 0.6471, 1)
 legend_guarantee = 1
+art_label = "HOF"

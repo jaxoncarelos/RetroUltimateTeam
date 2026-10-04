@@ -682,12 +682,14 @@ func _show_summary(instant := false) -> void:
 		_sell_btn = MetaUI.button("QUICK SELL DUPES +%s" % CoinPill.fmt(sell_total), Vector2(150, 26), _sell_dupes)
 		bar.add_child(_sell_btn)
 	var buy_pack := _buy_pack()
-	if buy_pack != null and buy_pack.price > 0:
+	if not _prof.pending_packs.is_empty():
+		# A bundle or rewards waiting: open the next one first.
+		var nxt := MetaUI.yellow("NEXT PACK (%d)" % _prof.pending_packs.size(), Vector2(130, 26), _open_next_free)
+		bar.add_child(nxt)
+	elif buy_pack != null and buy_pack.price > 0:
 		var again := MetaUI.button("OPEN ANOTHER  %s" % CoinPill.fmt(buy_pack.price), Vector2(140, 26), _open_another)
 		again.disabled = not EconomyRules.can_buy(_prof, buy_pack) or EconomyRules.has_pending_draft(_prof)
 		bar.add_child(again)
-	elif not _prof.pending_packs.is_empty():
-		bar.add_child(MetaUI.button("NEXT FREE PACK (%d)" % _prof.pending_packs.size(), Vector2(140, 26), _open_next_free))
 	var cont := MetaUI.yellow("CONTINUE ▶", Vector2(110, 26), func() -> void: SceneRouter.goto(_back))
 	bar.add_child(cont)
 	if instant:

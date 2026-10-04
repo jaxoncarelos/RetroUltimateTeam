@@ -1,7 +1,7 @@
 extends GutTest
 ## LEGEND cards: retired all-time greats from data/legends.csv. One LEGEND card each, kept off
-## the real teams and normal pack pools; pulled from the LEGENDS shelf (pack + draft), rarely
-## from Elite/Gold packs, the "4 ELITES" set and the 100-win objective.
+## the real teams and normal pack pools; pulled from the program packs (Hall of Fame, Throwback, era packs,
+## Legend Draft), at small odds from Silver+ packs, the "4 ELITES" set and the 100-win objective.
 
 var db: RosterDB
 var rng: RandomNumberGenerator
@@ -98,9 +98,9 @@ func test_legends_never_play_for_real_teams() -> void:
 			assert_false(_is_legend(cid), "normal pools never hold legends: %s" % cid)
 
 
-func test_normal_packs_have_no_legends_but_elite_rarely_does() -> void:
+func test_cheap_and_position_packs_have_no_legends_but_elite_rarely_does() -> void:
 	var prof := _starter()
-	for id in ["bronze", "silver", "draft", "xfactor", "qb", "trenches"]:
+	for id in ["bronze", "xfactor", "qb", "trenches"]:
 		var pack := PackCatalog.get_pack(id)
 		assert_eq(pack.legend_chance, 0.0, id)
 		assert_eq(pack.legend_guarantee, 0, id)

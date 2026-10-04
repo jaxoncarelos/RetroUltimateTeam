@@ -27,6 +27,7 @@ var pending_packs: Array = []    ## reward pack ids waiting to be opened (Econom
 var pending_pick: Dictionary = {}  ## a bought draft pack waiting for your pick: {pack, options: [card ids]}
 var rtg: Dictionary = {}         ## Road to Glory career (RtgRules), {} = none yet
 var rtg_legends: Array = []      ## retired Road to Glory players (RtgRules.retire entries)
+var store_buys: Dictionary = {}  ## featured store offers bought: offer key -> count (StoreRules)
 
 
 func has_team() -> bool:
@@ -73,6 +74,7 @@ func to_dict() -> Dictionary:
 		"objectives": objectives.duplicate(true), "coach": coach.duplicate(), "login": login.duplicate(),
 		"pending_packs": pending_packs.duplicate(), "pending_pick": pending_pick.duplicate(true),
 		"rtg": rtg.duplicate(true), "rtg_legends": rtg_legends.duplicate(true),
+		"store_buys": store_buys.duplicate(),
 	}
 
 
@@ -114,6 +116,7 @@ static func from_dict(d: Dictionary) -> Profile:
 		p.pending_pick = {"pack": str(pk.get("pack", "")), "options": opts}
 	p.rtg = _ints_deep(data.get("rtg", {}))
 	p.rtg_legends = _ints_deep(data.get("rtg_legends", []))
+	p.store_buys = _ints_deep(data.get("store_buys", {}))
 	return p
 
 

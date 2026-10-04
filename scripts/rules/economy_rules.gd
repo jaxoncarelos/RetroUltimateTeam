@@ -103,7 +103,7 @@ static func open_pack(pack: PackDef, profile: Profile, db: RosterDB, rng: Random
 		if not legend and pack.legend_chance > 0.0:
 			legend = rng.randf() < pack.legend_chance
 		if legend:
-			id = pick_legend(pack, db, rng, weak)
+			id = pick_legend(pack, db, rng, weak, profile.franchise_team)
 			if id != "":
 				out.append(id)
 				continue
@@ -164,10 +164,17 @@ static func pick_card(tier: int, pack: PackDef, profile: Profile, db: RosterDB, 
 	return ids[AIPlayCaller.weighted_index(weights, rng)]
 
 
-## A random LEGEND card that fits the pack's positions (higher OVR rarer: LEGEND_FALLOFF;
-## weak positions likelier). "" when none fits.
-static func pick_legend(pack: PackDef, db: RosterDB, rng: RandomNumberGenerator, weak: Array[String] = []) -> String:
-	var ids := db.legend_card_ids(Array(pack.positions))
+## A random LEGEND card that fits the pack's positions, eras and team (a team pack: that
+## franchise's legends) (higher OVR rarer: LEGEND_FALLOFF; weak positions likelier). "" when
+## none fits.
+static func pick_legend(pack: PackDef, db: RosterDB, rng: RandomNumberGenerator, weak: Array[String] = [],
+		franchise := "") -> String:
+	var team := franchise if pack.team == "FRANCHISE" else pack.team
+	var ids: Array[String] = []
+	for cid in db.legend_card_ids(Array(pack.positions)):
+		var p: PlayerData = db.players[db.cards[cid].player_id]
+		if (pack.eras.is_empty() or p.era in pack.eras) and (team == "" or p.team == team):
+			ids.append(cid)
 	if ids.is_empty():
 		return ""
 	var weights := PackedFloat32Array()
@@ -180,8 +187,10 @@ static func pick_legend(pack: PackDef, db: RosterDB, rng: RandomNumberGenerator,
 	return ids[AIPlayCaller.weighted_index(weights, rng)]
 
 
-static func can_buy(profile: Profile, pack: PackDef) -> bool:
-	return pack.price > 0 and profile.coins >= pack.price
+## `price` overrides the pack's own (a store deal); -1 = list price.
+static func can_buy(profile: Profile, pack: PackDef, price := -1) -> bool:
+	var cost := pack.price if price < 0 else price
+	return pack.price > 0 and profile.coins >= cost
 
 
 ## Buys and opens a pack: coins are spent and cards added in one step (so quitting midway
@@ -197,18 +206,23 @@ static func buy_and_open(profile: Profile, pack: PackDef, db: RosterDB, rng: Ran
 ## Buys any store pack in one saved step. Returns {} if unaffordable, else
 ## {"pack": PackDef actually opened (a mystery pack's reveal), "mystery": bool,
 ##  "uids": Array[int] (new cards), "draft": bool (options are waiting in
-##  Profile.pending_pick: choose with pick_draft)}.
+##  Profile.pending_pick: choose with pick_draft), "bundle": bool (its packs were queued in
+##  Profile.pending_packs: open them with open_pending)}. `price` = a deal price (-1 = list).
 static func buy(profile: Profile, pack: PackDef, db: RosterDB, rng: RandomNumberGenerator,
-		unix_time := 0) -> Dictionary:
-	if not can_buy(profile, pack) or has_pending_draft(profile):
+		unix_time := 0, price := -1) -> Dictionary:
+	if not can_buy(profile, pack, price) or has_pending_draft(profile):
 		return {}
-	profile.coins -= pack.price
+	profile.coins -= pack.price if price < 0 else price
+	if not pack.bundle.is_empty():
+		for id in pack.bundle:
+			profile.pending_packs.append(id)
+		return {"pack": pack, "mystery": false, "uids": [] as Array[int], "draft": false, "bundle": true}
 	if pack.pick:
 		start_draft(profile, pack, db, rng)
-		return {"pack": pack, "mystery": false, "uids": [] as Array[int], "draft": true}
+		return {"pack": pack, "mystery": false, "uids": [] as Array[int], "draft": true, "bundle": false}
 	var real := resolve_mystery(pack, rng)
 	return {"pack": real, "mystery": real != pack, "uids": grant_pack(profile, real, db, rng, unix_time),
-			"draft": false}
+			"draft": false, "bundle": false}
 
 
 ## Draft pack: rolls the options (saved in Profile.pending_pick so quitting keeps them).
@@ -242,6 +256,9 @@ static func pick_draft(profile: Profile, db: RosterDB, index: int, unix_time := 
 static func grant_pack(profile: Profile, pack: PackDef, db: RosterDB, rng: RandomNumberGenerator,
 		unix_time := 0) -> Array[int]:
 	var uids: Array[int] = []
+	if not pack.bundle.is_empty():
+		profile.pending_packs.append_array(pack.bundle)
+		return uids
 	if pack.pick:
 		profile.pending_packs.append(pack.id)
 		return uids
@@ -289,6 +306,12 @@ static func open_pending(profile: Profile, db: RosterDB, rng: RandomNumberGenera
 		var id := str(profile.pending_packs.pop_front())
 		var pack := PackCatalog.get_pack(id)
 		if pack == null:
+			continue
+		if not pack.bundle.is_empty():
+			var q: Array = []
+			q.append_array(pack.bundle)
+			q.append_array(profile.pending_packs)
+			profile.pending_packs = q
 			continue
 		if pack.pick:
 			start_draft(profile, pack, db, rng)

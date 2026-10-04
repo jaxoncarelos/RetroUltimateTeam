@@ -16,3 +16,4 @@ team = ""
 color = Color(0.0, 0.8941, 0.2118, 1)
 xf_weight = 0.5
 pick = true
+legend_chance = 0.01

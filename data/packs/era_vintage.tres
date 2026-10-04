@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="PackDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/pack_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "era_vintage"
+display_name = "IRON AGE PACK"
+price = 35000
+card_count = 5
+odds = PackedFloat32Array(0.0, 0.6, 0.36, 0.04)
+guarantee_tier = 2
+positions = Array[String]([])
+team = ""
+color = Color(0.5490, 0.4196, 0.2902, 1)
+legend_guarantee = 1
+eras = Array[String](["1960s", "1970s", "1980s"])
+blurb = "1 LEGEND FROM THE '60S-'80S + 4 CURRENT CARDS"
+art_label = "IRON AGE"
+tag = "LIMITED"

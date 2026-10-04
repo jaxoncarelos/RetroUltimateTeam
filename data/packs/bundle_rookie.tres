@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="PackDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/pack_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "bundle_rookie"
+display_name = "ROOKIE BUNDLE"
+price = 19500
+card_count = 5
+odds = PackedFloat32Array(0.8, 0.18, 0.02, 0.0)
+guarantee_tier = -1
+positions = Array[String]([])
+team = ""
+color = Color(0.1608, 0.6784, 1.0000, 1)
+bundle = Array[String](["silver", "silver", "silver", "gold", "xfactor"])
+tag = "BEST VALUE"
+blurb = "3 SILVER + GOLD + X-FACTOR PACK"

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="PackDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/models/pack_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "pro"
+display_name = "PRO PACK"
+price = 18000
+card_count = 6
+odds = PackedFloat32Array(0.0, 0.5, 0.45, 0.05)
+guarantee_tier = 2
+positions = Array[String]([])
+team = ""
+color = Color(0.1608, 0.8784, 1.0000, 1)
+xf_weight = 0.3
+xf_guarantee = 1
+legend_chance = 0.006
+blurb = "6 CARDS - 1 GOLD+ AND 1 X-FACTOR GUARANTEED"
+tag = "NEW"

@@ -178,6 +178,13 @@ User playtest feedback (2026-09-28) comes first, then the PLAN.md phases:
    `CardRules.PROGRAM_LEGEND` (id `<player>_legend`, value x1.25, no development), packs legends (45,000, 1 legend
    guaranteed) + legend_draft (keep 1 of 3), Elite 2%/card, Gold 0.2%; jade LGND card style, sets/milestones.
    Debug: `--demo-profile --legends`, `--screen=store --tab=4`, `--screen=pack_open --pack=legends`.
+27. [x] Store v2, Madden Mobile 16 style (owner: "more packs, more options, bake the vintage packs in with normal
+   cards"): tabs FEATURED / PACKS / PROGRAMS / BUNDLES / DRAFTS. `StoreRules.featured(unix)`: program of the week
+   (era pack `era_90s`/`era_vintage`/`era_2000s`, `PackDef.eras` filters the legend), daily deal (30% off, 1/day),
+   bundle of the week (15% off, 1/week); countdowns + limits, `Profile.store_buys` (stale keys pruned on buy). Legends
+   at small odds in Silver+ (`legend_chance`), Throwback (5%/card), Team pack (your franchise's legends). New Pro pack
+   (6 cards, Gold+ and X-Factor). Bundles (`PackDef.bundle`) queue packs in `pending_packs`; pack opening shows NEXT
+   PACK first. Ribbons from `PackDef.tag` / bundle savings. test_store. Debug: `--screen=store --tab=0..4`.
 Next ideas (after the owner's playtest): see MORNING_NOTES.md. RTG follow-ups: kick returns, S/LB/TE positions,
    injuries, rivalries / weekly storylines. Card revamp follow-ups: CPU star
 abilities, ability UI on the lineup screen, ability-themed sets/objectives, balance pass on ability boosts.
