@@ -104,6 +104,12 @@ func apply(dt: float) -> void:
 	_update_telegraph()
 	if not me.can_act() or runner.handoff_to == me:
 		return   # down / diving, or the back is still taking the handoff
+	if me == runner.qb and runner.handoff_to != null:
+		# A called run: the QB opens to the mesh and hands it off on his own (holding the ball
+		# isn't carrying it yet; running upfield would leave the back chasing him).
+		me.human = false
+		me.accel_mult = 1.0
+		return
 	var carrier := me == runner.carrier
 	var passer := me == runner.qb and runner.qb_is_passer()
 	var dir := stick_to_field(pad.stick)

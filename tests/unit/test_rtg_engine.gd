@@ -289,3 +289,40 @@ func test_result_carries_target_and_cover() -> void:
 	assert_true(r.has("cover_slot"))
 	if r["pass_thrown"]:
 		assert_ne(r["target_slot"], "")
+
+
+## A called run with you at QB: he hands it off at the mesh even while you push the stick
+## (he used to run upfield and the ball "teleported" to the back seconds later).
+func test_rtg_qb_hands_off_a_run_at_the_mesh() -> void:
+	for stick in [Vector2.ZERO, Vector2(1.0, 0.0), Vector2(0.0, 1.0)]:
+		_setup("hb_dive", "cover3", PlayerAgent.Team.OFFENSE, "QB")
+		var qb: PlayerAgent = runner.qb
+		var rb: PlayerAgent = runner.off_slots["RB"]
+		runner.snap()
+		pad.stick = stick
+		var gap := -1.0
+		var qb_x := 0.0
+		for i in 180:
+			gap = qb.field_pos.distance_to(rb.field_pos)
+			qb_x = qb.field_pos.x - runner.los_x
+			runner._physics_process(DT)
+			if runner.carrier == rb:
+				break
+		pad.stick = Vector2.ZERO
+		assert_eq(runner.carrier, rb, "handed off (stick %s)" % stick)
+		assert_lt(gap, runner.handoff_range + 0.5, "hand to hand, no teleport (stick %s)" % stick)
+		assert_lt(qb_x, 0.5, "the QB never ran upfield with it (stick %s)" % stick)
+
+
+## The back never got to the mesh: the QB keeps it instead of the ball flying across the field.
+func test_failed_mesh_never_teleports_the_ball() -> void:
+	_setup("hb_dive", "cover3", PlayerAgent.Team.OFFENSE, "QB")
+	var rb: PlayerAgent = runner.off_slots["RB"]
+	runner.snap()
+	rb.field_pos += Vector2(0.0, 15.0)   # knocked far off his path
+	rb.brain = IdleBrain.new(rb, runner)
+	for i in 200:
+		runner._physics_process(DT)
+		if runner.carrier != runner.qb or runner.phase != PlayRunner.Phase.LIVE:
+			break
+	assert_ne(runner.carrier, rb, "no handoff across the field")

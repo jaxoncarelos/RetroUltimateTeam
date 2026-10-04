@@ -949,9 +949,17 @@ func _physics_process(dt: float) -> void:
 func _check_handoff() -> void:
 	if handoff_to == null or carrier != qb or pass_thrown:
 		return
-	var close := qb.field_pos.distance_to(handoff_to.field_pos) < handoff_range
+	var gap := qb.field_pos.distance_to(handoff_to.field_pos)
 	var ready := play_time > maxf(0.2, handoff_delay)
-	if (ready and close) or play_time > 2.0 + handoff_delay:
+	var late := play_time > 2.0 + handoff_delay
+	if late and (gap > handoff_range * 2.0 or handoff_to.is_down or not handoff_to.can_act()):
+		# The mesh never happened (the back got knocked off his path): the QB keeps it and runs.
+		# Never hand the ball across the field.
+		handoff_to = null
+		scrambling = true
+		_set_carrier(qb)
+		return
+	if (ready and gap < handoff_range) or late:
 		var rb := handoff_to
 		handoff_to = null
 		qb.brain = IdleBrain.new(qb, self)
